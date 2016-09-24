@@ -103,7 +103,7 @@ void RoadCells::computeRoadCells() {
 
 	for (unsigned int ii = 0; ii < norg; ii++) {
 		// First make sure that the current x,y and z values are finite
-		if (_finite((*x)(ii)) && _finite((*y)(ii)) && _finite((*z)(ii))) {
+        if (isfinite((*x)(ii)) && isfinite((*y)(ii)) && isfinite((*z)(ii))) {
 
 			// Put the existing points in the matrix
             this->x(counter) = (*x)(ii);
@@ -261,8 +261,8 @@ void RoadCells::computeRoadCells() {
 	}
 
 	// Add the very last point if finite
-	if (_finite((*x)(x->size())) && _finite((*y)(y->size()))
-			&& _finite((*z)(z->size()))) {
+    if (isfinite((*x)(x->size())) && isfinite((*y)(y->size()))
+            && isfinite((*z)(z->size()))) {
         this->x(counter) = (*x)(x->size() - 1);
         this->y(counter) = (*y)(y->size() - 1);
         this->z(counter) = (*z)(z->size() - 1);
