@@ -1,6 +1,6 @@
 #include "../transportbase.h"
 
-Vehicle::Vehicle(FuelPtr fuel, std::string nm, double width, double length, 
+Vehicle::Vehicle(CommodityPtr fuel, std::string nm, double width, double length,
 		double trafficProp, double load, double a, double agr, double av,
 		double avsq, double travel) {
 
