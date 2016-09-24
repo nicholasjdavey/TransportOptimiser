@@ -18,7 +18,6 @@
 #include <cmath>
 #include <math.h>
 #include <float.h>
-#include <tchar.h>
 #include <string>
 #include <map>
 #include <sstream>
