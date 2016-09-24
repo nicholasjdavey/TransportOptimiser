@@ -103,7 +103,7 @@ void RoadCells::computeRoadCells() {
 
 	for (unsigned int ii = 0; ii < norg; ii++) {
 		// First make sure that the current x,y and z values are finite
-        if (isfinite((*x)(ii)) && isfinite((*y)(ii)) && isfinite((*z)(ii))) {
+        if (std::isfinite((*x)(ii)) && std::isfinite((*y)(ii)) && std::isfinite((*z)(ii))) {
 
 			// Put the existing points in the matrix
             this->x(counter) = (*x)(ii);
@@ -144,11 +144,11 @@ void RoadCells::computeRoadCells() {
 					}
 
 					// Compute the corresponding y values
-					if (_finite(sleq(0,ii))) {
+					if (std::isfinite(sleq(0,ii))) {
 						pairs.block(0,1,abs(horCross(ii)),1) = sleq(0,ii)*
 								pairs.block(0,0,abs(horCross(ii)),1).array()
 								+ sleq(2,ii);
-					} else if (_finite(sleq(2,ii))) {
+					} else if (std::isfinite(sleq(2,ii))) {
 						pairs.block(0,1,abs(horCross(ii)),1) =
 								((pairs.block(0,0,abs(horCross(ii)),1)).
 								array())/sleq(2,ii);
@@ -163,7 +163,7 @@ void RoadCells::computeRoadCells() {
 					}
 
 					// Compute corresponding z values
-					if (_finite(sleq2(0,ii))) {
+					if (std::isfinite(sleq2(0,ii))) {
 						pairs.block(0,2,abs(horCross(ii)),1) = sleq2(1,ii) + 
 								sleq2(0,ii)*(((pairs.block(0,0,abs(horCross(ii
 								)),1).array() - (*x)(ii)).pow(2)
@@ -199,11 +199,11 @@ void RoadCells::computeRoadCells() {
 					}
 
 					// Compute the corresponding x values
-					if (_finite(sleq(0,ii))) {
+					if (std::isfinite(sleq(0,ii))) {
 						pairs.block(abs(horCross(ii)),0,abs(verCross(ii)),1) =
 								((pairs.block(abs(horCross(ii)),1,abs(
 								verCross(ii)),1)).array())/sleq(0,ii);
-					} else if (_finite(sleq(2,ii))) {
+					} else if (std::isfinite(sleq(2,ii))) {
 						pairs.block(abs(horCross(ii)),0,abs(verCross(ii)),1) =
 								sleq(3,ii) + sleq(2,ii)*pairs.block(abs(
 								horCross(ii)),1,abs(verCross(ii)),1).array();
@@ -218,7 +218,7 @@ void RoadCells::computeRoadCells() {
 					}
 
 					// Compute the corresponding z values
-					if (_finite(sleq2(0,ii))) {
+					if (std::isfinite(sleq2(0,ii))) {
 						pairs.block(abs(horCross(ii)),2,abs(verCross(ii)),1) =
 								sleq2(0,ii)*((pairs.block(abs(horCross(ii)),0,
 								abs(verCross(ii)),1).array() - (*x)(ii)).pow(2)
@@ -261,8 +261,8 @@ void RoadCells::computeRoadCells() {
 	}
 
 	// Add the very last point if finite
-    if (isfinite((*x)(x->size())) && isfinite((*y)(y->size()))
-            && isfinite((*z)(z->size()))) {
+    if (std::isfinite((*x)(x->size())) && std::isfinite((*y)(y->size()))
+            && std::isfinite((*z)(z->size()))) {
         this->x(counter) = (*x)(x->size() - 1);
         this->y(counter) = (*y)(y->size() - 1);
         this->z(counter) = (*z)(z->size() - 1);
