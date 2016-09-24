@@ -31,14 +31,14 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
 // LIBIGL
-#include <ceil.h>
-#include <floor.h>
-#include <repmat.h>
-#include <slice.h>
-#include <slice_into.h>
-#include <sort.h>
-#include <sortrows.h>
-#include <unique.h>
+#include <igl/ceil.h>
+#include <igl/floor.h>
+#include <igl/repmat.h>
+#include <igl/slice.h>
+#include <igl/slice_into.h>
+#include <igl/sort.h>
+#include <igl/sortrows.h>
+#include <igl/unique.h>
 // BOOST
 
 /*
