@@ -48,3 +48,7 @@ Species::Species(std::string* nm, bool sex, double lm, double lsd, double rcm,
 	this->setStatus(active);
 	this->habitat = *habitat;
 }
+
+Species::generateHabitatPatches(RoadPtr road) {
+
+}

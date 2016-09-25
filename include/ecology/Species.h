@@ -1,6 +1,9 @@
 #ifndef SPECIES_H
 #define SPECIES_H
 
+class Road;
+typedef std::shared_ptr<Road> RoadPtr;
+
 class Uncertainty;
 typedef std::shared_ptr<Uncertainty> UncertaintyPtr;
 
@@ -308,6 +311,12 @@ public:
 	// STATIC ROUTINES /////////////////////////////////////////////////////////
 
 	// CALCULATION ROUTINES ////////////////////////////////////////////////////
+
+    /**
+     * Generates the habitat patches relating to this species for the road in
+     * question.
+     */
+    void generateHabitatPatches(RoadPtr road);
 
 ////////////////////////////////////////////////////////////////////////////////
 private:

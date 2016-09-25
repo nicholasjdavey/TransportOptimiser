@@ -14,9 +14,10 @@ public:
 	// ENUMERATIONS ///////////////////////////////////////////////////////////
 	typedef enum {
 		PRIMARY,
-		MARGINAL,
-		CLEAR,
-		OTHER
+        MARGINAL,
+        OTHER,
+        CLEAR,
+        ROAD
 	} habType;
 
 	// CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
