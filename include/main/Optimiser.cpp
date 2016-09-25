@@ -54,4 +54,14 @@ Optimiser::Optimiser(std::vector<TrafficProgramPtr>* programs, OtherInputsPtr oI
 Optimiser::~Optimiser() {
 }
 
+OptimiserPtr Optimiser::me() {
+    return shared_from_this();
+}
+
+void Optimiser::computeHabitatMaps() {
+    for (SpeciesPtr species: this->species) {
+        species->generateHabitatMap(this->me());
+    }
+}
+
 void Optimiser::optimiseRoad() {}

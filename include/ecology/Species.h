@@ -1,6 +1,12 @@
 #ifndef SPECIES_H
 #define SPECIES_H
 
+class Optimiser;
+typedef std::shared_ptr<Optimiser> OptimiserPtr;
+
+class Region;
+typedef std::shared_ptr<Region> RegionPtr;
+
 class Road;
 typedef std::shared_ptr<Road> RoadPtr;
 
@@ -311,6 +317,13 @@ public:
 	// STATIC ROUTINES /////////////////////////////////////////////////////////
 
 	// CALCULATION ROUTINES ////////////////////////////////////////////////////
+
+    /**
+     * Builds the habitat map using input vegetation data.
+     *
+     * This routine is only run once at the beginning of the analysis.
+     */
+    void generateHabitatMap(OptimiserPtr optimiser);
 
     /**
      * Generates the habitat patches relating to this species for the road in

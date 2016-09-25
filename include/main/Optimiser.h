@@ -485,6 +485,11 @@ public:
      */
     void optimiseRoad();
 
+    /**
+     * Computes the habitat map for every species
+     */
+    void computeHabitatMaps();
+
 ///////////////////////////////////////////////////////////////////////////////
 private:
     Optimiser::Type type;                           /**< Type of ecological incorporation */
@@ -510,6 +515,7 @@ private:
     unsigned long habGridRes;						/**< Habitat grid 1D resolution */
     unsigned long noRuns;							/**< Number of runs to perform */
     std::string solutionScheme;						/**< Solution scheme used (i.e. name of experiment) */
+    OptimiserPtr me();                              /**< Creates a shared pointer from this */
 };
 
 #endif
