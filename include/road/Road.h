@@ -28,6 +28,9 @@ typedef std::shared_ptr<Attributes> AttributesPtr;
 class Costs;
 typedef std::shared_ptr<Costs> CostsPtr;
 
+class SpeciesRoadPatches;
+typedef std::shared_ptr<SpeciesRoadPatches> SpeciesRoadPatchesPtr;
+
 /**
  * Class for managing %Road objects
  */
@@ -212,6 +215,23 @@ public:
 		this->costs = costs;
 	}
 
+    /**
+     * Returns the habitat patches for each Species for this Road
+     *
+     * @return SpeciesRoadPatches as std::vector<SpeciesRoadPatchesPtr>*
+     */
+    std::vector<SpeciesRoadPatchesPtr>* getSpeciesRoadPatches() {
+        return &this->srp;
+    }
+    /**
+     * Sets the habitat patches for each Species for this Road
+     *
+     * @param srp as std::vector<SpeciesRoadPatchesPtr>*
+     */
+    void setSpeciesRoadPatches(std::vector<SpeciesRoadPatchesPtr>* srp) {
+        this->srp = *srp;
+    }
+
 	/**
 	 * Returns the test name
 	 *
@@ -310,6 +330,13 @@ public:
      */
     void computeOperating();
 
+    /**
+     * Adds simulation patches for a given Species
+     *
+     * @param srp as SpeciesRoadPatchesPtr
+     */
+    void addSpeciesPatches(SpeciesRoadPatchesPtr srp);
+
 private:
 	OptimiserPtr optimiser;						/**< Calling Optimisation object */
 	SimulatorPtr simulator;						/**< Simulator used to produce results */
@@ -320,6 +347,7 @@ private:
 	VerticalAlignmentPtr verticalAlignment;		/**< VerticalAlignment */
 	AttributesPtr attributes;					/**< Attributes */
 	CostsPtr costs;								/**< Costs */
+    std::vector<SpeciesRoadPatchesPtr> srp;     /**< Patches corresponding to each species */
 	std::string testName;						/**< Name of test */
 	Eigen::VectorXd xCoords;					/**< X coordinates of intersection points */
 	Eigen::VectorXd yCoords;					/**< Y coordinates of intersection points */

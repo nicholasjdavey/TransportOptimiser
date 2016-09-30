@@ -12,6 +12,7 @@ typedef std::shared_ptr<HabitatPatch> HabitatPatchPtr;
  */
 class HabitatPatch : public std::enable_shared_from_this<HabitatPatch> {
 
+public:
 	// CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
 	/**
@@ -52,6 +53,24 @@ class HabitatPatch : public std::enable_shared_from_this<HabitatPatch> {
 	void setType(HabitatTypePtr typ) {
 		this->type = typ;
 	}
+
+    /**
+     * Returns the patch area
+     *
+     * @return Area as double
+     */
+    double getArea() {
+        return this->area;
+    }
+
+    /**
+     * Sets the patch area
+     *
+     * @param area as double
+     */
+    void setArea(double area) {
+        this->area = area;
+    }
 
 	/**
 	 * Returns the x coordinate of the centroid
@@ -154,6 +173,24 @@ class HabitatPatch : public std::enable_shared_from_this<HabitatPatch> {
 	void setAAR(double aar) {
 		this->aar = aar;
 	}
+
+    /**
+     * Returns the cells occupied by the patch
+     *
+     * @return Cells as Eigen::MatrixXi*
+     */
+    Eigen::MatrixXi* getCells() {
+        return &this->cells;
+    }
+    /**
+     * Sets the cells occupied by the patch
+     *
+     * @param cells as Eigen::MatrixXi*
+     */
+    void setCells(Eigen::MatrixXi* cells) {
+        this->cells = *cells;
+    }
+
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
 
 	// CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -167,6 +204,7 @@ private:
         double growthRate;		/**< Prevailing population growth rate */
         double population;		/**< Prevailing population */
         double aar;			/**< Animals at risk in patch */
+        Eigen::MatrixXi cells;  /**< Grid cells occupied by patch */
 };
 
 #endif

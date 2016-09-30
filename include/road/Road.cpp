@@ -117,6 +117,12 @@ void Road::computeOperating() {
     }
 }
 
+void Road::addSpeciesPatches(SpeciesRoadPatchesPtr srp) {
+    this->srp.push_back(srp);
+}
+
+// PRIVATE ROUTINES ///////////////////////////////////////////////////////////
+
 void Road::computeAlignment() {
 	// Initialise referenced parameters
 	//double* designVel = this->getOptimiser()->getDesignParameters()

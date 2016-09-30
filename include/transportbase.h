@@ -91,6 +91,7 @@
 #include "utilities/r8lib.hpp"
 #include "utilities/pwl_interp_2d.hpp"
 #include "utilities/Utility.h"
+#include "road/SpeciesRoadPatches.h"
 
 // Introduce new namespaces
 //namespace bm = boost::math;

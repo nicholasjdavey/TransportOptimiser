@@ -10,6 +10,9 @@ typedef std::shared_ptr<Region> RegionPtr;
 class Road;
 typedef std::shared_ptr<Road> RoadPtr;
 
+class SpeciesRoadPatches;
+typedef std::shared_ptr<SpeciesRoadPatches> SpeciesRoadPatchesPtr;
+
 class Uncertainty;
 typedef std::shared_ptr<Uncertainty> UncertaintyPtr;
 
@@ -25,8 +28,7 @@ typedef std::shared_ptr<HabitatPatch> HabitatPatchPtr;
 /**
  * Class for managing %Species objects
  */
-class Species : public Uncertainty, 
-		public std::enable_shared_from_this<Species> {
+class Species : public std::enable_shared_from_this<Species> {
 
 public:
 	// CONSTRUCTORS AND DESTRUCTORS ////////////////////////////////////////////
@@ -49,8 +51,7 @@ public:
     Species(std::string* nm, bool sex, double lm, double lsd, double rcm,
             double rcsd, double grm, double grsd, double lenm, double lensd,
             double spm, double spsd, double cpa, bool active,
-            std::vector<HabitatTypePtr> *habitat, double current,
-            double meanP, double mean, double stdDev, double rev);
+            std::vector<HabitatTypePtr> *habitat, double current);
 
 	/**
 	 * Destructor
@@ -58,6 +59,40 @@ public:
 	~Species();
 
 	// ACCESSORS ///////////////////////////////////////////////////////////////
+
+    /**
+     * Returns the Species name
+     *
+     * @return Name as std::string
+     */
+    std::string getName() {
+        return this->name;
+    }
+    /**
+     * Sets the Species name
+     *
+     * @param nm as std::string
+     */
+    void setName(std::string nm) {
+        this->name = nm;
+    }
+
+    /**
+     * Returns whether the species is considered in the design process
+     *
+     * @return Active as bool
+     */
+    bool getActive() {
+        return this->active;
+    }
+    /**
+     * Sets whether the species is considered in the design process
+     *
+     * @param ac as bool
+     */
+    void setActive(bool ac) {
+        this->active = ac;
+    }
 
 	/**
 	 * Returns the sex
@@ -280,23 +315,6 @@ public:
 		this->habitat = *habitat;
 	}
 
-	/**
-	 * Returns the habitat patches for simulations
-	 *
-     * @return Habitat patches as std::vector<HabitatPatchPtr>*
-	 */
-    std::vector<HabitatPatchPtr>* getHabPatches() {
-		return &this->habPatch;
-	}
-	/**
-	 * Sets the habitat patches during simulations
-	 *
-     * @param habp as std::vector<HabitatPatchPtr>*
-	 */
-    void setHabPatches(std::vector<HabitatPatchPtr>* habp) {
-		this->habPatch = *habp;
-    }
-
     /**
      * Returns the map of habitat types for this species
      *
@@ -314,6 +332,23 @@ public:
         this->habitatMap = *habMap;
     }
 
+    /**
+     * Returns the population map of the species
+     *
+     * @return Population map as Eigen::MatrixXd*
+     */
+    Eigen::MatrixXd* getPopulationMap() {
+        return &this->populationMap;
+    }
+    /**
+     * Sets the population map of the species
+     *
+     * @param popMap as Eigen::MatrixXd*
+     */
+    void setPopulationMap(Eigen::MatrixXd* popMap) {
+        this->populationMap = *popMap;
+    }
+
 	// STATIC ROUTINES /////////////////////////////////////////////////////////
 
 	// CALCULATION ROUTINES ////////////////////////////////////////////////////
@@ -327,27 +362,40 @@ public:
 
     /**
      * Generates the habitat patches relating to this species for the road in
-     * question.
+     * question using a basic grid method.
      */
-    void generateHabitatPatches(RoadPtr road);
+    void generateHabitatPatchesGrid(RoadPtr road);
+
+    /**
+     * Generate habitat patches relating to this species using a more advanced
+     * blob method that ought to be more computationally tractable.
+     *
+     * This method first looks at the covexity and size of each blob in
+     * determining if the blob should be split into multiple patches or be left
+     * as a single patch.
+     */
+    void generateHabitatPatchesBlob(RoadPtr road);
 
 ////////////////////////////////////////////////////////////////////////////////
 private:
-        bool sex;						/**< 1 = female, 0 = male */
-        double lambdaMean;					/**< Mean movement propensity */
-        double lambdaSD;					/**< Movement propensity standard deviation */
-        double rangingCoeffMean;				/**< Ranging coefficient mean */
-        double rangingCoeffSD;					/**< Ranging coefficient standard deviation */
-        double growthRateMean;					/**< Mean growth rate parameters */
-        double growthRateSD;					/**< Growth rate standard devation */
-        double lengthMean;					/**< Mean species length */
-        double lengthSD;					/**< Species length standard deviation */
-        double speedMean;					/**< Mean species road crossing speed */
-        double speedSD;						/**< Species road crossing speed standard deviation */
-        double costPerAnimal;					/**< Cost per animal below threshold ($) */
-        std::vector<HabitatTypePtr> habitat;	/**< Habitat type */
-        std::vector<HabitatPatchPtr> habPatch;   /**< Habitat patches (for simulations) */
-        Eigen::MatrixXi habitatMap;         /**< Breakdown of region into the four base habitat types */
+    std::string name;               /**< Species name */
+    bool active;                    /**< Whether the species is used in the simulation */
+    bool sex;						/**< 1 = female, 0 = male */
+    double lambdaMean;					/**< Mean movement propensity */
+    double lambdaSD;					/**< Movement propensity standard deviation */
+    double rangingCoeffMean;				/**< Ranging coefficient mean */
+    double rangingCoeffSD;					/**< Ranging coefficient standard deviation */
+    double growthRateMean;					/**< Mean growth rate parameters */
+    double growthRateSD;					/**< Growth rate standard devation */
+    double lengthMean;					/**< Mean species length */
+    double lengthSD;					/**< Species length standard deviation */
+    double speedMean;					/**< Mean species road crossing speed */
+    double speedSD;						/**< Species road crossing speed standard deviation */
+    double costPerAnimal;					/**< Cost per animal below threshold ($) */
+    std::vector<HabitatTypePtr> habitat;	/**< Habitat type */
+    Eigen::MatrixXi habitatMap;         /**< Breakdown of region into the four base habitat types */
+    Eigen::MatrixXd populationMap;      /**< Population of animals in each cell */
+    SpeciesPtr me();                    /**< Enables sharing from this */
 };
 
 #endif
