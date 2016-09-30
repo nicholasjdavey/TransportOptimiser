@@ -1,5 +1,4 @@
 #include "../transportbase.h"
-#include "../utilities/labelmethod.h"
 
 Species::Species(std::string* nm, bool sex, double lm, double lsd, double rcm,
         double rcsd, double grm, double grsd, double lenm, double lensd,

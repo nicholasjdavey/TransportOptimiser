@@ -7,7 +7,7 @@ typedef std::shared_ptr<Uncertainty> UncertaintyPtr;
 /**
  * Class for managing %Uncertainty objects
  */
-class Uncertainty : public std::enable_shared_from_this<Uncertainty> {
+class Uncertainty {
 
 public:
 	// CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////

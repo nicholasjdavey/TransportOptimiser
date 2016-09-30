@@ -92,6 +92,7 @@
 #include "utilities/pwl_interp_2d.hpp"
 #include "utilities/Utility.h"
 #include "road/SpeciesRoadPatches.h"
+#include "utilities/labelmethod.h"
 
 // Introduce new namespaces
 //namespace bm = boost::math;

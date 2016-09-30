@@ -1,6 +1,9 @@
 #ifndef SPECIESROADPATCHES_H
 #define SPECIESROADPATCHES_H
 
+class Uncertainty;
+typedef std::shared_ptr<Uncertainty> UncertaintyPtr;
+
 class Species;
 typedef std::shared_ptr<Species> SpeciesPtr;
 
@@ -15,16 +18,21 @@ typedef std::shared_ptr<HabitatPatch> HabitatPatchPtr;
  */
 class SpeciesRoadPatches : public Uncertainty,
         public std::enable_shared_from_this<SpeciesRoadPatches> {
+
 public:
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
     /**
      * Constructor I
+     *
+     * Constructs a %SpeciesRoadPatches object with default values
      */
     SpeciesRoadPatches(SpeciesPtr species, RoadPtr road);
 
     /**
      * Constructor II
+     *
+     * Constructs a %SpeciesRoadPatches object with assigned values
      */
     SpeciesRoadPatches(SpeciesPtr species, RoadPtr road, bool active,
             double mean, double stdDev, double rev, std::string nm);
