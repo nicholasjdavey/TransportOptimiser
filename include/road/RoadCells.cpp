@@ -16,8 +16,7 @@ void RoadCells::computeRoadCells() {
 	Eigen::VectorXd* y = this->road->getRoadSegments()->getY();
 	Eigen::VectorXd* z = this->road->getRoadSegments()->getZ();
     Eigen::VectorXd* w = this->road->getRoadSegments()->getWidths();
-	std::vector<RoadSegments::Type>* typ = this->road
-			->getRoadSegments()->getType();
+    Eigen::VectorXi* typ = this->road->getRoadSegments()->getType();
 
 	// First need to see if the grid is evenly-spaced
     unsigned int rx = X->rows();
@@ -110,7 +109,7 @@ void RoadCells::computeRoadCells() {
             this->y(counter) = (*y)(ii);
             this->z(counter) = (*z)(ii);
             this->w(counter) = (*w)(ii);
-            this->type(counter) = (*typ)[ii];
+            this->type(counter) = (*typ)(ii);
 			unsigned int nump = 0;
 
 			// Find the x and y coordinates of every intervening intersection
@@ -253,7 +252,7 @@ void RoadCells::computeRoadCells() {
                 this->w.segment(counter+1,nump) = Eigen::VectorXd::Constant(
                             nump,(*w)(ii));
                 this->type.segment(counter+1,nump) = Eigen::VectorXi::Constant(
-                            nump,(*typ)[ii]);
+                            nump,(*typ)(ii));
 			}
 
 			counter += nump + 1;
@@ -267,7 +266,7 @@ void RoadCells::computeRoadCells() {
         this->y(counter) = (*y)(y->size() - 1);
         this->z(counter) = (*z)(z->size() - 1);
         this->w(counter) = (*w)(w->size() - 1);
-        this->type(counter) = (*typ)[x->size() - 1];
+        this->type(counter) = (*typ)(x->size() - 1);
 	}
 
 	// Finally, remove any extra rows

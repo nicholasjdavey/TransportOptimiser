@@ -54,8 +54,8 @@ void Costs::computeEarthworkCosts() {
 
 	Eigen::VectorXd avDepth = 0.5*(depth.segment(1,segs+1)
 			+ depth.segment(0,segs));
-	std::vector<RoadSegments::Type> type(segs);
-	type.assign(segs,RoadSegments::ROAD);
+    Eigen::VectorXi type = Eigen::VectorXi::Constant(segs,
+            (int)(RoadSegments::ROAD));
 	this->road->getRoadSegments()->setType(&type);
 
 	// Costs are USD per m^3 in 2015 based on Chew, Goh & Fwa 1988 indexed.

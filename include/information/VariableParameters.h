@@ -41,20 +41,20 @@ public:
 	}
 
 	/**
-	 * Returns whether the solution will contain an animal bridge.
+     * Returns animal bridge usage scenarios
 	 *
-	 * @return Existence of a bridge as bool
+     * @return Animal bridge usage scenarios as Eigen::VectorXd*
 	 */
-	bool getBridge() {
-		return this->animalBridge;
+    Eigen::VectorXd* getBridge() {
+        return &this->animalBridge;
 	}
 	/**
-	 * Sets whether the solution will contain an animal bridge.
+     * Returns animal bridge usage scenarios
 	 *
-	 * @param bridge as bool
+     * @param bridge as Eigen::VectorXd*
 	 */
-	void setBridge(bool bridge) {
-		this->animalBridge = bridge;
+    void setBridge(Eigen::VectorXd* bridge) {
+        this->animalBridge = *bridge;
 	}
 
 	/**
@@ -115,59 +115,55 @@ public:
 	}
 
 	/**
-	 * Returns whether the population growth rate is stochastic. The growth rate
-	 * is used in a logistic growth rate model where the population is split
-	 * into distinct patches that are analysed separately.
-	 *
-	 * @return Growth rate stochasticity as bool
+     * Returns the population growth rate standard deviation multiplier
+     *
+     * @return Growth rate standard deviation multiplier as Eigen::VectorXd*
 	 */
-	bool getGrowthRateVariable() {
-		return this->popGR;
+    Eigen::VectorXd* getGrowthRateSDMultipliers() {
+        return &this->popGR;
 	}
 	/**
-	 * Sets whether the population growth rate is stochastic.
+     * Sets the population growth rate standard deviation multiplier
 	 *
-	 * @param rate as bool
+     * @param rate as Eigen::VectorXd*
 	 */
-	void setGrowthRateVariable(bool rate) {
-		this->popGR = rate;
+    void setGrowthRateSDMultipliers(Eigen::VectorXd* rate) {
+        this->popGR = *rate;
 	}
 
 	/**
-	 * Returns whether the fuel price is stochastic or fixed. If stochastic, the
-	 * fuel price is mean reverting.
+     * Sets the fuel price standard deviation multiplier
 	 *
-	 * @return Stochasticity as bool
+     * @return Fuell price standard deviation multiplier as Eigen::VectorXd*
 	 */
-	bool getFuelVariable() {
-		return this->fuel;
+    Eigen::VectorXd* getFuelVariable() {
+        return &this->fuel;
 	}
 	/**
-	 * Sets whether the fuel price is stochastic or fixed.
+     * Sets the fuel price standard deviation multiplier
 	 *
-	 * @param fuel as bool
+     * @param fuel as Eigen::VectorXd*
 	 */
-	void setFuelVariable(bool fuel) {
-		this->fuel = fuel;
+    void setFuelVariable(Eigen::VectorXd* fuel) {
+        this->fuel = *fuel;
 	}
 
 	/**
-	 * Returns whether the commodity price is stochastic or fixed. If stochastic,
-	 * the commodity price is mean reverting.
+     * Returns the commodity price standard deviation multiplier
 	 *
-	 * @return Stochasticity as bool
+     * @return Commodity price standard deviation multiplier as Eigen::VectorXd*
 	 */
-	bool getCommodityVariable() {
-		return this->commodity;
+    Eigen::VectorXd* getCommodityVariable() {
+        return &this->commodity;
 	}
 	/**
-	 * Sets whether the commodity price is stochastic or fixed.
+     * Sets the commodity price standard deviation multiplier
 	 *
-	 * @param commodity as bool
+     * @param commodity as Eigen::VectorXd*
 	 */
-	void setCommodityVariable(bool commodity) {
-		this->commodity = commodity;
-	}
+    void setCommodityVariable(Eigen::VectorXd* commodity) {
+        this->commodity = *commodity;
+    }
 
 	// STATIC ROUTINES ///////////////////////////////////////////////////////////
 
@@ -177,11 +173,11 @@ public:
         Eigen::VectorXd populationLevels;
 		Eigen::VectorXd habPref;
 		Eigen::VectorXd lambda;
-		Eigen::VectorXd beta;        
-        bool animalBridge;
-		bool popGR;
-		bool fuel;
-		bool commodity;
+        Eigen::VectorXd beta;
+        Eigen::VectorXd animalBridge;
+        Eigen::VectorXd popGR;
+        Eigen::VectorXd fuel;
+        Eigen::VectorXd commodity;
 };
 
 #endif

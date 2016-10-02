@@ -187,19 +187,23 @@ public:
 
 	/**
 	 * Returns the type of road
+     *
+     * Although there is an enum for the three different types (ROAD,
+     * BRIDGE and TUNNEL), we cast them as ints so that we may store
+     * them in a matrix for easy use.
 	 *
-     * @return Road type as std::vector<RoadSegments::Type>*
+     * @return Road type as Eigen::VectorXi*
 	 */
-    std::vector<RoadSegments::Type>* getType() {
-		return &this->type;
+    Eigen::VectorXi* getType() {
+        return &this->typ;
 	}
 	/**
 	 * Sets the type of road
 	 *
-     * @param typ as std::vector<RoadSegments::Type>*
+     * @param typ as Eigen::VectorXi*
 	 */
-    void setType(std::vector<RoadSegments::Type>* typ) {
-		this->type = *typ;
+    void setType(Eigen::VectorXi* typ) {
+        this->typ = *typ;
 	}
 
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
@@ -219,16 +223,16 @@ public:
     void placeNetwork();
 
 private:
-	RoadPtr road;							/**< Road containing these segments */
-	Eigen::VectorXd x;						/**< X coordinates */
-	Eigen::VectorXd y;						/**< Y coordinates */
-	Eigen::VectorXd z;						/**< Z coordinates */
-	Eigen::VectorXd e;						/**< Natural elevation at x,y */
-	Eigen::VectorXd s;						/**< Distance along curve */
-	Eigen::VectorXd w;						/**< Road widths at each points */
-	Eigen::VectorXd v;						/**< Velocity at point */
-	Eigen::VectorXd spc;					/**< Distances to curve points */
-    std::vector<RoadSegments::Type> type;	/**< Type of segments */
+    RoadPtr road;			/**< Road containing these segments */
+    Eigen::VectorXd x;		/**< X coordinates */
+    Eigen::VectorXd y;		/**< Y coordinates */
+    Eigen::VectorXd z;		/**< Z coordinates */
+    Eigen::VectorXd e;		/**< Natural elevation at x,y */
+    Eigen::VectorXd s;		/**< Distance along curve */
+    Eigen::VectorXd w;		/**< Road widths at each points */
+    Eigen::VectorXd v;		/**< Velocity at point */
+    Eigen::VectorXd spc;	/**< Distances to curve points */
+    Eigen::VectorXi typ;    /**< Type of segments */
 
     // PRIVATE ROUTINES
 

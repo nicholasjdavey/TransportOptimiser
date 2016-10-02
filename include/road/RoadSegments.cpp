@@ -98,7 +98,8 @@ void RoadSegments::computeSegments() {
 	this->w.resize(noPoints-1);
 	this->spc.resize(2*(ip+1));
 	this->v.resize(noPoints);
-	this->v = this->v * vMax;
+    this->v = this->v * vMax;
+    this->typ = Eigen::VectorXi::Constant(noPoints-1,(int)(RoadSegments::ROAD));
 
 	this->x(0) = startX;
 	this->y(0) = startY;
@@ -180,8 +181,7 @@ void RoadSegments::computeSegments() {
 	this->spc(ip*2+1) = s(counter-1);
 
 	// Compute the velocities of each of the segments based on the horizontal
-	// alignment maximum speeds
-	Eigen::VectorXd* velh = road->getHorizontalAlignment()->getVelocities();
+    // alignment maximum speeds
 	Eigen::VectorXd* velv = road->getVerticalAlignment()->getVelocities();
 
 	// Ranges counter
@@ -201,7 +201,7 @@ void RoadSegments::computeSegments() {
 				// If r1 is 0 or even, we are in a tangent segment. Otherwise
 				// we need to adjust the velocity
 				if (!(r1 % 2)) {
-					this->v(ii) = (*velh)((r1-1)/2);
+                    this->v(ii) = (*velv)((r1-1)/2);
 				}
 
 			} else {

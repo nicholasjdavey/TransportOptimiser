@@ -8,7 +8,7 @@
 #define _USE_MATH_DEFINES
 #define NOMINMAX
 
-#include <stdio.h>
+// SYSTEM-WIDE HEADERS ////////////////////////////////////////////////////////
 #include <list>
 #include <limits>
 #include <iostream>
@@ -41,23 +41,9 @@
 #include <igl/unique.h>
 // BOOST
 
-/*
-#include <gnuplot-iostream-master/gnuplot-iostream.h>
-#include <boost/iostreams/device/file_descriptor.hpp>
-#include <boost/thread.hpp>
-#include <boost/thread/mutex.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/math/distributions.hpp>
-#include <boost/math/distributions/normal.hpp>
-#include <boost/array.hpp>
-*/
-
-// COMPILED LIBRARIES /////////////////////////////////////////////////////////
-//<NONE>
-
-/* Project-specific headers (must maintain order shown here */
+// PROJECT-SPECIFIC HEADERS (MUST MAINTAIN ORDER SHOWN HERE ) /////////////////
 #include "main/Optimiser.h"
+#include "main/ExperimentalScenario.h"
 #include "information/UnitCosts.h"
 #include "information/DesignParameters.h"
 #include "information/VariableParameters.h"
@@ -93,6 +79,21 @@
 #include "utilities/Utility.h"
 #include "road/SpeciesRoadPatches.h"
 #include "utilities/labelmethod.h"
+
+/*
+#include <gnuplot-iostream-master/gnuplot-iostream.h>
+#include <boost/iostreams/device/file_descriptor.hpp>
+#include <boost/thread.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/math/distributions.hpp>
+#include <boost/math/distributions/normal.hpp>
+#include <boost/array.hpp>
+*/
+
+// COMPILED LIBRARIES /////////////////////////////////////////////////////////
+//<NONE>
 
 // Introduce new namespaces
 //namespace bm = boost::math;

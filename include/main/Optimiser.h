@@ -1,6 +1,9 @@
 #ifndef OPTIMISER_H
 #define OPTIMISER_H
 
+class ExperimentalScenario;
+typedef std::shared_ptr<ExperimentalScenario> ExperimentalScenarioPtr;
+
 class Road;
 typedef std::shared_ptr<Road> RoadPtr;
 
@@ -77,6 +80,29 @@ public:
     ~Optimiser();
 
     // ACCESSORS //////////////////////////////////////////////////////////////
+
+    /**
+     * Returns the current ExperimentalScenario
+     *
+     * @return ExperimentalScenario as ExperimentalScenarioPtr
+     * @note Currently this is part of the Optimiser class so we cannot create
+     * parallel experiments. If we want to do this, copies of the Optimiser
+     * will have to be constructed and passed to different threads where the
+     * results are saved to the shared matrix of results. When each experiment
+     * is complete, the forked Optimiser can be deleted.
+     */
+    ExperimentalScenarioPtr getScenario() {
+        return this->scenario;
+    }
+    /**
+     * Sets the current ExperimentalScenario
+     *
+     * @param scenario as ExperimentalScenarioPtr
+     */
+    void setScenario(ExperimentalScenarioPtr scenario) {
+        this->scenario = scenario;
+    }
+
     /**
      * Returns the type of optimisation process used
      *
@@ -492,6 +518,7 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 private:
+    ExperimentalScenarioPtr scenario;               /**< Current experiment */
     Optimiser::Type type;                           /**< Type of ecological incorporation */
     Eigen::MatrixXd currentRoadPopulation;			/**< Current encoded population of roads */
     std::vector< std::vector<RoadPtr> > bestRoads;	/**< Best roads */
