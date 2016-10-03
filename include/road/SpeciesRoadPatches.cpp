@@ -69,13 +69,15 @@ Eigen::MatrixXi SpeciesRoadPatches::roadCrossings() {
     // We reduce the computation time by only considering cells that are close
     // enough to the originating cell (i.e. they are close enough to each other
     // that a transition is likely in the absence of a road). We use the 5th
-    // percentile distance based on the simple gamma distribution used in
+    // percentile distance based on the simple exponential distribution used in
     // Rhodes et al. 2014.
-    //
-    // Need to alter to take into account the lambda currently being tested
-    // from optimiser->variableParameters
     double lda = (*this->road->getOptimiser()->getVariableParams()
             ->getLambda())(this->road->getOptimiser()->getScenario()
             ->getLambda());
     double maxDist = log(0.05)/(-lda);
+
+    // No need to remove road segments that are not finite or for which the
+    // start and end points are coincident as this is already taken care of by
+    // RoadSegment.cpp
+
 }
