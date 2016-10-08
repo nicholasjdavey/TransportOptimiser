@@ -202,7 +202,7 @@ void Species::generateHabitatPatchesGrid(RoadPtr road) {
     }
 
     // Remove excess patches in container
-    habPatch.resize(patches);
+    habPatch.resize(--patches);
     // Save container to road
     SpeciesRoadPatchesPtr srp(new SpeciesRoadPatches(this->me(),road));
     srp->setHabPatches(&habPatch);

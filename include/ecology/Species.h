@@ -349,6 +349,23 @@ public:
         this->populationMap = *popMap;
     }
 
+    /**
+     * Returns the target population threshold (as a faction of initial)
+     *
+     * @return Threshold as double
+     */
+    double getThreshold() {
+        return this->threshold;
+    }
+    /**
+     * Sets the target population threshold
+     *
+     * @param threshold as double
+     */
+    void setThreshold(double threshold) {
+        this->threshold = threshold;
+    }
+
 	// STATIC ROUTINES /////////////////////////////////////////////////////////
 
 	// CALCULATION ROUTINES ////////////////////////////////////////////////////
@@ -378,23 +395,24 @@ public:
 
 ////////////////////////////////////////////////////////////////////////////////
 private:
-    std::string name;               /**< Species name */
-    bool active;                    /**< Whether the species is used in the simulation */
-    bool sex;						/**< 1 = female, 0 = male */
+    std::string name;                   /**< Species name */
+    bool active;                        /**< Whether the species is used in the simulation */
+    bool sex;                           /**< 1 = female, 0 = male */
     double lambdaMean;					/**< Mean movement propensity */
     double lambdaSD;					/**< Movement propensity standard deviation */
-    double rangingCoeffMean;				/**< Ranging coefficient mean */
-    double rangingCoeffSD;					/**< Ranging coefficient standard deviation */
-    double growthRateMean;					/**< Mean growth rate parameters */
-    double growthRateSD;					/**< Growth rate standard devation */
+    double rangingCoeffMean;			/**< Ranging coefficient mean */
+    double rangingCoeffSD;				/**< Ranging coefficient standard deviation */
+    double growthRateMean;				/**< Mean growth rate parameters */
+    double growthRateSD;				/**< Growth rate standard devation */
     double lengthMean;					/**< Mean species length */
     double lengthSD;					/**< Species length standard deviation */
     double speedMean;					/**< Mean species road crossing speed */
     double speedSD;						/**< Species road crossing speed standard deviation */
-    double costPerAnimal;					/**< Cost per animal below threshold ($) */
-    std::vector<HabitatTypePtr> habitat;	/**< Habitat type */
+    double costPerAnimal;				/**< Cost per animal below threshold ($) */
+    std::vector<HabitatTypePtr> habitat;/**< Habitat type */
     Eigen::MatrixXi habitatMap;         /**< Breakdown of region into the four base habitat types */
     Eigen::MatrixXd populationMap;      /**< Population of animals in each cell */
+    double threshold;                   /**< Target threshold as faction of initial population */
     SpeciesPtr me();                    /**< Enables sharing from this */
 };
 

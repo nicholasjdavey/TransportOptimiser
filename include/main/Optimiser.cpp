@@ -5,7 +5,7 @@ Optimiser::Optimiser(std::vector<TrafficProgramPtr>* programs, OtherInputsPtr oI
         UnitCostsPtr unitCosts, VariableParametersPtr varParams,
         std::vector<SpeciesPtr>* species, EconomicPtr economic, TrafficPtr traffic,
         RegionPtr region, double mr, unsigned long cf, unsigned long gens,
-        unsigned long popSize, double stopTol, double confidence,
+        unsigned long popSize, double stopTol, double confInt, double confLvl,
         unsigned long habGridRes, std::string solScheme, unsigned long noRuns,
         Optimiser::Type type) {
 
@@ -34,8 +34,7 @@ Optimiser::Optimiser(std::vector<TrafficProgramPtr>* programs, OtherInputsPtr oI
 	this->earthworks = earthworks;
 	this->economic = economic;
 	this->traffic = traffic;
-	this->region = region;
-	
+	this->region = region;	
 	this->earthworks = earthworks;
 	this->unitCosts = unitCosts;
 	this->species = *species;
@@ -46,7 +45,8 @@ Optimiser::Optimiser(std::vector<TrafficProgramPtr>* programs, OtherInputsPtr oI
 	this->noRuns = noRuns;
 	this->populationSizeGA = popSize;
 	this->stoppingTol = stopTol;
-	this->confidence = confidence;
+    this->confInt = confInt;
+    this->confLvl = confLvl;
 	this->habGridRes = habGridRes;
 	this->solutionScheme = solScheme;
 }

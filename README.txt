@@ -4,7 +4,7 @@ To build and run the road optimiser software, the following libraries need to be
 - Boost http://boost.org/
 - Eigen http://eigen.tuxfamily.org/
 - LibIGL http://libigl.github.io/libigl/
-- OpenCV http://opencv.org/
+- CTPL https://github.com/vit-vit/CTPL.git
 - CSIRO Workspace https://research.csiro.au/workspace/
 
 **WINDOWS**

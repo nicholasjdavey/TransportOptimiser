@@ -70,10 +70,10 @@ public:
             DesignParametersPtr desParams, EarthworkCostsPtr earthworks,
             UnitCostsPtr unitCosts, VariableParametersPtr varParams,
             std::vector<SpeciesPtr>* species, EconomicPtr economic, TrafficPtr
-            traffic, RegionPtr region, double mr, unsigned long cf, unsigned long
-            gens, unsigned long popSize, double stopTol, double confidence,
-            unsigned long habGridRes, std::string solScheme, unsigned long noRuns,
-            Optimiser::Type type);
+            traffic, RegionPtr region, double mr, unsigned long cf, unsigned
+            long gens, unsigned long popSize, double stopTol, double confInt,
+            double confLvl, unsigned long habGridRes, std::string solScheme,
+            unsigned long noRuns, Optimiser::Type type);
     /**
      * Destructor
      */
@@ -451,20 +451,47 @@ public:
     }
 
     /**
-     * Returns the confidence level for ROV
+     * Returns the confidence interval used for simulation results.
      *
-     * @return Confidence level as double
+     * This number (X) has different uses depending on the simulation model:
+     * 1.   Constant full traffic flow - X is used to compute the end animal
+     *      population that the road has a 95% chance of exceeding.
+     * 2.   Stochastic dynamic programming - X is the probability that using
+     *      control Y will result in the population exceeding the threshold.
+     *
+     * Alternately, X can be interpreted as the proportion of roads exceeding
+     * the number we use to define the road (end population, profit, etc.)
+     * when comparing it to other roads. That means that X is multi-purpose.
+     * @return Confidence interval as double
      */
-    double getConfidence() {
-	    return this->confidence;
+    double getConfidenceInterval() {
+        return this->confInt;
     }
     /**
-     * Sets the confidence level for ROV
+     * Sets the confidence interval used for simulation results.
      *
      * @param confidence as double
      */
     void setConfidence(double confidence) {
-	    this->confidence = confidence;
+        this->confInt = confidence;
+    }
+
+    /**
+     * Returns the confidence level used for simulations/sampling
+     *
+     * This is also used when computing required sample sizes.
+     * @return Confidence level of results as double
+     */
+    double getConfidenceLevel() {
+        return this->confLvl;
+    }
+    /**
+     * Sets the confidence level used for simulations/sampling
+     *
+     * @param confidence as double
+     */
+    void setConfidenceLevel(double confidence) {
+        this->confLvl = confidence;
     }
 
     /**
@@ -538,7 +565,8 @@ private:
     unsigned long generations;						/**< Generations required */
     unsigned long populationSizeGA;					/**< Population size for GA */
     double stoppingTol;								/**< Stopping tolerance */
-    double confidence;								/**< Required confidence level */
+    double confInt; 								/**< Required confidence interval */
+    double confLvl;                                 /**< Desired confidence level (default = 95%) */
     unsigned long habGridRes;						/**< Habitat grid 1D resolution */
     unsigned long noRuns;							/**< Number of runs to perform */
     std::string solutionScheme;						/**< Solution scheme used (i.e. name of experiment) */

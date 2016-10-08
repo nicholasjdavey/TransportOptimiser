@@ -15,8 +15,7 @@ public:
 	/**
 	 * Constructor Constructs a %Program object with default values.
 	 */
-    Program(Eigen::VectorXd* flowRates,
-			Eigen::MatrixXf* switching);
+    Program(Eigen::VectorXd* flowRates, Eigen::MatrixXf* switching);
 
 	/**
 	 * Destructor

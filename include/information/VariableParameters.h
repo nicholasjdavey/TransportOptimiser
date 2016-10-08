@@ -14,9 +14,9 @@ public:
 	 *
 	 * Constructs a %VariableParameters object with default values.
 	 */
-	VariableParameters(Eigen::VectorXd* popLevels, bool bridge,
+    VariableParameters(Eigen::VectorXd* popLevels, Eigen::VectorXd* bridge,
 		Eigen::VectorXd* hp, Eigen::VectorXd* l, Eigen::VectorXd* b,
-		bool pgr, bool f, bool c);
+        Eigen::VectorXd* pgr, Eigen::VectorXd* f, Eigen::VectorXd* c);
 	/**
 	 * Destructor
 	 */

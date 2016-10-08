@@ -23,3 +23,7 @@ Uncertainty::Uncertainty(std::string nm, double mp, double sd, double rev,
 
 Uncertainty::~Uncertainty() {
 }
+
+void Uncertainty::computeExpPV() {
+
+}

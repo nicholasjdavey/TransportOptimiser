@@ -311,6 +311,32 @@ void Costs::computeAccidentCosts() {
 
 Eigen::MatrixXd* Costs::computeUnitFuelCosts(Eigen::VectorXd& gr,
         Eigen::VectorXd& v, Eigen::VectorXd& s, Eigen::VectorXd& Q) {
+    // Compute the fuel price matrix and use this to
     // Get all vehicles
 
+}
+
+void Costs::computePenaltyCost() {
+    std::vector<SpeciesRoadPatchesPtr>* speciesRoadPatches =
+            this->road->getSpeciesRoadPatches();
+
+    this->penaltyCost = 0;
+    // The target confidence interval we are using
+    double cumpr = 1 - this->road->getOptimiser()->getConfidenceInterval();
+    double sd = Utility::NormalCDFInverse(cumpr);
+
+    for (int ii = 0; ii < speciesRoadPatches->size(); ii++) {
+        // Population at target confidence interval. For now we just assume
+        // that the sample data are normally distributed. This needs to be
+        // changed at a later date.
+        double endPop = (*speciesRoadPatches)[ii]->getEndPopMean()
+                +sd*(*speciesRoadPatches)[ii]->getEndPopSD();
+        double thresh = (*speciesRoadPatches)[ii]->getSpecies()->
+                getThreshold();
+        if (thresh > endPop) {
+            this->penaltyCost += (thresh - endPop)*
+                    (*speciesRoadPatches)[ii]->getSpecies()->
+                    getCostPerAnimal();
+        }
+    }
 }

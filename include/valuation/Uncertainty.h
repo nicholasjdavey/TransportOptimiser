@@ -135,18 +135,49 @@ public:
 		this->active = status;
 	}
 
+    /**
+     * Returns the expected present value of future cash flows of one unit use
+     *
+     * @return Present value as double
+     */
+    double getExpPV() {
+        return this->expPV;
+    }
+    /**
+     * Sets the expected present value of future cash flows of one unit use
+     *
+     * @param pv as double
+     */
+    void setExpPV(double pv) {
+        this->expPV = pv;
+    }
 
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
 
 	// CALCULATION ROUTINES ///////////////////////////////////////////////////
 
+    /**
+     * Runs Monte Carlo simulation to determine the expected present value
+     *
+     * This function uses Monte Carlo simulation to compute possible paths for
+     * the unit price to take over time. These paths are discounted and the
+     * average is taken to determine the present value of a constant one unit
+     * of usage for the design horizon. This function calls std::thread to run
+     * the simulation values in parallel.
+     *
+     * @note This function is called only once for a road optimisation and is
+     * therefore not computed for every road.
+     */
+    void computeExpPV();
+
 private:
-	std::string name;			/**< Name of the product */
-	double current;				/**< Current level of uncertainty */
-	double meanP;				/**< Long-run mean */
-	double standardDev;			/**< Standard deviation */
-	double reversion;			/**< Strength of mean reversion */
-	bool active;				/**< Used in problem? */
+    std::string name;	/**< Name of the product */
+    double current;		/**< Current level of uncertainty */
+    double meanP;		/**< Long-run mean */
+    double standardDev;	/**< Standard deviation */
+    double reversion;	/**< Strength of mean reversion */
+    double expPV;       /**< Expected PV of all future CF from MC sims per unit */
+    bool active;		/**< Used in problem? */
 };
 
 #endif

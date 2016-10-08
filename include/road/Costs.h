@@ -10,6 +10,9 @@ typedef std::shared_ptr<RoadSegments> RoadSegmentsPtr;
 class Species;
 typedef std::shared_ptr<Species> SpeciesPtr;
 
+class SpeciesRoadPatches;
+typedef std::shared_ptr<SpeciesRoadPatches> SpeciesRoadPatchesPtr;
+
 class HabitatType;
 typedef std::shared_ptr<HabitatType> HabitatTypePtr;
 
@@ -267,6 +270,14 @@ public:
 	 */
 	void computeAccidentCosts();
 
+    /**
+     * Computes the cost of the end population being below threshold
+     *
+     * @note This only applies to the design case where the road is run at full
+     * capacity for the entire design horizon
+     */
+    void computePenaltyCost();
+
 private:
 	RoadPtr road;						/**< Road with these costs */
 	double accidentFixed;				/**< Fixed component of accident cost */
@@ -290,10 +301,8 @@ private:
      * apply to any vehicle design. This method also allows simulation to be
      * used where the fuel prices can vary over time, if so desired.
      *
-     * This computes the mean fuel cost per unit traffic if fuel is not
-     * stochastic. If it is, then a different function is used. The function
-     * created here is likely to be used more often than the stochastic one
-     * as it allows for easier comparison between the different traffic regimes.
+     * This computes the mean fuel cost per unit traffic based on the
+     * prevailing fuel price.
      *
      * @return Unit fuel cost per vehicle, per unit fuel as Eigen::MatrixXd*
      */

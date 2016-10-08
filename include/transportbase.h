@@ -41,6 +41,9 @@
 #include <igl/unique.h>
 // BOOST
 
+// CTPL
+#include <CTPL-master/ctpl.h>
+
 // PROJECT-SPECIFIC HEADERS (MUST MAINTAIN ORDER SHOWN HERE ) /////////////////
 #include "main/Optimiser.h"
 #include "main/ExperimentalScenario.h"

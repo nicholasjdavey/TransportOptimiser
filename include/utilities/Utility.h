@@ -72,6 +72,119 @@ namespace Utility {
         igl::floor(tempvec, C);
         R = Y - C*xm;
     }
+
+    /**
+     * Allows determining where values in a matrix are finite
+     */
+    template<typename Derived>
+    inline bool is_finite(const Eigen::MatrixBase<Derived>& x)
+    {
+       return ( (x - x).array() == (x - x).array()).all();
+    }
+
+    /**
+     * Allows determining where values in a matrix are NaN
+     */
+    template<typename Derived>
+    inline bool is_nan(const Eigen::MatrixBase<Derived>& x)
+    {
+       return ((x.array() == x.array())).all();
+    }
+
+    /**
+     * Computes the number of times each line segment in XY1 intersects any
+     * line segment in XY2. The lines are piecewise linear.
+     *
+     * @param XY1 as Eigen::MatrixXd&. This is an N1 x 4 matrix where the
+     * columns, in order, are: starting x coordinate, starting y coordinate,
+     * ending x coordinate, ending y coordinate.
+     *
+     * @param XY2 as Eigen::MatrixXd&. This is an N2 x 4 matrix where the
+     * columns have the same meaning as in XY1. This is the curve that the
+     * individual lines in XY1 may intersect.
+     *
+     * @return Number of intersections as Eigen::MatrixXi
+     */
+    Eigen::MatrixXi lineSegmentIntersect(const Eigen::MatrixXd& XY1,
+            const Eigen::MatrixXd& XY2);
+
+    /**
+     * Same as lineSegmentIntersect but with extra information:
+     *
+     * @param adjMat as Eigen::MatrixXi& : N1xN2 indicator matrix where the
+     * entry (i,j) is 1 if line segments XY1(i,:) and XY2(j,:) intersect.
+     * @param intMatX as Eigen::MatrixXd& : N1xN2 matrix where the entry (i,j)
+     * is the X coordinate of the intersection point between line segments
+     * XY1(i,:) and XY2(j,:).
+     * @param intMatY as Eigen::MatrixXd& : N1xN2 matrix where the entry (i,j)
+     * is the Y coordinate of the intersection point between line segments
+     * XY1(i,:) and XY2(j,:).
+     * @param intNorDist1to2' as Eigen::MatrixXi& : N1xN2 matrix where the
+     * (i,j) entry is the normalized distance from the start point of line
+     * segment XY1(i,:) to the intersection point with XY2(j,:).
+     * @param intNormdDist2To1 as Eigen::MatrixXi& : N1xN2 matrix where the
+     * (i,j) entry is the normalized distance from the start point of line
+     * segment XY1(j,:) to the intersection point with XY2(i,:).
+     * @param parAdjMat as Eigen::MatrixX<bool,Eigen::Dynamic,Eigen::Dynamic>&
+     * : N1xN2 indicator matrix where the (i,j) entry is 1 if line segments
+     * XY1(i,:) and XY2(j,:) are parallel.
+     * @param coincAdjMat as Eigen::MatrixX<bool,Eigen::Dynamic,Eigen::Dynamic>
+     * : N1xN2 indicator matrix where the (i,j) entry is 1 if line segments
+     * XY1(i,:) and XY2(j,:) are coincident.
+     *
+     * N.B. This function will be completed at a later date
+     *
+     * The original MATLAB code was developed by
+     * U. Murat Erdem
+     * www.mathworks.com/matlabcentral/fileexchange/27205-fast-line-segment-intersection
+     * outStruct = lineSegmentIntersect(patchDistLines,roadSegsVisible);
+     */
+    void lineSegmentIntersect(
+            const Eigen::MatrixXd& XY1, const Eigen::MatrixXd& XY2,
+            Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic> &adjMat,
+            Eigen::MatrixXd& intMatX, Eigen::MatrixXd& intMatY,
+            Eigen::MatrixXd& normDist1to2, Eigen::MatrixXd& normDist2to1,
+            Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>& parAdjMat,
+            Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>& coincAdjMat);
+
+    /**
+     * Returns the standard normal inverse given a cumulative probability
+     *
+     * Code by John D. Cook. Computes the inverse normal distribution using the
+     * approximation for statistical functions by Abramawitz and Stegun,
+     * Formula 26.2.23:
+     * Abramowitz, M., & Stegun, I. A. (1964). Handbook of mathematical
+     * functions: with formulas, graphs, and mathematical tables (Vol. 55).
+     * Courier Corporation.
+     *
+     * Code By:
+     * John D. Cook
+     * www.johndcook.com/blog/normal_cdf_inverse
+     * Accessed: October 6, 2016
+     *
+     * @param p as double
+     * @return Standard deviations from the mean as double
+     */
+    double NormalCDFInverse(double p);
+
+    /**
+     * Implements the Abramowitz and Stegun approximation
+     *
+     * Code by John D. Cook. Computes the inverse normal distribution using the
+     * approximation for statistical functions by Abramawitz and Stegun,
+     * Formula 26.2.23:
+     * Abramowitz, M., & Stegun, I. A. (1964). Handbook of mathematical
+     * functions: with formulas, graphs, and mathematical tables (Vol. 55).
+     * Courier Corporation.
+     *
+     * Code By:
+     * John D. Cook
+     * www.johndcook.com/blog/normal_cdf_inverse
+     * Accessed: October 6, 2016
+     * @param t as double
+     * @return Relevant standard deviation as double
+     */
+    double RationalApproximation(double t);
 }
 
 #endif

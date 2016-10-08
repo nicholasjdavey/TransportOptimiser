@@ -62,7 +62,8 @@ void Road::computeOperating() {
             this->getCosts()->setPenalty(0.0);
 
             // If there is no uncertainty in the fuel or commodity prices,
-            // just treat the operating valuation as a simple annuity.
+            // just treat the operating valuation as a simple annuity. if there
+            // is uncertainty, this
             if (this->getOptimiser()->getVariableParams()->getFuelVariable() &&
                     this->getOptimiser()->getVariableParams()
                     ->getCommodityVariable()) {
