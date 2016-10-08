@@ -9,12 +9,12 @@ HabitatType::HabitatType() {
 }
 
 HabitatType::HabitatType(HabitatType::habType typ, double maxPop,
-        Eigen::VectorXi* vegetations, double habPrefMean, double habPrefSD,
+        IntVectorPtr vegetations, double habPrefMean, double habPrefSD,
         double cost) {
 	this->type = typ;
 	this->maxPop = maxPop;
     this->cost = cost;
-    this->vegetations = *vegetations;
+    this->vegetations = vegetations;
     this->habPrefMean = habPrefMean;
     this->habPrefSD = habPrefSD;
 }

@@ -7,6 +7,8 @@ typedef std::shared_ptr<HabitatType> HabitatTypePtr;
 class HabitatPatch;
 typedef std::shared_ptr<HabitatPatch> HabitatPatchPtr;
 
+typedef std::shared_ptr<Eigen::MatrixXi> IntMatrixPtr;
+
 /**
  * Class for managing Habitat patches
  */
@@ -50,7 +52,8 @@ public:
 	 *
 	 * @param typ as HabitatTypePtr
 	 */
-	void setType(HabitatTypePtr typ) {
+    void setType(HabitatTypePtr typ) {
+        this->type.reset();
 		this->type = typ;
 	}
 
@@ -177,18 +180,18 @@ public:
     /**
      * Returns the cells occupied by the patch
      *
-     * @return Cells as Eigen::MatrixXi*
+     * @return Cells as IntMatrixPtr
      */
-    Eigen::MatrixXi* getCells() {
-        return &this->cells;
+    IntMatrixPtr getCells() {
+        return this->cells;
     }
     /**
      * Sets the cells occupied by the patch
      *
-     * @param cells as Eigen::MatrixXi*
+     * @param cells as IntMatrixPtr
      */
-    void setCells(Eigen::MatrixXi* cells) {
-        this->cells = *cells;
+    void setCells(IntMatrixPtr cells) {
+        this->cells = cells;
     }
 
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
@@ -196,15 +199,15 @@ public:
 	// CALCULATION ROUTINES ///////////////////////////////////////////////////
 
 private:
-        HabitatTypePtr type;		/**< Type of habitat */
+        HabitatTypePtr type;	/**< Type of habitat */
         double area;			/**< Area of patch */
         double centroidX;		/**< Longitude/x coord of centroid */
         double centroidY;		/**< Latitude/y coord of centroid */
         double capacity;		/**< Max capacity of patch */
         double growthRate;		/**< Prevailing population growth rate */
         double population;		/**< Prevailing population */
-        double aar;			/**< Animals at risk in patch */
-        Eigen::MatrixXi cells;  /**< Grid cells occupied by patch */
+        double aar;         	/**< Animals at risk in patch */
+        IntMatrixPtr cells;     /**< Grid cells occupied by patch */
 };
 
 #endif

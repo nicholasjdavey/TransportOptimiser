@@ -4,6 +4,8 @@
 class HabitatType;
 typedef std::shared_ptr<HabitatType> HabitatTypePtr;
 
+typedef std::shared_ptr<Eigen::VectorXi> IntVectorPtr;
+
 /**
  * Class for managing habitat types.
  */
@@ -34,7 +36,7 @@ public:
 	 *
 	 * Constructs a %HabitatType object with assigned habitat
 	 */
-    HabitatType(HabitatType::habType typ, double maxPop, Eigen::VectorXi*
+    HabitatType(HabitatType::habType typ, double maxPop, IntVectorPtr
                 vegetations, double habPrefMean, double habPrefSD,
                 double cost);
 
@@ -82,18 +84,18 @@ public:
     /**
      * Return the vegetations corresponding to this habitat
      *
-     * @return Vegetations as Eigen::VectorXi*
+     * @return Vegetations as IntVectorPtr
      */
-    Eigen::VectorXi* getVegetations() {
-        return &this->vegetations;
+    IntVectorPtr getVegetations() {
+        return this->vegetations;
     }
     /**
      * Sets the vegetations corresponding to this habitat
      *
-     * @param veg as Eigen::VectorXi*
+     * @param veg as IntVectorPtr
      */
-    void setVegetations(Eigen::VectorXi* veg) {
-        this->vegetations = *veg;
+    void setVegetations(IntVectorPtr veg) {
+        this->vegetations = veg;
     }
 
     /**
@@ -159,11 +161,11 @@ public:
 
 private:
         HabitatType::habType type;	/**< Habitat type */
-        double maxPop;			/**< Maximum population per m^2 */
-        double cost;            /**< Cost per m^2 */
-        Eigen::VectorXi vegetations;    /**< Vegetations in this habitat type */
-        double habPrefMean;     /**< Species mean preference for this habitat */
-        double habPrefSD;       /**< Habitat preference standard deviation */
+        double maxPop;              /**< Maximum population per m^2 */
+        double cost;                /**< Cost per m^2 */
+        Eigen::VectorXi vegetations;/**< Vegetations in this habitat type */
+        double habPrefMean;         /**< Species mean preference for this habitat */
+        double habPrefSD;           /**< Habitat preference standard deviation */
 
 public:
         static Eigen::VectorXi allVegetations;  /**< All vegetations in the region */

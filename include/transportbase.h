@@ -82,6 +82,7 @@
 #include "utilities/Utility.h"
 #include "road/SpeciesRoadPatches.h"
 #include "utilities/labelmethod.h"
+#include "main/ThreadManager.h"
 
 /*
 #include <gnuplot-iostream-master/gnuplot-iostream.h>
