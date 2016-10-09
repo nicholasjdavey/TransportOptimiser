@@ -4,9 +4,6 @@
 class Vehicle;
 typedef std::shared_ptr<Vehicle> VehiclePtr;
 
-class Program;
-typedef std::shared_ptr<Program> ProgramPtr;
-
 class Traffic;
 typedef std::shared_ptr<Traffic> TrafficPtr;
 
@@ -30,7 +27,7 @@ public:
 	 *
 	 * Constructs a %Traffic object with assigned values.
 	 */
-	Traffic(std::vector<VehiclePtr>*vehicles, double peakProp, double d,
+    Traffic(const std::vector<VehiclePtr>& vehicles, double peakProp, double d,
 			double peak, double gr);
 
 	/** 
@@ -45,16 +42,16 @@ public:
 	 *
 	 * @return Vehicles as std::vector<VehiclePtr>*
 	 */
-	std::vector<VehiclePtr>* getVehicles() {
-		return &this->vehicles;
+    const std::vector<VehiclePtr>& getVehicles() {
+        return this->vehicles;
 	}
 	/**
 	 * Sets the vehicles used
 	 *
-	 * @param vehicles as std::vector<VehiclePtr>*
+     * @param vehicles as const std::vector<VehiclePtr>&
 	 */
-	void setVehicles(std::vector<VehiclePtr>* vehicles) {
-		this->vehicles = *vehicles;
+    void setVehicles(const std::vector<VehiclePtr>& vehicles) {
+        this->vehicles = vehicles;
 	}
 	
 	/**
@@ -130,8 +127,7 @@ public:
 	// CALCULATION ROUTINES ///////////////////////////////////////////////////
 
 private:
-	std::vector<VehiclePtr> vehicles;	/**< Vehicles in traffic */
-	ProgramPtr program;					/**< Assigned program */
+    std::vector<VehiclePtr> vehicles;	/**< Vehicles in traffic */
 	double peakProportion;				/**< Proportion of daily traffic during peak times */
 	double directionality;				/**< Peak time directionality toward A */
 	double peakHours;					/**< Peak hours in a day */

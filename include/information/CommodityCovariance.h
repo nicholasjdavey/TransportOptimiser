@@ -44,6 +44,7 @@ public:
 	 * @param comm as CommodityPtr
 	 */
 	void setCommodity1(CommodityPtr comm) {
+        this->commodity1.reset();
 		this->commodity1 = comm;
 	}
 
@@ -61,6 +62,7 @@ public:
 	 * @param comm as CommodityPtr
 	 */
 	void setCommodity2(CommodityPtr comm) {
+        this->commodity2.reset();
 		this->commodity2 = comm;
 	}
 

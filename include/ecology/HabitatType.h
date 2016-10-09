@@ -4,8 +4,6 @@
 class HabitatType;
 typedef std::shared_ptr<HabitatType> HabitatTypePtr;
 
-typedef std::shared_ptr<Eigen::VectorXi> IntVectorPtr;
-
 /**
  * Class for managing habitat types.
  */
@@ -36,7 +34,7 @@ public:
 	 *
 	 * Constructs a %HabitatType object with assigned habitat
 	 */
-    HabitatType(HabitatType::habType typ, double maxPop, IntVectorPtr
+    HabitatType(HabitatType::habType typ, double maxPop, const Eigen::VectorXi&
                 vegetations, double habPrefMean, double habPrefSD,
                 double cost);
 
@@ -84,17 +82,17 @@ public:
     /**
      * Return the vegetations corresponding to this habitat
      *
-     * @return Vegetations as IntVectorPtr
+     * @return Vegetations as const Eigen::VectorXi&
      */
-    IntVectorPtr getVegetations() {
+    const Eigen::VectorXi& getVegetations() {
         return this->vegetations;
     }
     /**
      * Sets the vegetations corresponding to this habitat
      *
-     * @param veg as IntVectorPtr
+     * @param veg as const Eigen::VectorXi&
      */
-    void setVegetations(IntVectorPtr veg) {
+    void setVegetations(const Eigen::VectorXi& veg) {
         this->vegetations = veg;
     }
 
@@ -156,6 +154,22 @@ public:
     }
 
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
+    /**
+     * Return all vegetations
+     *
+     * @return Vegetations as IntVectorPtr
+     */
+    const Eigen::VectorXi& getAllVegetations() {
+        return HabitatType::allVegetations;
+    }
+    /**
+     * Sets all vegetations
+     *
+     * @param veg as IntVectorPtr
+     */
+    void setAllVegetations(const Eigen::VectorXi& veg) {
+        HabitatType::allVegetations = veg;
+    }
 
 	// CALCULATION ROUTINES ///////////////////////////////////////////////////
 

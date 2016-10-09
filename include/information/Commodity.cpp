@@ -4,9 +4,9 @@ Commodity::Commodity() : Uncertainty() {
 }
 
 Commodity::Commodity(std::string nm, double mp, double sd, double rev,
-		std::vector<CommodityCovariancePtr>* covs, bool active) :
+        const std::vector<CommodityCovariancePtr>& covs, bool active) :
 		Uncertainty(nm, mp, sd, rev, active) {
-	this->covariances = *covs;
+    this->covariances = covs;
 }
 
 Commodity::~Commodity() {}

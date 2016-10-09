@@ -27,9 +27,9 @@ public:
 	 *
 	 * Constructs a %PolicyMapYear object by passing values
 	 */
-	PolicyMapYear(std::vector<PolicyMapFrontierPtr>* frontiers,
-			Eigen::MatrixXf* stateLevels,
-			Eigen::VectorXd* expectedProfit);
+    PolicyMapYear(const std::vector<PolicyMapFrontierPtr>& frontiers,
+            const Eigen::MatrixXd& stateLevels,
+            const Eigen::VectorXd& expectedProfit);
 
 	/**
 	 * Destructor
@@ -41,52 +41,52 @@ public:
 	/**
 	 * Returns the frontiers
 	 *
-	 * @return Frontiers as std::vector<PolicyMapFrontierPtr>*
+     * @return Frontiers as const std::vector<PolicyMapFrontierPtr>&
 	 */
-	std::vector<PolicyMapFrontierPtr>* getFrontiers() {
-		return &this->frontiers;
+    const std::vector<PolicyMapFrontierPtr>& getFrontiers() {
+        return this->frontiers;
 	}
 	/**
 	 * Sets the frontiers
 	 *
-	 * @param front as std::vector<PolicyMapFrontierPtr>*
+     * @param front as const std::vector<PolicyMapFrontierPtr>&
 	 */
-	void setFrontiers(std::vector<PolicyMapFrontierPtr>* front) {
-		this->frontiers = *front;
+    void setFrontiers(const std::vector<PolicyMapFrontierPtr>& front) {
+        this->frontiers = front;
 	}
 
 	/**
 	 * Returns the state levels for data points
 	 *
-	 * @return State levels as Eigen::MatrixXf*
+     * @return State levels as const Eigen::MatrixXd&
 	 */
-	Eigen::MatrixXf* getPopulations() {
-		return &this->stateLevels;
+    const Eigen::MatrixXd& getPopulations() {
+        return this->stateLevels;
 	}
 	/**
 	 * Sets the state levels for data points
 	 *
-	 * @param pops as Eigen::MatrixXf*
+     * @param pops as const Eigen::MatrixXd&
 	 */
-	void setPopulations(Eigen::MatrixXf* sl) {
-		this->stateLevels = *sl;
+    void setPopulations(const Eigen::MatrixXd& sl) {
+        this->stateLevels = sl;
 	}
 
 	/**
 	 * Returns the expected profits for data points
 	 *
-	 * @return Expected profits as Eigen::VectorXd*
+     * @return Expected profits as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getProfits() {
-		return &this->expectedProfit;
+    const Eigen::VectorXd& getProfits() {
+        return this->expectedProfit;
 	}
 	/**
 	 * Sets the expected profits for data points
 	 *
 	 * @param profs as std::vector<double>*
 	 */
-	void setProfits(Eigen::VectorXd* profs) {
-		this->expectedProfit = *profs;
+    void setProfits(const Eigen::VectorXd& profs) {
+        this->expectedProfit = profs;
 	}
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
 
@@ -94,7 +94,7 @@ public:
 
 private:
 	std::vector<PolicyMapFrontierPtr> frontiers;	/**< Frontiers produced */
-	Eigen::MatrixXf stateLevels;					/**< State values */
+    Eigen::MatrixXd stateLevels;					/**< State values */
 	Eigen::VectorXd expectedProfit;				/**< Corresponding E(Profit) */
 };
 

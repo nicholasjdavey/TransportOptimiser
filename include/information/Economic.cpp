@@ -5,13 +5,13 @@ Economic::Economic() {
 	this->nYears = 0;
 }
 
-Economic::Economic(std::vector<CommodityPtr>* commodities,
-		std::vector<FuelPtr>* fuels, double rr, double ny) {
+Economic::Economic(const std::vector<CommodityPtr> &commodities,
+        const std::vector<FuelPtr> &fuels, double rr, double ny) {
 
 	this->reqRate = rr;
 	this->nYears = ny;
-	this->commodities = *commodities;
-	this->fuels = *fuels;
+    this->commodities = commodities;
+    this->fuels = fuels;
 }
 
 Economic::~Economic() {

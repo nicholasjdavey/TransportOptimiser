@@ -27,7 +27,7 @@ public:
 	 *
 	 * Constructs a %PolicyMap object by passing attribute values.
 	 */
-	PolicyMap(ProgramPtr program, std::vector<PolicyMapYearPtr>* years);
+    PolicyMap(ProgramPtr program, const std::vector<PolicyMapYearPtr>& years);
 
 	/**
 	 * Destructor
@@ -50,24 +50,25 @@ public:
 	 * @param prog as ProgramPtr
 	 */
 	void setProgram(ProgramPtr prog) {
+        this->program.reset();
 		this->program = prog;
 	}
 
 	/**
 	 * Returns the policy map by year
 	 *
-	 * @return Policy map as std::vector<PolicyMapYearPtr>*
+     * @return Policy map as const std::vector<PolicyMapYearPtr>&
 	 */
-	std::vector<PolicyMapYearPtr>* getPolicyMapYear() {
-		return &this->yearlyMaps;
+    const std::vector<PolicyMapYearPtr>& getPolicyMapYear() {
+        return this->yearlyMaps;
 	}
 	/**
 	 * Sets the policy map by year
 	 *
-	 * @param pmy as std::vector<PolicyMapYear>*
+     * @param pmy as const std::vector<PolicyMapYearPtr>&
 	 */
-	void setPolicyMapYear(std::vector<PolicyMapYearPtr>* pmy) {
-		this->yearlyMaps = *pmy;
+    void setPolicyMapYear(const std::vector<PolicyMapYearPtr>& pmy) {
+        this->yearlyMaps = pmy;
 	}
 
 	// STATIC ROUTINES ////////////////////////////////////////////////////////

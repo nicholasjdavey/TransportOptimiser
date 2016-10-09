@@ -60,18 +60,18 @@ public:
 	/**
 	 * Returns the end population from all runs
 	 *
-	 * @return End populations as Eigen::VectorXd*
+     * @return End populations as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getEndPops() {
-		return &this->endPops;
+    const Eigen::VectorXd& getEndPops() {
+        return this->endPops;
 	}
 	/**
 	 * Sets the end population from all runs
 	 *
-	 * @param endPops as Eigen::VectorXd*
+     * @param endPops as const Eigen::VectorXd&
 	 */
-	void setEndPops(Eigen::VectorXd* endPops) {
-		this->endPops = *endPops;
+    void setEndPops(const Eigen::VectorXd& endPops) {
+        this->endPops = endPops;
 	}
 
 	/**

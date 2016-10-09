@@ -7,15 +7,15 @@ Road::Road() {
 }
 
 Road::Road(OptimiserPtr op, SimulatorPtr sim, std::string testName,
-		Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords,
-		Eigen::VectorXd* zCoords) {
+        const Eigen::VectorXd &xCoords, const Eigen::VectorXd &yCoords,
+        const Eigen::VectorXd &zCoords) {
 
 	this->optimiser = op;
 	this->simulator = sim;
 	this->testName = testName;
-	this->xCoords = *xCoords;
-	this->yCoords = *yCoords;
-	this->zCoords = *zCoords;
+    this->xCoords = xCoords;
+    this->yCoords = yCoords;
+    this->zCoords = zCoords;
 
 	// Assign an empty Attributes object (always has the same size)
 	AttributesPtr att(new Attributes(this->me()));
@@ -64,40 +64,40 @@ void Road::computeOperating() {
             // If there is no uncertainty in the fuel or commodity prices,
             // just treat the operating valuation as a simple annuity. if there
             // is uncertainty, this
-            if (this->getOptimiser()->getVariableParams()->getFuelVariable() &&
-                    this->getOptimiser()->getVariableParams()
-                    ->getCommodityVariable()) {
+            if ((this->getOptimiser()->getVariableParams()->getFuelVariable()
+                    .size() > 1) && (this->getOptimiser()->getVariableParams()
+                    ->getCommodityVariable().size() > 1)) {
                 double r = this->getOptimiser()->getEconomic()->getRRR();
                 double t = this->getOptimiser()->getEconomic()->getYears();
                 double g = this->getOptimiser()->getTraffic()->getGR();
-                Eigen::VectorXd* Qs = this->getOptimiser()
+                const Eigen::VectorXd& Qs = this->getOptimiser()
                         ->getTrafficProgram()->getFlowRates();
-                std::vector<VehiclePtr>* vehicles = this->getOptimiser()
+                const std::vector<VehiclePtr>& vehicles = this->getOptimiser()
                         ->getTraffic()->getVehicles();
-                double Q = (*Qs)(Qs->size());
+                double Q = Qs(Qs.size());
 
                 double factor = (1/(r-g) - (1/(r-g))*pow((1+g)/(1+r),t));
 
                 Eigen::VectorXd fuelPrices;
 
-                for (int ii = 0; ii < vehicles->size(); ii++) {
-                    fuelPrices(ii) = (*vehicles)[ii]->getFuel()->getMean();
+                for (int ii = 0; ii < vehicles.size(); ii++) {
+                    fuelPrices(ii) = vehicles[ii]->getFuel()->getMean();
                 }
 
                 // Compute the price of a tonne of raw ore
                 double orePrice = 0.0;
 
-                std::vector<CommodityPtr>* commodities = this->getOptimiser()
+                const std::vector<CommodityPtr>& commodities = this->getOptimiser()
                         ->getEconomic()->getCommodities();
 
-                for (int ii = 0; ii < commodities->size(); ii++) {
-                    orePrice += (*commodities)[ii]->getOreContent()*
-                            (*commodities)[ii]->getMean();
+                for (int ii = 0; ii < commodities.size(); ii++) {
+                    orePrice += commodities[ii]->getOreContent()*
+                            commodities[ii]->getMean();
                 }
 
                 this->getAttributes()->setUnitVarCosts(this->getAttributes()
                         ->getUnitVarCosts() + (this->getCosts()
-                        ->getUnitFuelCost())->transpose()*fuelPrices);
+                        ->getUnitFuelCost()).transpose()*fuelPrices);
                 this->getAttributes()->setVarProfitIC(Q*(this->getAttributes()
                         ->getUnitVarCosts() - this->getCosts()->getUnitRevenue()*
                         orePrice)*factor);
@@ -118,7 +118,8 @@ void Road::computeOperating() {
     }
 }
 
-void Road::addSpeciesPatches(SpeciesRoadPatchesPtr srp) {
+void Road::addSpeciesPatches(SpeciesPtr species) {
+    SpeciesRoadPatchesPtr srp(new SpeciesRoadPatches(species, this->me()));
     this->srp.push_back(srp);
 }
 
@@ -143,8 +144,8 @@ void Road::computeAlignment() {
 	this->computeHorizontalAlignment();
 	this->computeVerticalAlignment();
 	this->plotRoadPath();
-	Eigen::VectorXd* s = this->segments->getDists();
-	this->attributes->setLength((*s)(s->size()));
+    const Eigen::VectorXd& s = this->segments->getDists();
+    this->attributes->setLength(s(s.size()));
 }
 
 void Road::computeHorizontalAlignment() {

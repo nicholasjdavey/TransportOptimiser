@@ -21,15 +21,16 @@ public:
 	 *
 	 * Constructs an empty %TrafficProgram object
 	 */
-	TrafficProgram(Eigen::VectorXd* flowRates, Eigen::MatrixXf* switching);
+    TrafficProgram(const Eigen::VectorXd& flowRates, const Eigen::MatrixXf&
+            switching);
 
 	/**
 	 * Constructor II
 	 *
 	 * Constructs a %TrafficProgram control object
 	 */
-	TrafficProgram(bool br, TrafficPtr traffic, Eigen::VectorXd* flowRates,
-		Eigen::MatrixXf* switching);
+    TrafficProgram(bool br, TrafficPtr traffic, const Eigen::VectorXd&
+        flowRates, const Eigen::MatrixXf& switching);
 
 	/**
 	 * Destructor
@@ -69,6 +70,7 @@ public:
 	 * @param traffic as TrafficPtr
 	 */
 	void setTraffic(TrafficPtr traffic) {
+        this->traffic.reset();
 		this->traffic = traffic;
 	}
 

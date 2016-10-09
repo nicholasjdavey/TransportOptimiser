@@ -1,6 +1,9 @@
 #ifndef COSTS_H
 #define COSTS_H
 
+class Road;
+typedef std::shared_ptr<Road> RoadPtr;
+
 class RoadCells;
 typedef std::shared_ptr<RoadCells> RoadCellsPtr;
 
@@ -45,8 +48,8 @@ public:
 	 *
 	 * Constructs a cost object with assigned values
 	 */
-    Costs(double af, double av, double e, double lf, double lv, double loc,
-            double pc);
+    Costs(RoadPtr road, double af, double av, double e, double lf, double lv,
+            double loc, double pc);
 
 	/**
 	 * Destructor
@@ -194,18 +197,18 @@ public:
     /**
      * Returns the fuel cost per unit traffic per unit fuel per vehicle class
      *
-     * @return Unit fuel cost as Eigen::VectorXd*
+     * @return Unit fuel cost as const Eigen::VectorXd&
      */
-    Eigen::VectorXd* getUnitFuelCost() {
-        return &this->unitFuelVar;
+    const Eigen::VectorXd& getUnitFuelCost() {
+        return this->unitFuelVar;
     }
     /**
      * Sets the fuel cost per unit traffic per unit fuel per vehicle class
      *
-     * @param fuel as Eigen::VectorXd*
+     * @param fuel as const Eigen::VectorXd&
      */
-    void setUnitFuelCost(Eigen::VectorXd* fuel) {
-        this->unitFuelVar = *fuel;
+    void setUnitFuelCost(const Eigen::VectorXd& fuel) {
+        this->unitFuelVar = fuel;
     }
 
     /**
@@ -289,25 +292,6 @@ private:
 	double penaltyCost;					/**< Animal mortality penalty cost */
     Eigen::VectorXd unitFuelVar;        /**< Fuel costs per unit traffic */
     static double unitRevenueVar;       /**< Haul load per unit traffic */
-
-    /**
-     * Computes the fuel costs per unit traffic per unit fuel price.
-     *
-     * Computes the fuel costs per unit vehicle of traffic per unit fuel price
-     * for each vehicle class. The order of prices in each column is the same
-     * as the order of vehicles in the vehicle list in the Optimiser object.
-     *
-     * This method is adapted from Jong and Schonfeld (1999) but extended to
-     * apply to any vehicle design. This method also allows simulation to be
-     * used where the fuel prices can vary over time, if so desired.
-     *
-     * This computes the mean fuel cost per unit traffic based on the
-     * prevailing fuel price.
-     *
-     * @return Unit fuel cost per vehicle, per unit fuel as Eigen::MatrixXd*
-     */
-    Eigen::MatrixXd* computeUnitFuelCosts(Eigen::VectorXd& gr,
-            Eigen::VectorXd& v, Eigen::VectorXd& s, Eigen::VectorXd& Q);
 };
 
 #endif

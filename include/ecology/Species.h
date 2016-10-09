@@ -41,7 +41,7 @@ public:
     Species(std::string* nm, bool sex, double lm, double lsd, double rcm,
             double rcsd, double grm, double grsd, double lenm, double lensd,
             double spm, double spsd, double cpa, bool active,
-            std::vector<HabitatTypePtr> *habitat);
+            std::vector<HabitatTypePtr>& habitat);
 
 	/**
 	 * Constructor II
@@ -51,7 +51,7 @@ public:
     Species(std::string* nm, bool sex, double lm, double lsd, double rcm,
             double rcsd, double grm, double grsd, double lenm, double lensd,
             double spm, double spsd, double cpa, bool active,
-            std::vector<HabitatTypePtr> *habitat, double current);
+            std::vector<HabitatTypePtr> &habitat, double current);
 
 	/**
 	 * Destructor
@@ -301,52 +301,52 @@ public:
 	/**
 	 * Returns the habitat type of each grid location
 	 *
-     * @return Habitat types as std::vector<HabitatTypePtr>*
+     * @return Habitat types as const std::vector<HabitatTypePtr>&
 	 */
-    std::vector<HabitatTypePtr>* getHabitatTypes() {
-		return &this->habitat;
+    const std::vector<HabitatTypePtr>& getHabitatTypes() {
+        return this->habitat;
 	}
 	/**
 	 * Sets the habitat type of each grid location
 	 *
-     * @param habitat as std::vector<HabitatTypePtr>*
+     * @param habitat as const std::vector<HabitatTypePtr>&
 	 */
-    void setHabitat(std::vector<HabitatTypePtr>* habitat) {
-		this->habitat = *habitat;
+    void setHabitat(const std::vector<HabitatTypePtr>& habitat) {
+        this->habitat = habitat;
 	}
 
     /**
      * Returns the map of habitat types for this species
      *
-     * @return HabitatType map as Eigen::MatrixXi*
+     * @return HabitatType map as const Eigen::MatrixXi&
      */
-    Eigen::MatrixXi* getHabitatMap() {
-        return &this->habitatMap;
+    const Eigen::MatrixXi& getHabitatMap() {
+        return this->habitatMap;
     }
     /**
      * Sets the map of habitat types for this species
      *
-     * @param habMap as Eigen::MatrixXi*
+     * @param habMap as const Eigen::MatrixXi&
      */
-    void setHabitatMap(Eigen::MatrixXi* habMap) {
-        this->habitatMap = *habMap;
+    void setHabitatMap(const Eigen::MatrixXi& habMap) {
+        this->habitatMap = habMap;
     }
 
     /**
      * Returns the population map of the species
      *
-     * @return Population map as Eigen::MatrixXd*
+     * @return Population map as const Eigen::MatrixXd&
      */
-    Eigen::MatrixXd* getPopulationMap() {
-        return &this->populationMap;
+    const Eigen::MatrixXd& getPopulationMap() {
+        return this->populationMap;
     }
     /**
      * Sets the population map of the species
      *
-     * @param popMap as Eigen::MatrixXd*
+     * @param popMap as const Eigen::MatrixXd&
      */
-    void setPopulationMap(Eigen::MatrixXd* popMap) {
-        this->populationMap = *popMap;
+    void setPopulationMap(const Eigen::MatrixXd& popMap) {
+        this->populationMap = popMap;
     }
 
     /**
@@ -376,22 +376,6 @@ public:
      * This routine is only run once at the beginning of the analysis.
      */
     void generateHabitatMap(OptimiserPtr optimiser);
-
-    /**
-     * Generates the habitat patches relating to this species for the road in
-     * question using a basic grid method.
-     */
-    void generateHabitatPatchesGrid(RoadPtr road);
-
-    /**
-     * Generate habitat patches relating to this species using a more advanced
-     * blob method that ought to be more computationally tractable.
-     *
-     * This method first looks at the covexity and size of each blob in
-     * determining if the blob should be split into multiple patches or be left
-     * as a single patch.
-     */
-    void generateHabitatPatchesBlob(RoadPtr road);
 
 ////////////////////////////////////////////////////////////////////////////////
 private:

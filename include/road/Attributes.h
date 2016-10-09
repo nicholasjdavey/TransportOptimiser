@@ -1,6 +1,9 @@
 #ifndef ATTRIBUTES_H
 #define ATTRIBUTES_H
 
+class Road;
+typedef std::shared_ptr<Road> RoadPtr;
+
 class Attributes;
 typedef std::shared_ptr<Attributes> AttributesPtr;
 
@@ -49,6 +52,7 @@ public:
 	 * @param road as RoadPtr
 	 */
 	void setRoad(RoadPtr road) {
+        this->road.reset();
 		this->road = road;
 	}
 

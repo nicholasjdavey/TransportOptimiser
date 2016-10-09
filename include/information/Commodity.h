@@ -32,7 +32,7 @@ public:
 	 * Constructs a %Commodity object with assigned values
 	 */
 	Commodity(std::string nm, double mp, double sd, double rev,
-			std::vector<CommodityCovariancePtr>* covs, bool active);
+            const std::vector<CommodityCovariancePtr>& covs, bool active);
 
 	/**
 	 * Destructor
@@ -44,18 +44,18 @@ public:
 	/**
 	 * Returns the commodity's covariance with other commodities
 	 *
-	 * @return Covariances as std::vector<CommodityCovariancePtr>*
+     * @return Covariances as std::vector<CommodityCovariancePtr>&
 	 */
-	std::vector<CommodityCovariancePtr>* getCovariances() {
-		return &this->covariances;
+    const std::vector<CommodityCovariancePtr>& getCovariances() {
+        return this->covariances;
 	}
 	/**
 	 * Sets the commodity's covariance with other commodities
 	 *
-	 * @param covs as std::vector<CommodityCovariancePtr>*
+     * @param covs as std::vector<CommodityCovariancePtr>&
 	 */
-	void setCovariances(std::vector<CommodityCovariancePtr>* covs) {
-		this->covariances = *covs;
+    void setCovariances(const std::vector<CommodityCovariancePtr>& covs) {
+        this->covariances = covs;
 	}
 
     /**

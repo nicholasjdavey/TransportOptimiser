@@ -15,7 +15,8 @@ public:
 	/**
 	 * Constructor Constructs a %Program object with default values.
 	 */
-    Program(Eigen::VectorXd* flowRates, Eigen::MatrixXf* switching);
+    Program(const Eigen::VectorXd& flowRates, const Eigen::MatrixXf&
+            switching);
 
 	/**
 	 * Destructor
@@ -35,35 +36,35 @@ public:
 	/**
 	 * Returns the vector of flow rates
 	 *
-	 * @return Flow rates as Eigen::VectorXd*
+     * @return Flow rates as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getFlowRates() {
-		return &this->flowRates;
+    const Eigen::VectorXd& getFlowRates() {
+        return this->flowRates;
 	}
 	/**
 	 * Sets the vector of flow rates
 	 *
-	 * @param rates as Eigen::VectorXd*
+     * @param rates as const Eigen::VectorXd&
 	 */
-	void setFlowRates(Eigen::VectorXd* rates) {
-		this->flowRates = *rates;
+    void setFlowRates(const Eigen::VectorXd& rates) {
+        this->flowRates = rates;
 	}
 
 	/**
 	 * Returns the matrix of switching costs
 	 *
-	 * @return Switching matrix as Eigen::MatrixXf*
+     * @return Switching matrix as const Eigen::MatrixXf&
 	 */
-	Eigen::MatrixXf* getSwitchingCosts() {
-		return &this->switching;
+    const Eigen::MatrixXf& getSwitchingCosts() {
+        return this->switching;
 	}
 	/**
 	 * Sets the matrix of switching costs
 	 *
-	 * @param costs as Eigen::MatrixXf*
+     * @param costs as const Eigen::MatrixXf&
 	 */
-	void setSwitchingCosts(Eigen::MatrixXf* costs) {
-		this->switching = *costs;
+    void setSwitchingCosts(const Eigen::MatrixXf& costs) {
+        this->switching = costs;
 	}
 
 	/**

@@ -28,120 +28,120 @@ public:
 	/**
 	 * Returns the x values
 	 *
-	 * @return X values as *Eigen::VectorXd
+     * @return X values as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getX() {
-		return &this->x;
+    const Eigen::VectorXd& getX() {
+        return this->x;
 	}
 	/**
 	 * Sets the x values of the segments
 	 *
-	 * @param x as *Eigen::VectorXd
+     * @param x as const Eigen::VectorXd&
 	 */
-	void setX(Eigen::VectorXd *x) {
-		this->x = *x;
+    void setX(const Eigen::VectorXd& x) {
+        this->x = x;
 	}
 
 	/**
 	 * Returns the y values
 	 *
-	 * @return Y values as *Eigen::VectorXd
+     * @return Y values as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getY() {
-		return &this->y;
+    const Eigen::VectorXd& getY() {
+        return this->y;
 	}
 	/**
 	 * Sets the y values of the segments
 	 *
-	 * @param y as *Eigen::VectorXd
+     * @param y as const Eigen::VectorXd&
 	 */
-	void setY(Eigen::VectorXd* y) {
-		this->y = *y;
+    void setY(const Eigen::VectorXd& y) {
+        this->y = y;
 	}
 
 	/**
 	 * Returns the z values
 	 *
-	 * @return Z values as *Eigen::VectorXd
+     * @return Z values as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getZ() {
-		return &this->z;
+    const Eigen::VectorXd& getZ() {
+        return this->z;
 	}
 	/**
 	 * Sets the z values of the segments
 	 *
-	 * @param z as *Eigen::VectorXd
+     * @param z as const Eigen::VectorXd&
 	 */
-	void setZ(Eigen::VectorXd* z) {
-		this->z = *z;
+    void setZ(const Eigen::VectorXd& z) {
+        this->z = z;
 	}
 
 	/**
      * Returns the vegetation at each point
 	 *
-     * @return Vegetation as *Eigen::VectorXi
+     * @return Vegetation as const Eigen::VectorXi&
 	 */
-    Eigen::VectorXi* getVegetation() {
-        return &this->veg;
+    const Eigen::VectorXi& getVegetation() {
+        return this->veg;
 	}
 	/**
      * Sets the vegetation at each point
 	 *
-     * @param veg as *Eigen::VectorXi
+     * @param veg as const Eigen::VectorXi&
 	 */
-    void setVegetation(Eigen::VectorXi* veg) {
-        this->veg = *veg;
+    void setVegetation(const Eigen::VectorXi& veg) {
+        this->veg = veg;
 	}
 
 	/**
 	 * Returns the segement lengths
 	 *
-	 * @return Segment lengths as *Eigen::VectorXd
+     * @return Segment lengths as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getLengths() {
-		return &this->len;
+    const Eigen::VectorXd& getLengths() {
+        return this->len;
 	}
 	/**
 	 * Sets the segment lengths
 	 *
-	 * @param len as *Eigen::VectorXd
+     * @param len as const Eigen::VectorXd&
 	 */
-	void setLengths(Eigen::VectorXd* len) {
-		this->len = *len;
+    void setLengths(const Eigen::VectorXd& len) {
+        this->len = len;
 	}
 
 	/**
 	 * Returns the road segment areas
 	 *
-	 * @return Areas as *Eigen::VectorXd
+     * @return Areas as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getAreas() {
-		return &this->areas;
+    const Eigen::VectorXd& getAreas() {
+        return this->areas;
 	}
 	/**
 	 * Sets the road semgnet areas
 	 *
-	 * @param areas as *Eigen::VectorXd
+     * @param areas as const Eigen::VectorXd&
 	 */
-	void setAreas(Eigen::VectorXd* areas) {
-		this->areas = *areas;
+    void setAreas(const Eigen::VectorXd& areas) {
+        this->areas = areas;
 	}
 
 	/**
 	 * Returns the road semgnet types
 	 *
-	 * @return Tyeps as *Eigen::VectorXd
+     * @return Tyeps as const Eigen::VectorXi&
 	 */
-	Eigen::VectorXi* getTypes() {
-		return &this->type;
+    const Eigen::VectorXi& getTypes() {
+        return this->type;
 	}
 	/**
 	 * Sets the types of the segments
 	 *
-	 * @param type as *Eigen::VectorXd
+     * @param type as const Eigen::VectorXi&
 	 */
-	void setTypes(Eigen::VectorXi* type) {
-		this->type = *type;
+    void setTypes(const Eigen::VectorXi& type) {
+        this->type = type;
 	}
 
 	/**
@@ -149,37 +149,37 @@ public:
 	 *
 	 * Cells are referenced in (xcoord, ycoord), starting at coordinate (0,0)
 	 *
-     * @return Cell coordinates as *Eigen::VectorXi
+     * @return Cell coordinates as const Eigen::VectorXi&
 	 */
-    Eigen::VectorXi* getCellRefs() {
-		return &this->cellRefs;
+    const Eigen::VectorXi& getCellRefs() {
+        return this->cellRefs;
 	}
 	/**
 	 * Sets the cell references
 	 *
      * Cells are referenced as indices in column-major format
 	 *
-     * @param cellrefs as *Eigen::VectorXi
+     * @param cellrefs as const Eigen::VectorXi&
 	 */
-    void setCellRefs(Eigen::VectorXi* cellrefs) {
-		this->cellRefs = *cellrefs;
+    void setCellRefs(const Eigen::VectorXi& cellrefs) {
+        this->cellRefs = cellrefs;
 	}
 
 	/**
 	 * Returns the unique cells occupied by the road
 	 *
-     * @return Cells as Eigen::VectorXi*
+     * @return Cells as const Eigen::VectorXi&
 	 */
-    Eigen::VectorXi* getUniqueCells() {
-		return &this->uniqueCells;
+    const Eigen::VectorXi& getUniqueCells() {
+        return this->uniqueCells;
 	}
 	/**
 	 * Sets the unique cells occupied by the road
 	 *
-     * @param cells as Eigen::VectorXi*
+     * @param cells as const Eigen::VectorXi&
 	 */
-    void setUniqueCells(Eigen::VectorXi* cells) {
-		this->uniqueCells = *cells;
+    void setUniqueCells(const Eigen::VectorXi& cells) {
+        this->uniqueCells = cells;
     }
 
 	// STATIC ROUTINES ////////////////////////////////////////////////////////

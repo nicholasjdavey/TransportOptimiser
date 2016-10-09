@@ -48,6 +48,7 @@ public:
      * @param optimiser as OptimiserPtr
      */
     void setOptimiser(OptimiserPtr optimiser) {
+        this->optimiser.reset();
         this->optimiser = optimiser;
     }
 

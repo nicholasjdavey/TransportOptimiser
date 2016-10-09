@@ -32,8 +32,8 @@ public:
 	 * Constructs a %PolicyMapFrontier object with all attributes
 	 */
 	PolicyMapFrontier(unsigned long base, unsigned long proposed,
-			Eigen::MatrixXf* lvls,
-			Eigen::VectorXd* unitProfit);
+            const Eigen::MatrixXd& lvls,
+            const Eigen::VectorXd& unitProfit);
 
 	/**
 	 * Destructor
@@ -79,35 +79,35 @@ public:
 	/**
 	 * Returns the state levels
 	 *
-	 * @return State levels as Eigen::MatrixXf*
+     * @return State levels as const Eigen::MatrixXd&
 	 */
-	Eigen::MatrixXf* getStateLevels() {
-		return &this->stateLevels;
+    const Eigen::MatrixXd& getStateLevels() {
+        return this->stateLevels;
 	}
 	/**
 	 * Sets the state levels
 	 *
-	 * @param lvls as Eigen::MatrixXf*
+     * @param lvls as const Eigen::MatrixXd&
 	 */
-	void setStateLevels(Eigen::MatrixXf* lvls) {
-		this->stateLevels = *lvls;
+    void setStateLevels(const Eigen::MatrixXd& lvls) {
+        this->stateLevels = lvls;
 	}
 
 	/**
 	 * Returns the corresponding unit profits on the frontier
 	 *
-	 * @return Frontier unit profits as Eigen::VectorXd*
+     * @return Frontier unit profits as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getProfits() {
-		return &this->unitProfit;
+    const Eigen::VectorXd& getProfits() {
+        return this->unitProfit;
 	}
 	/**
 	 * Sets the corresponding unit profits on the frontier
 	 *
-	 * @param profs as Eigen::VectorXd*
+     * @param profs as const Eigen::VectorXd&
 	 */
-	void setProfits(Eigen::VectorXd* profs) {
-		this->unitProfit = *profs;
+    void setProfits(const Eigen::VectorXd& profs) {
+        this->unitProfit = profs;
 	}
 
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
@@ -117,7 +117,7 @@ public:
 private:
 	unsigned long baseOption;				/**< Prevailing control */
 	unsigned long proposedOption;			/**< Proposed control */
-	Eigen::MatrixXf stateLevels;			/**< Populations for frontier */
+    Eigen::MatrixXd stateLevels;			/**< Populations for frontier */
 	Eigen::VectorXd unitProfit;				/**< Unit profit along frontier */
 };
 

@@ -51,211 +51,212 @@ public:
 	 * @param road as RoadPtr
 	 */
 	void setRoad(RoadPtr road) {
+        this->road.reset();
 		this->road = road;
 	}
 
 	/**
 	 * Returns the arc angles (radians)
 	 *
-	 * @return Arc angles as Eigen::VectorXd*
+     * @return Arc angles as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getDeltas() {
-		return &this->deltas;
+    const Eigen::VectorXd& getDeltas() {
+        return this->deltas;
 	}
 	/**
 	 * Sets the arc angles (radians)
 	 *
-	 * @param del as Eigen::VectorXd*
+     * @param del as const Eigen::VectorXd&
 	 */
-    void setDeltas(Eigen::VectorXd* del) {
-		this->deltas = *del;
+    void setDeltas(const Eigen::VectorXd& del) {
+        this->deltas = del;
 	}
 
 	/**
 	 * Returns the radiis of curvature (radians)
 	 *
-	 * @return Radiis of curvature as Eigen::VectorXd*
+     * @return Radiis of curvature as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getRadii() {
-		return &this->radii;
+    const Eigen::VectorXd& getRadii() {
+        return this->radii;
 	}
 	/**
 	 * Sets the radiis of curvature (radians)
 	 *
-	 * @param radii as Eigen::VectorXd*
+     * @param radii as const Eigen::VectorXd&
 	 */
-	void setRadii(Eigen::VectorXd* radii) {
-		this->radii = *radii;
+    void setRadii(const Eigen::VectorXd radii) {
+        this->radii = radii;
 	}
 
 	/**
 	 * Return the required radii of curvature (radians)
 	 *
-	 * @return as Eigen::VectorXd*
+     * @return as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getRadiiReq() {
-		return &this->radiiReq;
+    const Eigen::VectorXd& getRadiiReq() {
+        return this->radiiReq;
 	}
 	/**
 	 * Sets the required radii of curvature (radians)
 	 *
-	 * @param radiireq as Eigen::VectorXd*
+     * @param radiireq as const Eigen::VectorXd&
 	 */
-	void setRadiiReq(Eigen::VectorXd* radiireq) {
-		this->radiiReq = *radiireq;
+    void setRadiiReq(const Eigen::VectorXd& radiireq) {
+        this->radiiReq = radiireq;
 	}
 
 	/**
 	 * Return the x coordinates of points of curvature (m)
 	 *
-	 * @return X coordinates as Eigen::VectorXd*
+     * @return X coordinates as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getPOCX() {
-		return &this->pocx;
+    const Eigen::VectorXd& getPOCX() {
+        return this->pocx;
 	}
 	/**
 	 * Sets the x coordinates of points of curvature (m)
 	 *
-	 * @param pocx as Eigen::VectorXd*
+     * @param pocx as const Eigen::VectorXd&
 	 */
-	void setPOCX(Eigen::VectorXd* pocx) {
-		this->pocx = *pocx;
+    void setPOCX(const Eigen::VectorXd& pocx) {
+        this->pocx = pocx;
 	}
 
 	/**
 	 * Returns the y coordinates of points of curvature (m)
 	 *
-	 * @return Y coordinates as Eigen::VectorXd*
+     * @return Y coordinates as Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getPOCY() {
-		return &this->pocy;
+    const Eigen::VectorXd& getPOCY() {
+        return this->pocy;
 	}
 	/**
 	 * Sets the y coordinates of points of curvature (m)
 	 *
-	 * @param POCY as Eigen::VectorXd*
+     * @param POCY as const Eigen::VectorXd&
 	 */
-	void setPOCY(Eigen::VectorXd* pocy) {
-		this->pocy = *pocy;
+    void setPOCY(const Eigen::VectorXd& pocy) {
+        this->pocy = pocy;
 	}
 
 	/**
 	 * Returns the x coordinates of the points of tangency (m)
 	 *
-	 * @return X coordinates as Eigen::VectorXd*
+     * @return X coordinates as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getPOTX() {
-		return &this->potx;
+    const Eigen::VectorXd& getPOTX() {
+        return this->potx;
 	}
 	/**
 	 * Sets the x coordinates of the points of tangency (m)
 	 *
-	 * @param potx as Eigen::VectorXd*
+     * @param potx as const Eigen::VectorXd&
 	 */
-	void setPOTX(Eigen::VectorXd* potx) {
-		this->potx = *potx;
+    void setPOTX(const Eigen::VectorXd& potx) {
+        this->potx = potx;
 	}
 
 	/**
 	 * Returns the y coordinates of the points of tangency (m)
 	 *
-	 * @return Y coordinates as Eigen::VectorXd*
+     * @return Y coordinates as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getPOTY() {
-		return &this->poty;
+    const Eigen::VectorXd& getPOTY() {
+        return this->poty;
 	}
 	/**
 	 * Sets the y coordinates of the points of tangency (m)
 	 *
-	 * @param poty as Eigen::VectorXd*
+     * @param poty as const Eigen::VectorXd&
 	 */
-	void setPOTY(Eigen::VectorXd* poty) {
-		this->poty = *poty;
+    void setPOTY(const Eigen::VectorXd& poty) {
+        this->poty = poty;
 	}
 
 	/**
 	 * Returns the x coordinates of the chord midpoints (m)
 	 *
-	 * @return X midpoints as Eigen::VectorXd*
+     * @return X midpoints as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getMidX() {
-		return &this->mx;
+    const Eigen::VectorXd& getMidX() {
+        return this->mx;
 	}
 	/**
 	 * Sets the x coordinates of the chord midpoints (m)
 	 *
-	 * @param mx as Eigen::VectorXd*
+     * @param mx as const Eigen::VectorXd&
 	 */
-	void setMidX(Eigen::VectorXd* mx) {
-		this->mx = *mx;
+    void setMidX(const Eigen::VectorXd& mx) {
+        this->mx = mx;
 	}
 
 	/**
 	 * Returns the y coordinates of the chord midpoints
 	 *
-	 * @return Y midpoints as Eigen::VectorXd*
+     * @return Y midpoints as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getMixY() {
-		return &this->my;
+    const Eigen::VectorXd& getMixY() {
+        return this->my;
 	}
 	/**
 	 * Sets the y coordinates of the chord midpoints
 	 *
-	 * @param my as Eigen::VectorXd*
+     * @param my as const Eigen::VectorXd&
 	 */
-	void setMY(Eigen::VectorXd* my) {
-		this->my = *my;
+    void setMY(const Eigen::VectorXd& my) {
+        this->my = my;
 	}
 
 	/**
 	 * Returns the x coordinates of the centres of curvature (m)
 	 *
-	 * @return Centres Xs as Eigen::VectorXd*
+     * @return Centres Xs as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getDelX() {
-		return &this->delx;
+    const Eigen::VectorXd& getDelX() {
+        return this->delx;
 	}
 	/**
 	 * Sets the x coordinates of the centres of curvature (m)
 	 *
-	 * @param delx as Eigen::VectorXd*
+     * @param delx as const Eigen::VectorXd&
 	 */
-	void setDelX(Eigen::VectorXd* delx) {
-		this->delx = *delx;
+    void setDelX(const Eigen::VectorXd& delx) {
+        this->delx = delx;
 	}
 
 	/**
 	 * Return the y coordinates of the centres of curvature (m)
 	 *
-	 * @return Centre Ys as Eigen::VectorXd*
+     * @return Centre Ys as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getDelY() {
-		return &this->dely;
+    const Eigen::VectorXd& getDelY() {
+        return this->dely;
 	}
 	/**
 	 * Sets the y coordinates of the centres of curvature (m)
 	 *
-	 * @param dely as Eigen::VectorXd*
+     * @param dely as const Eigen::VectorXd&
 	 */
-	void setDelY(Eigen::VectorXd* dely) {
-		this->dely = *dely;
+    void setDelY(const Eigen::VectorXd& dely) {
+        this->dely = dely;
 	}
 
 	/**
 	 * Return the design velocities
 	 *
-	 * @return Design velocities as Eigen::VectorXd*
+     * @return Design velocities as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getVelocities() {
-		return &this->vel;
+    const Eigen::VectorXd& getVelocities() {
+        return this->vel;
 	}
 	/**
 	 * Sets the design velocities
 	 *
-	 * @param vel as Eigen::VectorXd*
+     * @param vel as const Eigen::VectorXd&
 	 */
-	void setVelocities(Eigen::VectorXd* vel) {
-		this->vel = *vel;
+    void setVelocities(const Eigen::VectorXd& vel) {
+        this->vel = vel;
 	}
 
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
@@ -287,124 +288,128 @@ private:
 	/**
 	 * Computes the side friction limit based on cornering velocity
 	 *
-	 * @param velocities as 
-	 * @return Friction as Eigen::VectorXd
+     * @param vels as const Eigen::VectorXd&
+     * @return fric as Eigen::VectorXd&
 	 */
-	Eigen::VectorXd sideFriction(Eigen::VectorXd* vels);
+    void sideFriction(const Eigen::VectorXd& vels, Eigen::VectorXd&
+            fric);
 
 	/**
 	 * Computes the angle (radians) at the iith intersection point
 	 *
-	 * @param xCoords as Eigen::VectorXd*
-	 * @param yCoords as Eigen::VectorXd*
+     * @param xCoords as const Eigen::VectorXd&
+     * @param yCoords as const Eigen::VectorXd&
 	 * @param ii as int
 	 */
-	double computeDelta(Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords,
-			int ii);
+    double computeDelta(const Eigen::VectorXd& xCoords, const Eigen::VectorXd&
+            yCoords, int ii);
 
 	/**
 	 * Computes the x coordinate of the point of tangency of the iith curve
 	 *
-	 * @param rad as Eigen::VectorXd*
-	 * @param delta as Eigen::VectorXd*
-	 * @param xCoords as Eigen::VectorXd*
-	 * @param yCoords as Eigen::VectorXd*
+     * @param rad as const Eigen::VectorXd&
+     * @param delta as const Eigen::VectorXd&
+     * @param xCoords as const Eigen::VectorXd&
+     * @param yCoords as const Eigen::VectorXd&
 	 * @param ii as int
 	 * @return POTX as double
 	 */
-	double computePOTX(Eigen::VectorXd* rad, Eigen::VectorXd* delta,
-		Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords, int ii);
+    double computePOTX(const Eigen::VectorXd& rad, const Eigen::VectorXd&
+            delta, const Eigen::VectorXd& xCoords, const Eigen::VectorXd&
+            yCoords, int ii);
 
 	/**
 	 * Computes the y coordinate of the point of tangency of the iith curve
 	 *
-	 * @param rad as Eigen::VectorXd*
-	 * @param delta as Eigen::VectorXd*
-	 * @param xCoords as Eigen::VectorXd*
-	 * @param yCoords as Eigen::VectorXd*
+     * @param rad as const Eigen::VectorXd&
+     * @param delta as const Eigen::VectorXd&
+     * @param xCoords as const Eigen::VectorXd&
+     * @param yCoords as const Eigen::VectorXd&
 	 * @param ii as int
 	 * @return POTY as double
 	 */
-	double computePOTY(Eigen::VectorXd* rad, Eigen::VectorXd* delta,
-		Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords, int ii);
+    double computePOTY(const Eigen::VectorXd& rad, const Eigen::VectorXd&
+            delta, const Eigen::VectorXd& xCoords, const Eigen::VectorXd&
+            yCoords, int ii);
 
 	/**
 	 * Computes the x coordinate of the point of curvature of the iith curve
 	 *
-	 * @param rad as Eigen::VectorXd*
-	 * @param delta as Eigen::VectorXd*
-	 * @param xCoords as Eigen::VectorXd*
-	 * @param yCoords as Eigen::VectorXd*
+     * @param rad as const Eigen::VectorXd&
+     * @param delta as const Eigen::VectorXd&
+     * @param xCoords as const Eigen::VectorXd&
+     * @param yCoords as const Eigen::VectorXd&
 	 * @param ii as int
 	 * @return POCX as double
 	 */
-	double computePOCX(Eigen::VectorXd* rad, Eigen::VectorXd* delta,
-		Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords, int ii);
+    double computePOCX(const Eigen::VectorXd& rad, const Eigen::VectorXd&
+            delta, const Eigen::VectorXd& xCoords, const Eigen::VectorXd&
+            yCoords, int ii);
 
 	/**
 	 * Computes the y coordinate of the point of curvature of the iith curve
 	 *
-	 * @param rad as Eigen::VectorXd*
-	 * @param delta as Eigen::VectorXd*
-	 * @param xCoords as Eigen::VectorXd*
-	 * @param yCoords as Eigen::VectorXd*
+     * @param rad as const Eigen::VectorXd&
+     * @param delta as const Eigen::VectorXd&
+     * @param xCoords as const Eigen::VectorXd&
+     * @param yCoords as const Eigen::VectorXd&
 	 * @param ii as int
 	 * @return POCY as double
 	 */
-	double computePOCY(Eigen::VectorXd* rad, Eigen::VectorXd* delta,
-		Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords, int ii);
+    double computePOCY(const Eigen::VectorXd &rad, const Eigen::VectorXd &delta,
+        const Eigen::VectorXd &xCoords, const Eigen::VectorXd &yCoords, int ii);
 
 	/**
 	 * Computes the absolute distance from the iith POC to the iith PI
 	 *
-	 * @param xCoords as Eigen::VectorXd*
-	 * @param yCoords as Eigen::VectorXd*
-	 * @param pocx as Eigen::VectorXd*
-	 * @param pocy as Eigen::VectorXd*
+     * @param xCoords as const Eigen::VectorXd&
+     * @param yCoords as const Eigen::VectorXd&
+     * @param pocx as const Eigen::VectorXd&
+     * @param pocy as const Eigen::VectorXd&
 	 * @param ii as int
 	 * @return Distance as double
 	 */
-	double poc2pi(Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords,
-			Eigen::VectorXd* pocx, Eigen::VectorXd* pocy,
+    double poc2pi(const Eigen::VectorXd& xCoords, const Eigen::VectorXd&
+            yCoords, const Eigen::VectorXd& pocx, const Eigen::VectorXd& pocy,
 			int ii);
 
 	/**
 	 * Computes the absolute distance from the iith POT to the iith PI
 	 *
-	 * @param xCoords as Eigen::VectorXd*
-	 * @param yCoords as Eigen::VectorXd*
-	 * @param pocx as Eigen::VectorXd*
-	 * @param pocy as Eigen::VectorXd*
+     * @param xCoords as const Eigen::VectorXd&
+     * @param yCoords as const Eigen::VectorXd&
+     * @param pocx as const Eigen::VectorXd&
+     * @param pocy as const Eigen::VectorXd&
 	 * @param ii as int
 	 * @return Distance as double
 	 */
-	double pot2pi(Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords,
-			Eigen::VectorXd* pocx, Eigen::VectorXd* pocy,
+    double pot2pi(const Eigen::VectorXd& xCoords, const Eigen::VectorXd&
+            yCoords, const Eigen::VectorXd& pocx, const Eigen::VectorXd& pocy,
 			int ii);
 	
 	/**
 	 * Computes the absolute distance between the iith PI and the
 	 * previous PI
 	 *
-	 * @param xCoords as Eigen::VectorXd*
-	 * @param yCoords as Eigen::VectorXd*
+     * @param xCoords as const Eigen::VectorXd&
+     * @param yCoords as const Eigen::VectorXd&
 	 * @param ii as int
 	 * @return Distance as double
 	 */
-	double pi2prev(Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords,
-			int ii);
+    double pi2prev(const Eigen::VectorXd& xCoords, const Eigen::VectorXd&
+            yCoords, int ii);
 
 	/**
 	 * Computes the absolute distance between the iith PI and the
 	 * next PI
 	 *
-	 * @param xCoords as Eigen::VectorXd*
-	 * @param yCoords as Eigen::VectorXd*
+     * @param xCoords as const Eigen::VectorXd&
+     * @param yCoords as const Eigen::VectorXd&
 	 * @param ii as int
 	 * @return Distance as double
 	 */
-	double pi2next(Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords,
-			int ii);
+    double pi2next(const Eigen::VectorXd &xCoords, const Eigen::VectorXd
+        &yCoords, int ii);
 
 	/**
 	 * Recomputes the radius of curvature at curve ii given a revised POC
@@ -412,15 +417,15 @@ private:
 	 * @param revPOCX as double
 	 * @param revPOCY as double
 	 * @param tanlen as double
-	 * @param xCoords as Eigen::VectorXd*
-	 * @param yCoords as Eigen::VectorXd*
-	 * @param delta as Eigen::VectorXd*
+     * @param xCoords as const Eigen::VectorXd&
+     * @param yCoords as const Eigen::VectorXd&
+     * @param delta as const Eigen::VectorXd&
 	 * @param ii as int
 	 * @return Radius as double
 	 */
-	double radNewPOC(Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords,
-			Eigen::VectorXd* delta, int ii, double tanlen, double revPOCX,
-			double revPOCY);
+    double radNewPOC(const Eigen::VectorXd& xCoords, const Eigen::VectorXd&
+            yCoords, const Eigen::VectorXd& delta, int ii, double tanlen,
+            double revPOCX, double revPOCY);
 
 	/**
 	 * Recomputes the radius of curvature at curve ii given a revised POT
@@ -428,47 +433,47 @@ private:
 	 * @param revPOTX as double
 	 * @param revPOTY as double
 	 * @param tanlen as double
-	 * @param xCoords as Eigen::VectorXd*
-	 * @param yCoords as Eigen::VectorXd*
-	 * @param delta as Eigen::VectorXd*
+     * @param xCoords as const Eigen::VectorXd&
+     * @param yCoords as const Eigen::VectorXd&
+     * @param delta as const Eigen::VectorXd&
 	 * @param ii as int
 	 * @return Radius as double
 	 */
-	double radNewPOT(Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords,
-			Eigen::VectorXd* delta, int ii, double tanlen, double revPOTX,
-			double revPOTY);
+    double radNewPOT(const Eigen::VectorXd &xCoords, const Eigen::VectorXd
+            &yCoords, const Eigen::VectorXd &delta, int ii, double tanlen,
+            double revPOTX, double revPOTY);
 
 	/**
 	 * Computes the x coordinate of the centre of curvature
 	 *
-	 * @param xCoords as Eigen::VectorXd*
-	 * @param yCoords as Eigen::VectorXd*
-	 * @param rad as Eigen::VectorXd*
-	 * @param delta as Eigen::VectorXd*
-	 * @param mx as Eigen::VectorXd*
-	 * @param my as Eigen::VectorXd*
+     * @param xCoords as const Eigen::VectorXd&
+     * @param yCoords as const Eigen::VectorXd&
+     * @param rad as const Eigen::VectorXd&
+     * @param delta as const Eigen::VectorXd&
+     * @param mx as const Eigen::VectorXd&
+     * @param my as const Eigen::VectorXd&
 	 * @param ii as int
 	 * @return X coordinate of curve centre as double
 	 */
-	double curveCentreX(Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords,
-			Eigen::VectorXd* rad, Eigen::VectorXd* delta, Eigen::VectorXd* mx,
-			Eigen::VectorXd* my, int ii);
+    double curveCentreX(const Eigen::VectorXd& xCoords, const Eigen::VectorXd& yCoords,
+            const Eigen::VectorXd& rad, const Eigen::VectorXd& delta, const Eigen::VectorXd& mx,
+            const Eigen::VectorXd& my, int ii);
 
 	/**
 	 * Computes the y coordinate of the centre of curvature
 	 *
-	 * @param xCoords as Eigen::VectorXd*
-	 * @param yCoords as Eigen::VectorXd*
-	 * @param rad as Eigen::VectorXd*
-	 * @param delta as Eigen::VectorXd*
-	 * @param mx as Eigen::VectorXd*
-	 * @param my as Eigen::VectorXd*
+     * @param xCoords as const Eigen::VectorXd&
+     * @param yCoords as const Eigen::VectorXd&
+     * @param rad as const Eigen::VectorXd&
+     * @param delta as const Eigen::VectorXd&
+     * @param mx as const Eigen::VectorXd&
+     * @param my as const Eigen::VectorXd&
 	 * @param ii as int
 	 * @return Y coordinate of curve centre as double
 	 */
-	double curveCentreY(Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords,
-			Eigen::VectorXd* rad, Eigen::VectorXd* delta, Eigen::VectorXd* mx,
-			Eigen::VectorXd* my, int ii);
+    double curveCentreY(const Eigen::VectorXd &xCoords, const Eigen::VectorXd &yCoords,
+            const Eigen::VectorXd &rad, const Eigen::VectorXd &delta, const Eigen::VectorXd &mx,
+            const Eigen::VectorXd &my, int ii);
 };
 
 #endif

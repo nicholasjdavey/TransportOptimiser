@@ -20,8 +20,8 @@ public:
 	 *
 	 * Constructs a %State object using the problem variables
 	 */
-	State(double t, ProgramPtr p, std::vector<UncertaintyPtr>* ex,
-			std::vector<UncertaintyPtr>* en);
+    State(double t, ProgramPtr p, const std::vector<UncertaintyPtr>& ex,
+            const std::vector<UncertaintyPtr>& en);
 
 	/**
 	 * Destructor
@@ -61,41 +61,42 @@ public:
 	 * @param program as ProgramPtr
 	 */
 	void setProgram(ProgramPtr program) {
+        this->program.reset();
 		this->program = program;
 	}
 
 	/**
 	 * Returns the exogenous uncertainties in the state
 	 *
-	 * @return Exogenous uncertainties as std::vector<UncertaintyPtr>*
+     * @return Exogenous uncertainties as const std::vector<UncertaintyPtr>&
 	 */
-	std::vector<UncertaintyPtr>* getExogenousUncertainties() {
-		return &this->exogenousUncertainties;
+    const std::vector<UncertaintyPtr>& getExogenousUncertainties() {
+        return this->exogenousUncertainties;
 	}
 	/**
 	 * Sets the exogenous uncertainties in the state
 	 *
-	 * @param ex as std::vector<UncertaintyPtr>*
+     * @param ex as const std::vector<UncertaintyPtr>&
 	 */
-	void setExogenousUncertainties(std::vector<UncertaintyPtr>* ex) {
-		this->exogenousUncertainties = *ex;
+    void setExogenousUncertainties(const std::vector<UncertaintyPtr>& ex) {
+        this->exogenousUncertainties = ex;
 	}
 
 	/**
 	 * Returns the endogenous uncertainties in the state
 	 *
-	 * @return Endogenous uncertainties as std::vector<UncertaintyPtr>*
+     * @return Endogenous uncertainties as const std::vector<UncertaintyPtr>&
 	 */
-	std::vector<UncertaintyPtr>* getEndogenousUncertainties() {
-		return &this->endogenousUncertainties;
+    const std::vector<UncertaintyPtr>& getEndogenousUncertainties() {
+        return this->endogenousUncertainties;
 	}
 	/**
 	 * Sets the endogenous uncertainties in the state
 	 *
-	 * @param en as std::vector<UncertaintyPtr>*
+     * @param en as const std::vector<UncertaintyPtr>&
 	 */
-	void setEndogenousUncertainties(std::vector<UncertaintyPtr>* en ) {
-		this->endogenousUncertainties = *en;
+    void setEndogenousUncertainties(const std::vector<UncertaintyPtr>& en ) {
+        this->endogenousUncertainties = en;
 	}
 
 	// STATIC ROUTINES ///////////////////////////////////////////////////////////

@@ -10,22 +10,20 @@ RoadCells::~RoadCells() {
 void RoadCells::computeRoadCells() {
 
 	// Create short names for all important inputs
-	Eigen::MatrixXd* X = this->road->getOptimiser()->getRegion()->getX();
-	Eigen::MatrixXd* Y = this->road->getOptimiser()->getRegion()->getY();
-	Eigen::VectorXd* x = this->road->getRoadSegments()->getX();
-	Eigen::VectorXd* y = this->road->getRoadSegments()->getY();
-	Eigen::VectorXd* z = this->road->getRoadSegments()->getZ();
-    Eigen::VectorXd* w = this->road->getRoadSegments()->getWidths();
-    Eigen::VectorXi* typ = this->road->getRoadSegments()->getType();
+    const Eigen::MatrixXd& X = this->road->getOptimiser()->getRegion()->getX();
+    const Eigen::MatrixXd& Y = this->road->getOptimiser()->getRegion()->getY();
+    const Eigen::VectorXd& x = this->road->getRoadSegments()->getX();
+    const Eigen::VectorXd& y = this->road->getRoadSegments()->getY();
+    const Eigen::VectorXd& z = this->road->getRoadSegments()->getZ();
+    const Eigen::VectorXd& w = this->road->getRoadSegments()->getWidths();
+    const Eigen::VectorXi& typ = this->road->getRoadSegments()->getType();
 
 	// First need to see if the grid is evenly-spaced
-    unsigned int rx = X->rows();
-    unsigned int cx = X->cols();
-    unsigned int ry = Y->rows();
-	unsigned int cy = Y->cols();
+    unsigned int rx = X.rows();
+    unsigned int cy = Y.cols();
 
-	Eigen::VectorXd xspacing = (X->block(1,0,rx-1,1)-X->block(0,0,rx-1,1));
-	Eigen::VectorXd yspacing = (Y->block(0,1,0,cy-1)-Y->block(0,0,1,cy-1));
+    Eigen::VectorXd xspacing = (X.block(1,0,rx-1,1)-X.block(0,0,rx-1,1));
+    Eigen::VectorXd yspacing = (Y.block(0,1,0,cy-1)-Y.block(0,0,1,cy-1));
 
 	if (((xspacing.block(1,0,rx-2,1)-xspacing.block(0,0,rx-2,1)).sum()
 			> 1e-4) || ((yspacing.block(0,1,1,cy-2)-
@@ -36,55 +34,53 @@ void RoadCells::computeRoadCells() {
 
 	// X and Y must be monotonically increasing. That is, they must be ordered
 	// such that they can directly plot the region
-	double xmin = (*X)(0,0);
-    double ymin = (*Y)(0,0);
-    double xmax = (*X)(rx-1,cx-1);
-    double ymax = (*Y)(ry-1,cy-1);
+    double xmin = X(0,0);
+    double ymin = Y(0,0);
 
 	// Compute road cells
-	unsigned int norg = x->size() - 1;
+    unsigned int norg = x.size() - 1;
 
 	// Compute the span of each grid cell. We assume all cells have the same
 	// span.
-	double xspan = (*X)(1,0) - (*X)(0,0);
-	double yspan = (*Y)(0,1) - (*Y)(0,0);
+    double xspan = X(1,0) - X(0,0);
+    double yspan = Y(0,1) - Y(0,0);
 
 	// Compute the number of horizontal crosses between each consecutive pair
 	// of road points
-	Eigen::VectorXi horCross = ((x->segment(1,norg)/xspan)
-			- (x->segment(0,norg)/xspan)).cast<int>();
-	Eigen::VectorXi verCross = ((y->segment(1,norg)/yspan)
-			- (y->segment(0,norg)/yspan)).cast<int>();
+    Eigen::VectorXi horCross = ((x.segment(1,norg)/xspan)
+            - (x.segment(0,norg)/xspan)).cast<int>();
+    Eigen::VectorXi verCross = ((y.segment(1,norg)/yspan)
+            - (y.segment(0,norg)/yspan)).cast<int>();
 
 	// Number of intersection points for reparametrised road. These
 	// intersection points all lie on grid lines of the terrain grid.
 	unsigned long nnew = horCross.array().abs().sum() + 
-			verCross.array().abs().sum() + x->size();
+            verCross.array().abs().sum() + x.size();
 
 	// Straight line equation in x,y for each segment
 	Eigen::MatrixXd sleq = Eigen::MatrixXd::Zero(4,norg);
 
 	// Where the difference in x is non-zero (and hence we have a function
 	// mapping x to a unique and defined y)
-	sleq.block(0,0,1,norg) = (((y->segment(1,norg)
-			- y->segment(0,norg)).array())/((x->segment(1,norg)
-			- x->segment(0,norg)).array())).matrix();
-	sleq.block(1,0,1,norg) = (y->segment(0,norg)
-			- x->segment(0,norg)).array()*sleq.block(0,0,1,norg).array();
+    sleq.block(0,0,1,norg) = (((y.segment(1,norg)
+            - y.segment(0,norg)).array())/((x.segment(1,norg)
+            - x.segment(0,norg)).array())).matrix();
+    sleq.block(1,0,1,norg) = (y.segment(0,norg)
+            - x.segment(0,norg)).array()*sleq.block(0,0,1,norg).array();
 	// Otherwise
-	sleq.block(2,0,1,norg) = (((x->segment(1,norg)
-			- x->segment(0,norg)).array())/((y->segment(1,norg)
-			- y->segment(0,norg)).array())).matrix();
-	sleq.block(3,0,1,norg) = (x->segment(0,norg)
-			- y->segment(0,norg)).array()*sleq.block(0,0,1,norg).array();
+    sleq.block(2,0,1,norg) = (((x.segment(1,norg)
+            - x.segment(0,norg)).array())/((y.segment(1,norg)
+            - y.segment(0,norg)).array())).matrix();
+    sleq.block(3,0,1,norg) = (x.segment(0,norg)
+            - y.segment(0,norg)).array()*sleq.block(0,0,1,norg).array();
 	
 	// Straight line equation of variation in z for each segment
 	Eigen::MatrixXd sleq2 = Eigen::MatrixXd::Zero(2,norg);
-	sleq2.block(0,0,1,norg) = (((z->segment(1,norg)
-			- z->segment(0,norg)).array())/(((x->segment(1,norg)
-			- x->segment(0,norg)).array().pow(2) + (y->segment(1,norg)
-			- y->segment(0,norg)).array().pow(2)).sqrt()));
-	sleq2.block(1,0,1,norg) = z->segment(0,norg);
+    sleq2.block(0,0,1,norg) = (((z.segment(1,norg)
+            - z.segment(0,norg)).array())/(((x.segment(1,norg)
+            - x.segment(0,norg)).array().pow(2) + (y.segment(1,norg)
+            - y.segment(0,norg)).array().pow(2)).sqrt()));
+    sleq2.block(1,0,1,norg) = z.segment(0,norg);
 
 	// Note, here if the distance from (x1,y1) to (x2,y2) is zero, then we just
 	// say that we are at the same z value because it is the same point.
@@ -102,14 +98,14 @@ void RoadCells::computeRoadCells() {
 
 	for (unsigned int ii = 0; ii < norg; ii++) {
 		// First make sure that the current x,y and z values are finite
-        if (std::isfinite((*x)(ii)) && std::isfinite((*y)(ii)) && std::isfinite((*z)(ii))) {
+        if (std::isfinite(x(ii)) && std::isfinite(y(ii)) && std::isfinite(z(ii))) {
 
 			// Put the existing points in the matrix
-            this->x(counter) = (*x)(ii);
-            this->y(counter) = (*y)(ii);
-            this->z(counter) = (*z)(ii);
-            this->w(counter) = (*w)(ii);
-            this->type(counter) = (*typ)(ii);
+            this->x(counter) = x(ii);
+            this->y(counter) = y(ii);
+            this->z(counter) = z(ii);
+            this->w(counter) = w(ii);
+            this->type(counter) = typ(ii);
 			unsigned int nump = 0;
 
 			// Find the x and y coordinates of every intervening intersection
@@ -122,20 +118,20 @@ void RoadCells::computeRoadCells() {
 					// Compute the x values
 					if (horCross(ii) > 0) {
 						pairs.block(0,0,abs(horCross(ii)),1) = 
-								xspan*(floor((*x)(ii)/xspan) 
+                                xspan*(floor(x(ii)/xspan)
 								+ Eigen::VectorXd::LinSpaced(
 								abs(horCross(ii)),1,abs(horCross(ii)))
 								.array());
 					} else if (horCross(ii) < 0) {
-						if (fmod((*x)(ii), xspan) == 0) {
+                        if (fmod(x(ii), xspan) == 0) {
 							pairs.block(0,0,abs(horCross(ii)),1) =
-									xspan*(ceil((*x)(ii)/xspan)
+                                    xspan*(ceil(x(ii)/xspan)
 									- Eigen::VectorXd::LinSpaced(
 									abs(horCross(ii)),0,abs(horCross(ii))-1)
 									.array());
 						} else {
 							pairs.block(0,0,abs(horCross(ii)),1) =
-									xspan*(ceil((*x)(ii)/xspan)
+                                    xspan*(ceil(x(ii)/xspan)
 									- Eigen::VectorXd::LinSpaced(
 									abs(horCross(ii)),1,abs(horCross(ii)))
 									.array());
@@ -158,20 +154,20 @@ void RoadCells::computeRoadCells() {
 						// we get around it by using this approach carefully.
 						pairs.block(0,1,abs(horCross(ii)),1) =
 								Eigen::VectorXd::Constant(abs(horCross(ii)),1,
-								(*y)(ii));
+                                y(ii));
 					}
 
 					// Compute corresponding z values
 					if (std::isfinite(sleq2(0,ii))) {
 						pairs.block(0,2,abs(horCross(ii)),1) = sleq2(1,ii) + 
 								sleq2(0,ii)*(((pairs.block(0,0,abs(horCross(ii
-								)),1).array() - (*x)(ii)).pow(2)
+                                )),1).array() - x(ii)).pow(2)
 								+ (pairs.block(0,1,abs(horCross(ii)),1).array()
-								- (*y)(ii)).pow(2)).array().sqrt());
+                                - y(ii)).pow(2)).array().sqrt());
 					} else {
 						pairs.block(0,2,abs(horCross(ii)),1) = 
 								Eigen::VectorXd::Constant(abs(horCross(ii)),1,
-								(*z)(ii));
+                                z(ii));
 					}
 				}
 
@@ -179,19 +175,19 @@ void RoadCells::computeRoadCells() {
 					// Compute the y values
 					if (verCross(ii) > 0) {
 						pairs.block(abs(horCross(ii)),1,abs(verCross(ii)),1) =
-								yspan*(floor((*y)(ii)/yspan)
+                                yspan*(floor(y(ii)/yspan)
 								+ Eigen::VectorXd::LinSpaced(
 								abs(verCross(ii)),1,abs(horCross(ii)))
 								.array());
 					} else if (verCross(ii) < 0) {
-						if (fmod((*y)(ii), yspan) == 0) {
+                        if (fmod(y(ii), yspan) == 0) {
 							pairs.block(abs(horCross(ii)),1,abs(verCross(ii)),
-									1) = yspan*(ceil((*y)(ii)/yspan)
+                                    1) = yspan*(ceil(y(ii)/yspan)
 									- Eigen::VectorXd::LinSpaced(abs(verCross(
 									ii)),0,abs(horCross(ii))-1).array());
 						} else {
 							pairs.block(abs(horCross(ii)),1,abs(verCross(ii)),
-									1) = yspan*(ceil((*y)(ii)/yspan)
+                                    1) = yspan*(ceil(y(ii)/yspan)
 									- Eigen::VectorXd::LinSpaced(abs(verCross(
 									ii)),1,abs(verCross(ii))).array());
 						}
@@ -213,25 +209,25 @@ void RoadCells::computeRoadCells() {
 						// we get around it by using this approach carefully.
 						pairs.block(abs(horCross(ii)),0,abs(verCross(ii)),1) =
 								Eigen::VectorXd::Constant(verCross(ii),1,
-								(*x)(ii));
+                                x(ii));
 					}
 
 					// Compute the corresponding z values
 					if (std::isfinite(sleq2(0,ii))) {
 						pairs.block(abs(horCross(ii)),2,abs(verCross(ii)),1) =
 								sleq2(0,ii)*((pairs.block(abs(horCross(ii)),0,
-								abs(verCross(ii)),1).array() - (*x)(ii)).pow(2)
+                                abs(verCross(ii)),1).array() - x(ii)).pow(2)
 								+ (pairs.block(abs(horCross(ii)),1,
-								abs(verCross(ii)),1).array() - (*y)(ii)).pow(2)
+                                abs(verCross(ii)),1).array() - y(ii)).pow(2)
 								).sqrt() + sleq(1,ii);
 					} else {
 						pairs.block(abs(horCross(ii)),2,abs(verCross(ii)),1) =
 								Eigen::VectorXd::Constant(abs(verCross(ii)),1,
-								(*z)(ii));
+                                z(ii));
 					}
 				}
 
-                if ((*x)(ii+1) >= (*x)(ii)) {
+                if (x(ii+1) >= x(ii)) {
                     Eigen::MatrixXd temppairs = Eigen::MatrixXd::Zero(nump,3);
                     Eigen::VectorXi indices = Eigen::VectorXi::Zero(nump);
                     igl::sortrows(pairs,true,temppairs,indices);
@@ -250,9 +246,9 @@ void RoadCells::computeRoadCells() {
                 this->z.segment(counter+1,nump) = (pairs.block(0,2,pairs.
 						cols(),1)).transpose();
                 this->w.segment(counter+1,nump) = Eigen::VectorXd::Constant(
-                            nump,(*w)(ii));
+                            nump,w(ii));
                 this->type.segment(counter+1,nump) = Eigen::VectorXi::Constant(
-                            nump,(*typ)(ii));
+                            nump,typ(ii));
 			}
 
 			counter += nump + 1;
@@ -260,13 +256,13 @@ void RoadCells::computeRoadCells() {
 	}
 
 	// Add the very last point if finite
-    if (std::isfinite((*x)(x->size())) && std::isfinite((*y)(y->size()))
-            && std::isfinite((*z)(z->size()))) {
-        this->x(counter) = (*x)(x->size() - 1);
-        this->y(counter) = (*y)(y->size() - 1);
-        this->z(counter) = (*z)(z->size() - 1);
-        this->w(counter) = (*w)(w->size() - 1);
-        this->type(counter) = (*typ)(x->size() - 1);
+    if (std::isfinite(x(x.size())) && std::isfinite(y(y.size()))
+            && std::isfinite(z(z.size()))) {
+        this->x(counter) = x(x.size() - 1);
+        this->y(counter) = y(y.size() - 1);
+        this->z(counter) = z(z.size() - 1);
+        this->w(counter) = w(w.size() - 1);
+        this->type(counter) = typ(x.size() - 1);
 	}
 
 	// Finally, remove any extra rows
@@ -305,13 +301,13 @@ void RoadCells::computeRoadCells() {
     this->areas = (this->len).array()*this->w.array();
 
     // Assign the corresponding habitat to each cell reference
-    Eigen::MatrixXi* vegPtr = this->road->getOptimiser()->getRegion()
+    const Eigen::MatrixXi& vegPtr = this->road->getOptimiser()->getRegion()
             ->getVegetation();
     Eigen::VectorXi rows = gridRefs.block(0,0,nnew,1);
     Eigen::VectorXi cols = gridRefs.block(0,1,nnew,1);
-    Utility::sub2ind(*vegPtr,rows,cols,this->cellRefs);
+    Utility::sub2ind(vegPtr,rows,cols,this->cellRefs);
 
-    igl::slice(*vegPtr,this->cellRefs,this->veg);
+    igl::slice(vegPtr,this->cellRefs,this->veg);
 
     // Finally, determine the unique cells occupied by road. This is the same
     // as this->cellRefs but with unique values removed.

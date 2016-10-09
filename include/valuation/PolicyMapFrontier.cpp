@@ -11,13 +11,13 @@ PolicyMapFrontier::PolicyMapFrontier(unsigned long base,
 }
 
 PolicyMapFrontier::PolicyMapFrontier(unsigned long base,
-		unsigned long proposed, Eigen::MatrixXf* lvls,
-		Eigen::VectorXd* unitProfit) {
+        unsigned long proposed, const Eigen::MatrixXd &lvls,
+        const Eigen::VectorXd &unitProfit) {
 
 	this->baseOption = base;
 	this->proposedOption = proposed;
-	this->stateLevels = *lvls;
-	this->unitProfit = *unitProfit;
+    this->stateLevels = lvls;
+    this->unitProfit = unitProfit;
 }
 
 PolicyMapFrontier::~PolicyMapFrontier() {

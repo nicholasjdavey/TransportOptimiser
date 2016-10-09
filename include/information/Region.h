@@ -17,10 +17,10 @@ public:
 	 *
 	 * Constructs a %Region object with values passed from main program
 	 */
-	Region(Eigen::MatrixXd* X, Eigen::MatrixXd* Y, Eigen::MatrixXd* Z,
-			Eigen::MatrixXd* acCost, Eigen::MatrixXd* ssc,
-            Eigen::MatrixXd* cc, Eigen::MatrixXi* veg,
-			std::string inputFile = "");
+    Region(const Eigen::MatrixXd& X, const Eigen::MatrixXd& Y, const
+            Eigen::MatrixXd& Z, const Eigen::MatrixXd& acCost, const
+            Eigen::MatrixXd& ssc, const Eigen::MatrixXd& cc, const
+            Eigen::MatrixXi& veg, std::string inputFile = "");
 
 	/**
 	 * Constructor II
@@ -61,120 +61,120 @@ public:
 	/**
 	 * Returns the matrix of X coordinates
 	 *
-	 * @return X matrix as Eigen::MatrixXd*
+     * @return X matrix as const Eigen::MatrixXd&
 	 */
-	Eigen::MatrixXd* getX() {
-		return &this->X;
+    const Eigen::MatrixXd& getX() {
+        return this->X;
 	}
 	/**
 	 * Sets the matrix of X coordinates
 	 *
-	 * @param X as Eigen::MatrixXd*
+     * @param X as const Eigen::MatrixXd&
 	 */
-	void setX(Eigen::MatrixXd* X) {
-		this->X = *X;
+    void setX(const Eigen::MatrixXd& X) {
+        this->X = X;
 	}
 
 	/**
 	 * Returns the matrix of Y coordinates
 	 *
-	 * @return Y matrix as Eigen::MatrixXd*
+     * @return Y matrix as const Eigen::MatrixXd&
 	 */
-	Eigen::MatrixXd* getY() {
-		return &this->Y;
+    const Eigen::MatrixXd& getY() {
+        return this->Y;
 	}
 	/**
 	 * Sets the matrix of Y coordinates
 	 *
-	 * @param Y as Eigen::MatrixXd*
+     * @param Y as const Eigen::MatrixXd&
 	 */
-	void setY(Eigen::MatrixXd* Y) {
-		this->Y = *Y;
+    void setY(const Eigen::MatrixXd& Y) {
+        this->Y = Y;
 	}
 
 	/**
 	 * Returns the matrix of Z coordinates
 	 *
-	 * @return Z matrix as Eigen::MatrixXd*
+     * @return Z matrix as const Eigen::MatrixXd&
 	 */
-	Eigen::MatrixXd* getZ() {
-		return &this->Z;
+    const Eigen::MatrixXd& getZ() {
+        return this->Z;
 	}
 	/**
 	 * Sets the matrix of Z coordinates
 	 *
-	 * @param Z as Eigen::MatrixXd*
+     * @param Z as const Eigen::MatrixXd&
 	 */
-	void setZ(Eigen::MatrixXd* Z) {
-		this->Z = *Z;
+    void setZ(const Eigen::MatrixXd& Z) {
+        this->Z = Z;
 	}
 
     /**
      * Returns the matrix of vegetations
      *
-     * @return Vegetation matrix as Eigen::MatrixXi*
+     * @return Vegetation matrix as const Eigen::MatrixXi&
      */
-    Eigen::MatrixXi* getVegetation() {
-        return &this->veg;
+    const Eigen::MatrixXi& getVegetation() {
+        return this->veg;
     }
     /**
      * Sets the matrix of vegetations
      *
-     * @param beg as Eigen::MatrixXi*
+     * @param beg as const Eigen::MatrixXi&
      */
-    void setVegetation(Eigen::MatrixXi* veg) {
-        this->veg = *veg;
+    void setVegetation(const Eigen::MatrixXi& veg) {
+        this->veg = veg;
     }
 
 	/**
 	 * Returns the matrix of acquisition costs
 	 *
-	 * @return Acquisition costs matrix as Eigen::MatrixXd*
+     * @return Acquisition costs matrix as const Eigen::MatrixXd&
 	 */
-	Eigen::MatrixXd* getAcquisitionCost() {
-		return &this->acCost;
+    const Eigen::MatrixXd& getAcquisitionCost() {
+        return this->acCost;
 	}
 	/**
 	 * Sets the matrix of acquisition costs
 	 *
-	 * @param acc as Eigen::MatrixXd*
+     * @param acc as const Eigen::MatrixXd&
 	 */
-	void setAcquisitionCost(Eigen::MatrixXd* acc) {
-		this->acCost = *acc;
+    void setAcquisitionCost(const Eigen::MatrixXd& acc) {
+        this->acCost = acc;
 	}
 
 	/**
 	 * Returns the matrix of soil stabilisation costs
 	 *
-	 * @return Soil stabilisation cost matrix as Eigen::MatrixXd*
+     * @return Soil stabilisation cost matrix as const Eigen::MatrixXd&
 	 */
-	Eigen::MatrixXd* getSoilStabilisationCost() {
-		return &this->soilStabCost;
+    const Eigen::MatrixXd& getSoilStabilisationCost() {
+        return this->soilStabCost;
 	}
 	/**
 	 * Sets the matrix of soil stabilisation costs
 	 *
-	 * @param ssc as Eigen::MatrixXd*
+     * @param ssc as const Eigen::MatrixXd&
 	 */
-	void setSoilStabilisationCost(Eigen::MatrixXd* ssc) {
-		this->soilStabCost = *ssc;
+    void setSoilStabilisationCost(const Eigen::MatrixXd& ssc) {
+        this->soilStabCost = ssc;
 	}
 
 	/**
 	 * Returns the matrix of clearance costs
 	 *
-	 * @return Clearance cost matrix as Eigen::MatrixXd*
+     * @return Clearance cost matrix as const Eigen::MatrixXd&
 	 */
-	Eigen::MatrixXd* getClearanceCost() {
-		return &this->clearCosts;
+    const Eigen::MatrixXd& getClearanceCost() {
+        return this->clearCosts;
 	}
 	/**
 	 * Sets the matrix of clearance costs
 	 *
-	 * @param cc as Eigen::MatrixXd*
+     * @param cc as const Eigen::MatrixXd&
 	 */
-	void setClearanceCost(Eigen::MatrixXd* cc) {
-		this->clearCosts = *cc;
+    void setClearanceCost(const Eigen::MatrixXd& cc) {
+        this->clearCosts = cc;
 	}
 
 	/**

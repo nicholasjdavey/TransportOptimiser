@@ -1,6 +1,9 @@
 #ifndef ROADSEGMENTS_H
 #define ROADSEGMENTS_H
 
+class Road;
+typedef std::shared_ptr<Road> RoadPtr;
+
 class RoadSegments;
 typedef std::shared_ptr<RoadSegments> RoadSegmentsPtr;
 
@@ -46,143 +49,144 @@ public:
 	 * @param road as RoadPtr
 	 */
 	void setRoad(RoadPtr road) {
+        this->road.reset();
 		this->road = road;
 	}
 
 	/**
 	 * Returns the X coordinates
 	 *
-	 * @return X coordinates as Eigen::VectorXd*
+     * @return X coordinates as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getX() {
-		return &this->x;
+    const Eigen::VectorXd& getX() {
+        return this->x;
 	}
 	/**
 	 * Sets the X coordinates
 	 *
-	 * @param x as Eigen::VectorXd*
+     * @param x as const Eigen::VectorXd&
 	 */
-	void setX(Eigen::VectorXd* x) {
-		this->x = *x;
+    void setX(const Eigen::VectorXd& x) {
+        this->x = x;
 	}
 
 	/**
 	 * Returns the Y coordinates
 	 *
-	 * @return Y coordinates as Eigen::VectorXd*
+     * @return Y coordinates as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getY() {
-		return &this->y;
+    const Eigen::VectorXd& getY() {
+        return this->y;
 	}
 	/**
 	 * Sets the Y coordinates
 	 *
-	 * @param y as Eigen::VectorXd*
+     * @param y as const Eigen::VectorXd&
 	 */
-	void setY(Eigen::VectorXd* y) {
-		this->y = *y;
+    void setY(const Eigen::VectorXd& y) {
+        this->y = y;
 	}
 
 	/**
 	 * Returns the natural elevation
 	 *
-	 * @return Natural elevation as Eigen::VectorXd*
+     * @return Natural elevation as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getE() {
-		return &this->e;
+    const Eigen::VectorXd& getE() {
+        return this->e;
 	}
 	/**
 	 * Sets the natural elevation
 	 *
-	 * @param e as Eigen::VectorXd*
+     * @param e as const Eigen::VectorXd&
 	 */
-	void setE(Eigen::VectorXd* e) {
-		this->e = *e;
+    void setE(const Eigen::VectorXd& e) {
+        this->e = e;
 	}
 
 	/**
 	 * Returns the Z coordinates
 	 *
-	 * @return Z coordinates as Eigen::VectorXd*
+     * @return Z coordinates as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getZ() {
-		return &this->z;
+    const Eigen::VectorXd& getZ() {
+        return this->z;
 	}
 	/**
 	 * Sets the Z coordinates
 	 *
-	 * @param z as Eigen::VectorXd*
+     * @param z as const Eigen::VectorXd&
 	 */
-	void setZ(Eigen::VectorXd* z) {
-		this->z = *z;
+    void setZ(const Eigen::VectorXd& z) {
+        this->z = z;
 	}
 
 	/**
 	 * Returns the parametrised distance along the curve
 	 *
-	 * @return Distances as Eigen::VectorXd*
+     * @return Distances as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getDists() {
-		return &this->s;
+    const Eigen::VectorXd& getDists() {
+        return this->s;
 	}
 	/**
 	 * Sets the parametrised distance along the curve
 	 *
-	 * @param s as Eigen::VectorXd*
+     * @param s as const Eigen::VectorXd&
 	 */
-	void setDists(Eigen::VectorXd* s) {
-		this->s = *s;
+    void setDists(const Eigen::VectorXd& s) {
+        this->s = s;
 	}
 
 	/**
 	 * Returns the widths
 	 *
-	 * @return Widths as Eigen::VectorXd*
+     * @return Widths as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getWidths() {
-		return &this->w;
+    const Eigen::VectorXd& getWidths() {
+        return this->w;
 	}
 	/**
 	 * Sets the segment widths
 	 *
-	 * @param w as Eigen::VectorXd*
+     * @param w as const Eigen::VectorXd&
 	 */
-	void setWidths(Eigen::VectorXd* w) {
-		this->w = *w;
+    void setWidths(const Eigen::VectorXd& w) {
+        this->w = w;
 	}
 
 	/**
 	 * Returns the velocities
 	 *
-	 * @return Velocities as Eigen::VectorXd*
+     * @return Velocities as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getVelocities() {
-		return &this->v;
+    const Eigen::VectorXd& getVelocities() {
+        return this->v;
 	}
 	/**
 	 * Sets the velocities
 	 *
-	 * @param v as Eigen::VectorXd*
+     * @param v as const Eigen::VectorXd&
 	 */
-	void setVelocities(Eigen::VectorXd* v) {
-		this->v = *v;
+    void setVelocities(const Eigen::VectorXd& v) {
+        this->v = v;
 	}
 
 	/**
 	 * Returns the distances to curve points
 	 *
-	 * @return Distances as Eigen::VectorXd*
+     * @return Distances as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getSPC() {
-		return &this->spc;
+    const Eigen::VectorXd& getSPC() {
+        return this->spc;
 	}
 	/**
 	 * Sets the distances to curve points
 	 *
-	 * @param spc as Eigen::VectorXd*
+     * @param spc as const Eigen::VectorXd&
 	 */
-	void setSPC(Eigen::VectorXd* spc) {
-		this->v = *spc;
+    void setSPC(const Eigen::VectorXd& spc) {
+        this->spc = spc;
 	}
 
 	/**
@@ -192,18 +196,18 @@ public:
      * BRIDGE and TUNNEL), we cast them as ints so that we may store
      * them in a matrix for easy use.
 	 *
-     * @return Road type as Eigen::VectorXi*
+     * @return Road type as const Eigen::VectorXi&
 	 */
-    Eigen::VectorXi* getType() {
-        return &this->typ;
+    const Eigen::VectorXi& getType() {
+        return this->typ;
 	}
 	/**
 	 * Sets the type of road
 	 *
-     * @param typ as Eigen::VectorXi*
+     * @param typ as const Eigen::VectorXi&
 	 */
-    void setType(Eigen::VectorXi* typ) {
-        this->typ = *typ;
+    void setType(const Eigen::VectorXi& typ) {
+        this->typ = typ;
 	}
 
 	// STATIC ROUTINES ////////////////////////////////////////////////////////

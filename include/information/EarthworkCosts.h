@@ -16,8 +16,8 @@ public:
 	 *
 	 * Constructs an %Earthwork object with default values.
 	 */
-	EarthworkCosts(Eigen::VectorXd* cd, Eigen::VectorXd* cc,
-			double fc);
+    EarthworkCosts(const Eigen::VectorXd &cd, const Eigen::VectorXd &cc,
+            double fc);
 
 	/**
 	 * Destructor
@@ -28,35 +28,35 @@ public:
 	/**
 	 * Returns the vector of cut depth thresholds
 	 *
-	 * @return Cut depths as Eigen::VectorXd*
+     * @return Cut depths as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getDepths() {
-		return &this->cDepths;
+    const Eigen::VectorXd& getDepths() {
+        return this->cDepths;
 	}
 	/**
 	 * Sets the vector of cut depth thresholds
 	 *
-	 * @param cd as Eigen::VectorXd*
+     * @param cd as const Eigen::VectorXd&
 	 */
-	void setDepths(Eigen::VectorXd* cd) {
-		this->cCosts = *cd;
+    void setDepths(const Eigen::VectorXd& cd) {
+        this->cCosts = cd;
 	}
 
 	/**
 	 * Returns the vector of corresponding cut costs
 	 *
-	 * @return Cut costs as Eigen::VectorXd*
+     * @return Cut costs as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getCutCosts() {
-		return &this->cCosts;
+    const Eigen::VectorXd& getCutCosts() {
+        return this->cCosts;
 	}
 	/**
 	 * Sets the vector of corresponding cut costs
 	 *
-	 * @param cc as Eigen::VectorXd*
+     * @param cc as const Eigen::VectorXd&
 	 */
-	void setCutCosts(Eigen::VectorXd* cc) {
-		this->cCosts = *cc;
+    void setCutCosts(const Eigen::VectorXd& cc) {
+        this->cCosts = cc;
 	}
 
 	/**

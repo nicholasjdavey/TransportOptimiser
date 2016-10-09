@@ -11,7 +11,8 @@ PolicyMap::PolicyMap(ProgramPtr program, unsigned long noYears) {
 	}
 }
 
-PolicyMap::PolicyMap(ProgramPtr program, std::vector<PolicyMapYearPtr>* years) {
+PolicyMap::PolicyMap(ProgramPtr program, const std::vector<PolicyMapYearPtr>
+        &years) {
 	this->program = program;
-	this->yearlyMaps = *years;
+    this->yearlyMaps = years;
 }

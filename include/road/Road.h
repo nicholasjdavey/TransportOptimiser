@@ -52,8 +52,8 @@ public:
 	 * Constructs a %Road object with assigned values
 	 */
 	Road(OptimiserPtr op, SimulatorPtr sim, std::string testName,
-			Eigen::VectorXd* xCoords, Eigen::VectorXd* yCoords,
-			Eigen::VectorXd* zCoords);
+            const Eigen::VectorXd& xCoords, const Eigen::VectorXd& yCoords,
+            const Eigen::VectorXd& zCoords);
 
 	/**
 	 * Destructor
@@ -76,6 +76,7 @@ public:
 	 * @param op as OptimiserPtr
 	 */
 	void setOptimiser(OptimiserPtr op) {
+        this->optimiser.reset();
 		this->optimiser = op;
 	}
 
@@ -93,6 +94,7 @@ public:
 	 * @param sim as SimulatorPtr
 	 */
 	void setSimulator(SimulatorPtr sim) {
+        this->simulator.reset();
 		this->simulator = sim;
 	}
 
@@ -110,6 +112,7 @@ public:
 	 * @param pm as PolicyMapPtr
 	 */
 	void setPolicyMap(PolicyMapPtr pm) {
+        this->policyMap.reset();
 		this->policyMap = pm;
 	}
 
@@ -127,6 +130,7 @@ public:
 	 * @param segments as RoadSegmentsPtr
 	 */
 	void setRoadSegments(RoadSegmentsPtr segments) {
+        this->segments.reset();
 		this->segments = segments;
 	}
 
@@ -144,6 +148,7 @@ public:
 	 * @param cells as RoadCellsPtr
 	 */
 	void setRoadCells(RoadCellsPtr cells) {
+        this->roadCells.reset();
 		this->roadCells = cells;
 	}
 
@@ -161,6 +166,7 @@ public:
 	 * @param ha as HorizontalAlignmentPtr
 	 */
 	void setHorizontalAlignment(HorizontalAlignmentPtr ha) {
+        this->horizontalAlignment.reset();
 		this->horizontalAlignment = ha;
 	}
 
@@ -178,6 +184,7 @@ public:
 	 * @param va as VerticalAlignmentPtr
 	 */
 	void setVerticalAlignment(VerticalAlignmentPtr va) {
+        this->verticalAlignment.reset();
 		this->verticalAlignment = va;
 	}
 
@@ -195,6 +202,7 @@ public:
 	 * @param att as AttributesPtr
 	 */
 	void setAttributes(AttributesPtr att) {
+        this->attributes.reset();
 		this->attributes = att;
 	}
 
@@ -212,24 +220,25 @@ public:
 	 * @param costs as CostsPtr
 	 */
 	void setCosts(CostsPtr costs) {
+        this->costs.reset();
 		this->costs = costs;
 	}
 
     /**
      * Returns the habitat patches for each Species for this Road
      *
-     * @return SpeciesRoadPatches as std::vector<SpeciesRoadPatchesPtr>*
+     * @return SpeciesRoadPatches as cosnt std::vector<SpeciesRoadPatchesPtr>&
      */
-    std::vector<SpeciesRoadPatchesPtr>* getSpeciesRoadPatches() {
-        return &this->srp;
+    const std::vector<SpeciesRoadPatchesPtr>& getSpeciesRoadPatches() {
+        return this->srp;
     }
     /**
      * Sets the habitat patches for each Species for this Road
      *
-     * @param srp as std::vector<SpeciesRoadPatchesPtr>*
+     * @param srp as const std::vector<SpeciesRoadPatchesPtr>&
      */
-    void setSpeciesRoadPatches(std::vector<SpeciesRoadPatchesPtr>* srp) {
-        this->srp = *srp;
+    void setSpeciesRoadPatches(const std::vector<SpeciesRoadPatchesPtr>& srp) {
+        this->srp = srp;
     }
 
 	/**
@@ -252,35 +261,35 @@ public:
 	/**
 	 * Returns X coordinates of the intersection points
 	 *
-	 * @return X coordinates as Eigen::VectorXd*
+     * @return X coordinates as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getXCoords() {
-		return &this->xCoords;
+    const Eigen::VectorXd& getXCoords() {
+        return this->xCoords;
 	}
 	/**
 	 * Sets the X coordinates of the intersection points
 	 *
-	 * @param xc as Eigen::VectorXd*
+     * @param xc as const Eigen::VectorXd&
 	 */
-	void setXCoords(Eigen::VectorXd* xc) {
-		this->xCoords = *xc;
+    void setXCoords(const Eigen::VectorXd& xc) {
+        this->xCoords = xc;
 	}
 
 	/**
 	 * Returns the Y coordinates of the intersection points
 	 *
-	 * @return Y coordinates as Eigen::VectorXd*
+     * @return Y coordinates as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getYCoords() {
-		return &this->yCoords;
+    const Eigen::VectorXd& getYCoords() {
+		return this->yCoords;
 	}
 	/**
 	 * Sets the Y coordinates of the intersection points
 	 *
-	 * @param yc as Eigen::VectorXd*
+     * @param yc as const Eigen::VectorXd&
 	 */
-	void setYCoordinates(Eigen::VectorXd* yc) {
-		this->yCoords = *yc;
+    void setYCoordinates(const Eigen::VectorXd& yc) {
+		this->yCoords = yc;
 	}
 
 	/**
@@ -288,16 +297,16 @@ public:
 	 *
 	 * @return Z coordinates of the the intersection points
 	 */
-	Eigen::VectorXd* getZCoords() {
-		return &this->zCoords;
+    const Eigen::VectorXd& getZCoords() {
+        return this->zCoords;
 	}
 	/**
 	 * Sets the Z coordinates of the intersection points
 	 *
-	 * @param zc as Eigen::VectorXd*
+     * @param zc as const Eigen::VectorXd&
 	 */
-	void setZCoords(Eigen::VectorXd* zc) {
-		this->zCoords = *zc;
+    void setZCoords(const Eigen::VectorXd& zc) {
+        this->zCoords = zc;
 	}
 
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
@@ -335,7 +344,7 @@ public:
      *
      * @param srp as SpeciesRoadPatchesPtr
      */
-    void addSpeciesPatches(SpeciesRoadPatchesPtr srp);
+    void addSpeciesPatches(SpeciesPtr species);
 
 private:
 	OptimiserPtr optimiser;						/**< Calling Optimisation object */

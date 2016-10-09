@@ -40,172 +40,172 @@ public:
 	/**
 	 * Return distances of intersection points along HA
 	 *
-	 * @return Distances as Eigen::VectorXd*
+     * @return Distances as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getSDistances() {
-		return &this->s;
+    const Eigen::VectorXd& getSDistances() {
+        return this->s;
 	}
 	/**
 	 * Sets distances of intersection points along HA
 	 *
-	 * @param s as Eigen::VectorXd*
+     * @param s as const Eigen::VectorXd&
 	 */
-	void setSDistances(Eigen::VectorXd* s) {
-		this->s = *s;
+    void setSDistances(const Eigen::VectorXd& s) {
+        this->s = s;
 	}
 
 	
 	/**
 	 * Return points of vertical curvature
 	 *
-	 * @return PVCs as Eigen::VectorXd*
+     * @return PVCs as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getPVCs() {
-		return &this->pvc;
+    const Eigen::VectorXd& getPVCs() {
+        return this->pvc;
 	}
 	/**
 	 * Sets points of vertical curvature
 	 *
-	 * @param pvcs as Eigen::VectorXd*
+     * @param pvcs as const Eigen::VectorXd&
 	 */
-	void setPVCs(Eigen::VectorXd* pvcs) {
-		this->pvc = *pvcs;
+    void setPVCs(const Eigen::VectorXd& pvcs) {
+        this->pvc = pvcs;
 	}
 
 	/**
 	 * Return points of vertical tangency
 	 *
-	 * @return PVTs as Eigen::VectorXd*
+     * @return PVTs as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getPVTs() {
-		return &this->pvt;
+    const Eigen::VectorXd& getPVTs() {
+        return this->pvt;
 	}
 	/**
 	 * Sets points of vertical tangency
 	 *
-	 * @param pvts as Eigen::VectorXd*
+     * @param pvts as const Eigen::VectorXd&
 	 */
-	void setPVTs(Eigen::VectorXd* pvts) {
-		this->pvt = *pvts;
+    void setPVTs(const Eigen::VectorXd& pvts) {
+        this->pvt = pvts;
 	}
 
 	/**
 	 * Return elevations of points of vertical curvature
 	 *
-	 * @return EPVCs as Eigen::VectorXd*
+     * @return EPVCs as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getEPVCs() {
-		return &this->epvc;
+    const Eigen::VectorXd& getEPVCs() {
+        return this->epvc;
 	}
 	/**
 	 * Sets elevations of points of vertical curvature
 	 *
-	 * @param epvcs as Eigen::VectorXd*
+     * @param epvcs as const Eigen::VectorXd&
 	 */
-	void setEPVCs(Eigen::VectorXd* epvcs) {
-		this->epvc = *epvcs;
+    void setEPVCs(const Eigen::VectorXd& epvcs) {
+        this->epvc = epvcs;
 	}
 
 	/**
 	 * Return elevations of points of vertical tangency
 	 *
-	 * @return EPVTs as Eigen::VectorXd*
+     * @return EPVTs as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getEPVTs() {
-		return &this->epvt;
+    const Eigen::VectorXd& getEPVTs() {
+        return this->epvt;
 	}
 	/**
 	 * Sets elevations of points of vertical tangency
 	 *
-	 * @param epvts as Eigen::VectorXd*
+     * @param epvts as const Eigen::VectorXd&
 	 */
-	void setEPVTs(Eigen::VectorXd* epvts) {
-		this->epvt = *epvts;
+    void setEPVTs(const Eigen::VectorXd& epvts) {
+        this->epvt = epvts;
 	}
 
 	/**
 	 * Returns polynomial coefficiens (const, x, x^2)
 	 *
-	 * @return Polynomial coefficients as Eigen::MatrixXd*
+     * @return Polynomial coefficients as const Eigen::MatrixXd&
 	 */
-	Eigen::MatrixXd* getPolyCoeffs() {
-		return &this->a;
+    const Eigen::MatrixXd& getPolyCoeffs() {
+        return this->a;
 	}
 	/**
 	 * Sets polynomial coefficients (const, x, x^2)
 	 *
-	 * @param coeffs as Eigen::MatrixXd*
+     * @param coeffs as const Eigen::MatrixXd&
 	 */
-	void setPolyCoeffs(Eigen::MatrixXd* coeffs) {
-		this->a = *coeffs;
+    void setPolyCoeffs(const Eigen::MatrixXd& coeffs) {
+        this->a = coeffs;
 	}
 
 	/**
 	 * Return velocities at each IP
 	 *
-	 * @return Velocities as Eigen::VectorXd*
+     * @return Velocities as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getVelocities() {
-		return &this->v;
+    const Eigen::VectorXd& getVelocities() {
+        return this->v;
 	}
 	/**
 	 * Sets velocities at each IP
 	 *
-	 * @param v as Eigen::VectorXd*
+     * @param v as const Eigen::VectorXd&
 	 */
-	void setVelocities(Eigen::VectorXd* v) {
-		this->v = *v;
+    void setVelocities(const Eigen::VectorXd& v) {
+        this->v = v;
 	}
 
 	/**
 	 * Return lengths of curvature
 	 *
-	 * @return Lengths of curvature as Eigen::VectorXd*
+     * @return Lengths of curvature as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getLenghts() {
-		return &this->Ls;
+    const Eigen::VectorXd& getLenghts() {
+        return this->Ls;
 	}
 	/**
 	 * Sets the lengths of curvature
 	 *
-	 * @param ls as Eigen::VectorXd*
+     * @param ls as const Eigen::VectorXd&
 	 */
-	void setLengths(Eigen::VectorXd* ls) {
-		this->Ls = *ls;
+    void setLengths(const Eigen::VectorXd& ls) {
+        this->Ls = ls;
 	}
 
 	/**
 	 * Return segment grades
 	 *
-	 * @return Grades as Eigen::VectorXd*
+     * @return Grades as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getGrades() {
-		return &this->gr;
+    const Eigen::VectorXd& getGrades() {
+        return this->gr;
 	}
 	/**
 	 * Sets segment grades
 	 *
-	 * @param gr as Eigen::VectorXd*
+     * @param gr as const Eigen::VectorXd&
 	 */
-	void setGrades(Eigen::VectorXd* gr) {
-		this->gr = *gr;
+    void setGrades(const Eigen::VectorXd& gr) {
+        this->gr = gr;
 	}
 
 	/**
 	 * Return stopping sight distances
 	 *
-	 * @return Stopping sight distances as Eigen::VectorXd*
+     * @return Stopping sight distances as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getSSDs() {
-		return &this->ssd;
+    const Eigen::VectorXd& getSSDs() {
+        return this->ssd;
 	}
 	/**
 	 * Sets stopping sight distances
 	 *
-	 * @param ssds as Eigen::VectorXd*
+     * @param ssds as const Eigen::VectorXd&
 	 */
-	void setSSDs(Eigen::VectorXd* ssds) {
-		this->ssd = *ssds;
+    void setSSDs(const Eigen::VectorXd& ssds) {
+        this->ssd = ssds;
 	}
 
 	// STATIC ROUTINES ////////////////////////////////////////////////////////

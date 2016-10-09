@@ -14,9 +14,10 @@ public:
 	 *
 	 * Constructs a %VariableParameters object with default values.
 	 */
-    VariableParameters(Eigen::VectorXd* popLevels, Eigen::VectorXd* bridge,
-		Eigen::VectorXd* hp, Eigen::VectorXd* l, Eigen::VectorXd* b,
-        Eigen::VectorXd* pgr, Eigen::VectorXd* f, Eigen::VectorXd* c);
+    VariableParameters(const Eigen::VectorXd& popLevels, const Eigen::VectorXd&
+        bridge, const Eigen::VectorXd& hp, const Eigen::VectorXd& l, const
+        Eigen::VectorXd& b, const Eigen::VectorXd& pgr, const Eigen::VectorXd& f,
+        const Eigen::VectorXd& c);
 	/**
 	 * Destructor
 	 */
@@ -26,143 +27,143 @@ public:
 	/**
 	 * Returns the different population levels as a percentage of starting pop.
 	 *
-	 * @return Population level as Eigen::VectorXd
+     * @return Population level as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getPopulationLevels() {
-		return &this->populationLevels;
+    const Eigen::VectorXd& getPopulationLevels() {
+        return this->populationLevels;
 	}
 	/**
 	 * Sets the population levels
 	 *
-	 * @param levels as Eigen::VectorXd
+     * @param levels as const Eigen::VectorXd&
 	 */
-	void setPopulationLevels(Eigen::VectorXd* levels) {
-		this->populationLevels = *levels;
+    void setPopulationLevels(const Eigen::VectorXd& levels) {
+        this->populationLevels = levels;
 	}
 
 	/**
      * Returns animal bridge usage scenarios
 	 *
-     * @return Animal bridge usage scenarios as Eigen::VectorXd*
+     * @return Animal bridge usage scenarios as const Eigen::VectorXd&
 	 */
-    Eigen::VectorXd* getBridge() {
-        return &this->animalBridge;
+    const Eigen::VectorXd& getBridge() {
+        return this->animalBridge;
 	}
 	/**
      * Returns animal bridge usage scenarios
 	 *
-     * @param bridge as Eigen::VectorXd*
+     * @param bridge as const Eigen::VectorXd&
 	 */
-    void setBridge(Eigen::VectorXd* bridge) {
-        this->animalBridge = *bridge;
+    void setBridge(const Eigen::VectorXd& bridge) {
+        this->animalBridge = bridge;
 	}
 
 	/**
 	 * Returns the number of standard deviations away from the mean the habitat
 	 * preference used is (for sensitivity analysis).
 	 *
-	 * @return Habitat preference standard deviations as Eigen::VectorXd
+     * @return Habitat preference standard deviations as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getHabPref() {
-		return &this->habPref;
+    const Eigen::VectorXd& getHabPref() {
+        return this->habPref;
 	}
 	/**
 	 * Sets the number of standard deviations away from the mean the habitat
 	 * preference used is (for sensitivity analysis).
 	 *
-	 * @param habPref as Eigen::VectorXd
+     * @param habPref as const Eigen::VectorXd&
 	 */
-	void setHabPref(Eigen::VectorXd* habPref) {
-		this->habPref = *habPref;
+    void setHabPref(const Eigen::VectorXd habPref) {
+        this->habPref = habPref;
 	}
 
 	/**
 	 * Returns the number of standard deviations away from the mean the movement
 	 * propensity parameter used is (for sensitivity analysis).
 	 *
-	 * @return lambda as Eigen::VectorXd
+     * @return lambda as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getLambda() {
-		return &this->lambda;
+    const Eigen::VectorXd& getLambda() {
+        return this->lambda;
 	}
 	/**
 	 * Sets the number of standard deviations away from the mean the movement
 	 * propensity parameter used is (for sensitivity analysis).
 	 *
-	 * @param lambda as Eigen::VectorXd
+     * @param lambda as const Eigen::VectorXd&
 	 */
-	void setLambda(Eigen::VectorXd* lambda) {
-		this->lambda = *lambda;
+    void setLambda(const Eigen::VectorXd& lambda) {
+        this->lambda = lambda;
 	}
 
 	/**
 	 * Returns the number of standard deviations away from the mean the ranging
 	 * coefficient used is (for sensitivity analysis).
 	 *
-	 * @return Beta as Eigen::VectorXd
+     * @return Beta as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getBeta() {
-		return &this->beta;
+    const Eigen::VectorXd& getBeta() {
+        return this->beta;
 	}
 	/**
 	 * Sets the number of standard deviations away from the mean the ranging
 	 * coefficient used is (for sensitivity analysis).
 	 *
-	 * @param beta as Eigen::VectorXd
+     * @param beta as const Eigen::VectorXd&
 	 */
-	void setBeta(Eigen::VectorXd* beta) {
-		this->beta = *beta;
+    void setBeta(const Eigen::VectorXd& beta) {
+        this->beta = beta;
 	}
 
 	/**
      * Returns the population growth rate standard deviation multiplier
      *
-     * @return Growth rate standard deviation multiplier as Eigen::VectorXd*
+     * @return Growth rate standard deviation multiplier as const Eigen::VectorXd&
 	 */
-    Eigen::VectorXd* getGrowthRateSDMultipliers() {
-        return &this->popGR;
+    const Eigen::VectorXd& getGrowthRateSDMultipliers() {
+        return this->popGR;
 	}
 	/**
      * Sets the population growth rate standard deviation multiplier
 	 *
-     * @param rate as Eigen::VectorXd*
+     * @param rate as const Eigen::VectorXd&
 	 */
-    void setGrowthRateSDMultipliers(Eigen::VectorXd* rate) {
-        this->popGR = *rate;
+    void setGrowthRateSDMultipliers(const Eigen::VectorXd rate) {
+        this->popGR = rate;
 	}
 
 	/**
      * Sets the fuel price standard deviation multiplier
 	 *
-     * @return Fuell price standard deviation multiplier as Eigen::VectorXd*
+     * @return Fuell price standard deviation multiplier as const Eigen::VectorXd&
 	 */
-    Eigen::VectorXd* getFuelVariable() {
-        return &this->fuel;
+    const Eigen::VectorXd& getFuelVariable() {
+        return this->fuel;
 	}
 	/**
      * Sets the fuel price standard deviation multiplier
 	 *
-     * @param fuel as Eigen::VectorXd*
+     * @param fuel as const Eigen::VectorXd&
 	 */
-    void setFuelVariable(Eigen::VectorXd* fuel) {
-        this->fuel = *fuel;
+    void setFuelVariable(const Eigen::VectorXd& fuel) {
+        this->fuel = fuel;
 	}
 
 	/**
      * Returns the commodity price standard deviation multiplier
 	 *
-     * @return Commodity price standard deviation multiplier as Eigen::VectorXd*
+     * @return Commodity price standard deviation multiplier as const Eigen::VectorXd&
 	 */
-    Eigen::VectorXd* getCommodityVariable() {
-        return &this->commodity;
+    const Eigen::VectorXd& getCommodityVariable() {
+        return this->commodity;
 	}
 	/**
      * Sets the commodity price standard deviation multiplier
 	 *
-     * @param commodity as Eigen::VectorXd*
+     * @param commodity as const Eigen::VectorXd&
 	 */
-    void setCommodityVariable(Eigen::VectorXd* commodity) {
-        this->commodity = *commodity;
+    void setCommodityVariable(const Eigen::VectorXd& commodity) {
+        this->commodity = commodity;
     }
 
 	// STATIC ROUTINES ///////////////////////////////////////////////////////////

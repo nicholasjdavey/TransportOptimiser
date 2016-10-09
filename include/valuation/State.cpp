@@ -1,12 +1,12 @@
 #include "../transportbase.h"
 
-State::State(double t, ProgramPtr p, std::vector<UncertaintyPtr>* ex,
-			std::vector<UncertaintyPtr>* en) {
+State::State(double t, ProgramPtr p, const std::vector<UncertaintyPtr> &ex,
+            const std::vector<UncertaintyPtr> &en) {
 
 	this->time = t;
 	this->program = p;
-	this->exogenousUncertainties = *ex;
-	this->endogenousUncertainties = *en;
+    this->exogenousUncertainties = ex;
+    this->endogenousUncertainties = en;
 }
 
 State::~State() {}

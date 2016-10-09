@@ -8,10 +8,10 @@ Traffic::Traffic() {
 	this->growthRate = 0;
 }
 
-Traffic::Traffic(std::vector<VehiclePtr>*vehicles, double peakProp, double d,
-        double peak, double gr) {
+Traffic::Traffic(const std::vector<VehiclePtr> &vehicles, double peakProp,
+        double d, double peak, double gr) {
 
-	this->vehicles = *vehicles;
+    this->vehicles = vehicles;
 	this->peakProportion = peakProp;
 	this->directionality = d;
 	this->peakHours = peak;

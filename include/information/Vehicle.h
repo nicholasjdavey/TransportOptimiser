@@ -44,6 +44,7 @@ public:
      * @param fuel as CommodityPtr
 	 */
     void setFuel(CommodityPtr fuel) {
+        this->fuel.reset();
 		this->fuel = fuel;
 	}
 

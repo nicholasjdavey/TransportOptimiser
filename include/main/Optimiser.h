@@ -66,10 +66,10 @@ public:
      *
      * Constructs an %Optimiser object with default values.
      */
-    Optimiser(std::vector<TrafficProgramPtr>* programs, OtherInputsPtr oInputs,
+    Optimiser(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr oInputs,
             DesignParametersPtr desParams, EarthworkCostsPtr earthworks,
-            UnitCostsPtr unitCosts, VariableParametersPtr varParams,
-            std::vector<SpeciesPtr>* species, EconomicPtr economic, TrafficPtr
+            UnitCostsPtr unitCosts, VariableParametersPtr varParams, const
+            std::vector<SpeciesPtr>& species, EconomicPtr economic, TrafficPtr
             traffic, RegionPtr region, double mr, unsigned long cf, unsigned
             long gens, unsigned long popSize, double stopTol, double confInt,
             double confLvl, unsigned long habGridRes, std::string solScheme,
@@ -100,6 +100,7 @@ public:
      * @param scenario as ExperimentalScenarioPtr
      */
     void setScenario(ExperimentalScenarioPtr scenario) {
+        this->scenario.reset();
         this->scenario = scenario;
     }
 
@@ -124,52 +125,52 @@ public:
      * Returns the current GA population of roads. These roads are only defined
      * by their intersection points.
      *
-     * @return Roads as (Eigen::MatrixXd)*
+     * @return Roads as const Eigen::MatrixXd&
      */
-    Eigen::MatrixXd* getCurrentRoads() {
-	    return &this->currentRoadPopulation;
+    const Eigen::MatrixXd& getCurrentRoads() {
+        return this->currentRoadPopulation;
     }
     /**
      * Sets the current GA population of roads
      *
-     * @param roads as (Eigen::MatrixXd)*
+     * @param roads as const Eigen::MatrixXd&
      */
-    void setCurrentRoads(Eigen::MatrixXd* roads) {
-	    this->currentRoadPopulation = *roads;
+    void setCurrentRoads(const Eigen::MatrixXd& roads) {
+        this->currentRoadPopulation = roads;
     }
 
     /**
      * Returns the best roads computed by the optimiser.
      *
-     * @return Roads as std::vector< std::vector<RoadPtr> >*
+     * @return Roads as const std::vector< std::vector<RoadPtr> >&
      */
-    std::vector< std::vector<RoadPtr> >* getBestRoads() {
-	    return &this->bestRoads;
+    const std::vector< std::vector<RoadPtr> >& getBestRoads() {
+        return this->bestRoads;
     }
     /**
      * Sets the best roads computed by the optimiser
      *
-     * @param roads as std::vector< std::vector<RoadPtr> >*
+     * @param roads as const std::vector< std::vector<RoadPtr> >&
      */
-    void setBestRoads(std::vector< std::vector<RoadPtr> >* roads) {
-	    this->bestRoads = *roads;
+    void setBestRoads(const std::vector< std::vector<RoadPtr> >& roads) {
+        this->bestRoads = roads;
     }
 
     /**
      * Returns the different switching programs
      *
-     * @return Program as std::vector<TrafficProgramPtr>
+     * @return Program as const std::vector<TrafficProgramPtr>&
      */
-    std::vector<TrafficProgramPtr>* getPrograms() {
-	    return &this->programs;
+    const std::vector<TrafficProgramPtr>& getPrograms() {
+        return this->programs;
     }
     /**
      * Sets the different switching programs
      *
-     * @param programs as std::vector<TrafficProgramPtr>
+     * @param programs as const std::vector<TrafficProgramPtr>&
      */
-    void setPrograms(std::vector<TrafficProgramPtr>* program) {
-	    this->programs = *program;
+    void setPrograms(const std::vector<TrafficProgramPtr>& program) {
+        this->programs = program;
     }
 
     /**
@@ -265,18 +266,18 @@ public:
     /**
      * Returns the species details
      *
-     * @return Species as std::vector<SpeciesPtr>*
+     * @return Species as const std::vector<SpeciesPtr>&
      */
-    std::vector<SpeciesPtr>* getSpecies() {
-	    return &this->species;
+    const std::vector<SpeciesPtr>& getSpecies() {
+        return this->species;
     }
     /**
      * Sets the species details
      *
-     * @param species as std::vector<SpeciesPtr>*
+     * @param species as const std::vector<SpeciesPtr>&
      */
-    void setSpecies(std::vector<SpeciesPtr>* species) {
-	    this->species = *species;
+    void setSpecies(const std::vector<SpeciesPtr>& species) {
+        this->species = species;
     }
 
     /**
@@ -293,6 +294,7 @@ public:
      * @param econ as EconomicPtr
      */
     void setEconomic(EconomicPtr econ) {
+        this->economic.reset();
 	    this->economic = econ;
     }
 
@@ -310,6 +312,7 @@ public:
      * @param traffic as TrafficPtr
      */
     void setTraffic(TrafficPtr traffic) {
+        this->traffic.reset();
 	    this->traffic = traffic;
     }
 
@@ -327,6 +330,7 @@ public:
      * @param tp as TrafficProgramPtr
      */
     void setTrafficProgram(TrafficProgramPtr tp) {
+        this->trafficProgram.reset();
         this->trafficProgram = tp;
     }
 
@@ -344,6 +348,7 @@ public:
      * @param region as RegionPtr
      */
     void setRegion(RegionPtr region) {
+        this->region.reset();
 	    this->region = region;
     }
 

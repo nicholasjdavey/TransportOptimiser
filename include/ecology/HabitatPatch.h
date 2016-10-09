@@ -7,8 +7,6 @@ typedef std::shared_ptr<HabitatType> HabitatTypePtr;
 class HabitatPatch;
 typedef std::shared_ptr<HabitatPatch> HabitatPatchPtr;
 
-typedef std::shared_ptr<Eigen::MatrixXi> IntMatrixPtr;
-
 /**
  * Class for managing Habitat patches
  */
@@ -180,17 +178,17 @@ public:
     /**
      * Returns the cells occupied by the patch
      *
-     * @return Cells as IntMatrixPtr
+     * @return Cells as const Eigen::MatrixXi&
      */
-    IntMatrixPtr getCells() {
+    const Eigen::MatrixXi& getCells() {
         return this->cells;
     }
     /**
      * Sets the cells occupied by the patch
      *
-     * @param cells as IntMatrixPtr
+     * @param cells as Eigen::MatrixXi&
      */
-    void setCells(IntMatrixPtr cells) {
+    void setCells(const Eigen::MatrixXi& cells) {
         this->cells = cells;
     }
 
@@ -207,7 +205,7 @@ private:
         double growthRate;		/**< Prevailing population growth rate */
         double population;		/**< Prevailing population */
         double aar;         	/**< Animals at risk in patch */
-        IntMatrixPtr cells;     /**< Grid cells occupied by patch */
+        Eigen::MatrixXi cells;  /**< Grid cells occupied by patch */
 };
 
 #endif

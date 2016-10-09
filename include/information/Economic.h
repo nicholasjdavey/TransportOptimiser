@@ -29,8 +29,8 @@ public:
 	 *
 	 * Constructs an %Economic object with assigned values
 	 */
-	Economic(std::vector<CommodityPtr>* commodities,
-			std::vector<FuelPtr>* fuels, double rr, double ny);
+    Economic(const std::vector<CommodityPtr>& commodities,
+            const std::vector<FuelPtr>& fuels, double rr, double ny);
 
 	/**
 	 * Destructor
@@ -42,35 +42,35 @@ public:
 	/**
 	 * Returns the commodities used
 	 *
-	 * @return Commodities as std::vector<CommodityPtr>*
+     * @return Commodities as const std::vector<CommodityPtr>&
 	 */
-	std::vector<CommodityPtr>* getCommodities() {
-		return &this->commodities;
+    const std::vector<CommodityPtr>& getCommodities() {
+        return this->commodities;
 	}
 	/**
 	 * Sets the commodities
 	 *
-	 * @param comm as std::vector<CommodityPtr>*
+     * @param comm as const std::vector<CommodityPtr>&
 	 */
-	void setCommodities(std::vector<CommodityPtr>* comm) {
-		this->commodities = *comm;
+    void setCommodities(const std::vector<CommodityPtr>& comm) {
+        this->commodities = comm;
 	}
 
 	/**
 	 * Returns the fuels
 	 *
-	 * @return Fuels as std::vector<FuelPtr>*
+     * @return Fuels as const std::vector<FuelPtr>&
 	 */
-	std::vector<FuelPtr>* getFuels() {
-		return &this->fuels;
+    const std::vector<FuelPtr>& getFuels() {
+        return this->fuels;
 	}
 	/**
 	 * Sets the fuels
 	 *
-	 * @param fuels as std::vector<FuelPtr>*
+     * @param fuels as const std::vector<FuelPtr>&
 	 */
-	void setFuels(std::vector<FuelPtr>* fuels) {
-		this->fuels = *fuels;
+    void setFuels(const std::vector<FuelPtr>& fuels) {
+        this->fuels = fuels;
 	}
 
 	/**

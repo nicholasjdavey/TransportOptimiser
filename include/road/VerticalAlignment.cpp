@@ -29,18 +29,18 @@ VerticalAlignment::~VerticalAlignment() {
 void VerticalAlignment::computeAlignment() {
 
 	// Create short names for input data
-	Eigen::VectorXd* xFull = this->road->getXCoords();
-	Eigen::VectorXd* yFull = this->road->getYCoords();
-	Eigen::VectorXd* zFull = this->road->getZCoords();
-	std::vector<bool> duplicates(xFull->size(),false);
+    const Eigen::VectorXd& xFull = this->road->getXCoords();
+    const Eigen::VectorXd& yFull = this->road->getYCoords();
+    const Eigen::VectorXd& zFull = this->road->getZCoords();
+    std::vector<bool> duplicates(xFull.size(),false);
 	int uniqueEntries = 1;
 
 	// If we have duplicate entries in our list, remove them for now and record
 	// where they occur for later use
-	for (int ii = 1; ii < xFull->size(); ii++) {
-		if (((*xFull)(ii) == (*xFull)(ii-1)) &&
-				((*yFull)(ii) == (*yFull)(ii-1))) {
-			if ((*zFull)(ii) != (*zFull)(ii-1)) {
+    for (int ii = 1; ii < xFull.size(); ii++) {
+        if ((xFull(ii) == xFull(ii-1)) &&
+                (yFull(ii) == yFull(ii-1))) {
+            if (zFull(ii) != zFull(ii-1)) {
 				std::cerr << "Discontinuous vertical alignment" << std::endl;
 			}
 			duplicates[ii] = true;
@@ -52,15 +52,15 @@ void VerticalAlignment::computeAlignment() {
 	Eigen::VectorXd xCoords(uniqueEntries);
 	Eigen::VectorXd yCoords(uniqueEntries);
 	Eigen::VectorXd zCoords(uniqueEntries);
-	xCoords(0) = (*xFull)(0);
-	yCoords(0) = (*yFull)(0);
-	zCoords(0) = (*zFull)(0);
+    xCoords(0) = xFull(0);
+    yCoords(0) = yFull(0);
+    zCoords(0) = zFull(0);
 
 	for (int ii = 1; ii < xCoords.size(); ii++) {
 		if (!duplicates[ii]) {
-			xCoords(ii) = (*xFull)(ii);
-			yCoords(ii) = (*yFull)(ii);
-			zCoords(ii) = (*zFull)(ii);
+            xCoords(ii) = xFull(ii);
+            yCoords(ii) = yFull(ii);
+            zCoords(ii) = zFull(ii);
 		}
 	}
 
@@ -74,34 +74,34 @@ void VerticalAlignment::computeAlignment() {
 				->getDeccelRate();
 
 		unsigned long ip = xCoords.size() - 2;
-		Eigen::VectorXd* pocx = this->road->getHorizontalAlignment()
+        const Eigen::VectorXd& pocx = this->road->getHorizontalAlignment()
 				->getPOCX();
-		Eigen::VectorXd* pocy = this->road->getHorizontalAlignment()
+        const Eigen::VectorXd& pocy = this->road->getHorizontalAlignment()
 				->getPOCX();
-		Eigen::VectorXd* potx = this->road->getHorizontalAlignment()
+        const Eigen::VectorXd& potx = this->road->getHorizontalAlignment()
 				->getPOCX();
-		Eigen::VectorXd* poty = this->road->getHorizontalAlignment()
+        const Eigen::VectorXd& poty = this->road->getHorizontalAlignment()
 				->getPOCX();
-		Eigen::VectorXd* radii = this->road->getHorizontalAlignment()
+        const Eigen::VectorXd& radii = this->road->getHorizontalAlignment()
 				->getPOCX();
-		Eigen::VectorXd* delta = this->road->getHorizontalAlignment()
+        const Eigen::VectorXd& delta = this->road->getHorizontalAlignment()
 				->getPOCX();
 
 		this->s.resize(ip+2);
 
 		this->s(0) = 0.0;
-		this->s(1) = sqrt((pow((*pocx)(0)-xCoords(0),2) 
-				+ pow((*pocy)(0)-yCoords(0),2))	+ (*delta)(0)*(*radii)(0)/2);
+        this->s(1) = sqrt((pow(pocx(0)-xCoords(0),2)
+                + pow(pocy(0)-yCoords(0),2))	+ delta(0)*radii(0)/2);
 
 		for (unsigned long ii = 2; ii < ip+1; ii++) {
-			this->s(ii) = this->s(ii-1) + (*delta)(ii-2)* (*radii)(ii-1)/2
-					+ (*delta)(ii-1)* (*radii)(ii-1)/2 + sqrt(pow((*pocx)(ii-1)
-					-(*potx)(ii-2),2) + pow((*pocy)(ii-1)-(*poty)(ii-2),2));
+            this->s(ii) = this->s(ii-1) + delta(ii-2)* radii(ii-1)/2
+                    + delta(ii-1)* radii(ii-1)/2 + sqrt(pow(pocx(ii-1)
+                    -potx(ii-2),2) + pow(pocy(ii-1)-poty(ii-2),2));
 		}
 
-		this->s(ip+1) = this->s(ip) + sqrt(pow(xCoords(ip+1)-(*potx)(ip-1),2) 
-				+ pow(yCoords(ip+1)-(*poty)(ip-1),2))
-				+ (*delta)(ip-1)*(*radii)(ip-1)/2;
+        this->s(ip+1) = this->s(ip) + sqrt(pow(xCoords(ip+1)-potx(ip-1),2)
+                + pow(yCoords(ip+1)-poty(ip-1),2))
+                + delta(ip-1)*radii(ip-1)/2;
 
 		// this->s.resize(ip+2);
 		this->pvc.resize(ip);
@@ -124,11 +124,11 @@ void VerticalAlignment::computeAlignment() {
 
 		// Compute the corresponding required sight distance for each s other
 		// than the start and end points (where we do not fit a parabolic curve)
-		Eigen::VectorXd* vel = this->road->getHorizontalAlignment()
+        const Eigen::VectorXd& vel = this->road->getHorizontalAlignment()
 				->getVelocities();
 
-		this->ssd = (vel->array()) * tr + 0.5*(vel->array().pow(2))/acc;
-		this->v = *vel;
+        this->ssd = (vel.array()) * tr + 0.5*(vel.array().pow(2))/acc;
+        this->v = vel;
 
 		// For each intersection point, compute the length if there is a
 		// gradient change
@@ -303,7 +303,7 @@ void VerticalAlignment::computeAlignment() {
 				}
 
 			} else {
-				this->v(ii) = (*vel)(ii);
+                this->v(ii) = vel(ii);
 			}
 		}
 	}

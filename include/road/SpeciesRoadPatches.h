@@ -57,6 +57,7 @@ public:
      * @param species as SpeciesPtr
      */
     void setSpecies(SpeciesPtr species) {
+        this->species.reset();
         this->species = species;
     }
 
@@ -74,91 +75,92 @@ public:
      * @param road as RoadPtr
      */
     void setRoad(RoadPtr road){
+        this->road.reset();
         this->road = road;
     }
 
     /**
      * Returns the habitat patches for simulations
      *
-     * @return Habitat patches as std::vector<HabitatPatchPtr>*
+     * @return Habitat patches as const std::vector<HabitatPatchPtr>&
      */
-    std::vector<HabitatPatchPtr>* getHabPatches() {
-        return &this->habPatch;
+    const std::vector<HabitatPatchPtr>& getHabPatches() {
+        return this->habPatch;
     }
     /**
      * Sets the habitat patches during simulations
      *
-     * @param habp as std::vector<HabitatPatchPtr>*
+     * @param habp as const std::vector<HabitatPatchPtr>&
      */
-    void setHabPatches(std::vector<HabitatPatchPtr>* habp) {
-        this->habPatch = *habp;
+    void setHabPatches(const std::vector<HabitatPatchPtr>& habp) {
+        this->habPatch = habp;
     }
 
     /**
      * Returns the distance from every patch to every other
      *
-     * @return Distance matrix as Eigen::MatrixXd*
+     * @return Distance matrix as const Eigen::MatrixXd&
      */
-    Eigen::MatrixXd* getDistances() {
-        return &this->dists;
+    const Eigen::MatrixXd& getDistances() {
+        return this->dists;
     }
     /**
      * Sets the distance from every patch to every other
      *
-     * @param dist as Eigen::MatrixXd*
+     * @param dist as const Eigen::MatrixXd&
      */
-    void setDistances(Eigen::MatrixXd* dist) {
-        this->dists = *dist;
+    void setDistances(const Eigen::MatrixXd& dist) {
+        this->dists = dist;
     }
 
     /**
      * Returns the number of crossings between each valid patch transition
      *
-     * @return Crossing matrix as Eigen::MatrixXi*
+     * @return Crossing matrix as const Eigen::MatrixXi&
      */
-    Eigen::MatrixXi* getCrossings() {
-        return &this->crossings;
+    const Eigen::MatrixXi getCrossings() {
+        return this->crossings;
     }
     /**
      * Sets the number of crossings between each valid patch transition
      *
-     * @param cross as Eigen::MatrixXi*
+     * @param cross as const Eigen::MatrixXi&
      */
-    void setCrossings(Eigen::MatrixXi* cross) {
-        this->crossings = *cross;
+    void setCrossings(const Eigen::MatrixXi& cross) {
+        this->crossings = cross;
     }
     /**
      * Returns the transition probability matrix
      *
-     * @return Transition probability matrix as Eigen::MatrixXd*
+     * @return Transition probability matrix as const Eigen::MatrixXd&
      */
-    Eigen::MatrixXd* getTransProbs() {
-        return &this->transProbs;
+    const Eigen::MatrixXd& getTransProbs() {
+        return this->transProbs;
     }
     /**
      * Sets the transition probability matrix
      *
-     * @param transProbs as Eigen::MatrixXd*
+     * @param transProbs as const Eigen::MatrixXd&
      */
-    void setTransProbs(Eigen::MatrixXd* transProbs) {
-        this->transProbs = *transProbs;
+    void setTransProbs(const Eigen::MatrixXd& transProbs) {
+        this->transProbs = transProbs;
     }
 
     /**
      * Returns the survival probability matrices for each control
      *
-     * @return Survival probability matrices as std::vector<Eigen::MatrixXd>*
+     * @return Survival probability matrices as const std::vector<Eigen::MatrixXd>&
      */
-    std::vector<Eigen::MatrixXd>* getSurvivalProbs() {
-        return &this->survProbs;
+    const std::vector<Eigen::MatrixXd>& getSurvivalProbs() {
+        return this->survProbs;
     }
     /**
      * Sets the survival probability matrices for each control
      *
-     * @param survProbs as std::vector<Eigen::MatrixXd>*
+     * @param survProbs as const std::vector<Eigen::MatrixXd>&
      */
-    void setSurvivalProbs(std::vector<Eigen::MatrixXd>* survProbs) {
-        this->survProbs = *survProbs;
+    void setSurvivalProbs(const std::vector<Eigen::MatrixXd>& survProbs) {
+        this->survProbs = survProbs;
     }
 
     /**
@@ -217,6 +219,22 @@ public:
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
 
     /**
+     * Generates the habitat patches relating to this species for the road in
+     * question using a basic grid method.
+     */
+    void generateHabitatPatchesGrid();
+
+    /**
+     * Generate habitat patches relating to this species using a more advanced
+     * blob method that ought to be more computationally tractable.
+     *
+     * This method first looks at the covexity and size of each blob in
+     * determining if the blob should be split into multiple patches or be left
+     * as a single patch.
+     */
+    void generateHabitatPatchesBlob();
+
+    /**
      * Computes the distance between each patch with every other patch.
      */
     void habitatPatchDistances();
@@ -245,7 +263,7 @@ public:
      * as well as the prevailing population at the start of a period (i.e.
      * before accounting for natural births and deaths).
      */
-    Eigen::VectorXd computeAAR(Eigen::VectorXd* pops);
+    void computeAAR(const Eigen::VectorXd& pops, Eigen::VectorXd& aar);
 
 ///////////////////////////////////////////////////////////////////////////////
 private:

@@ -49,6 +49,7 @@ public:
 	 * @param state as StatePtr
 	 */
 	void setState(StatePtr state) {
+        this->state.reset();
 		this->state = state;
 	}
 
@@ -66,6 +67,7 @@ public:
 	 * @param pm as PolicyMapPtr
 	 */
 	void setPolicyMap(PolicyMapPtr pm) {
+        this->policyMap.reset();
 		this->policyMap = pm;
 	}
 
@@ -89,52 +91,52 @@ public:
 	/**
 	 * Returns the seeds for the controls
 	 *
-	 * @return Seeds as std::vector<double>*
+     * @return Seeds as const std::vector<double>&
 	 */
-	std::vector<double>* getControlSeeds() {
-		return &this->seedsControl;
+    const std::vector<double>& getControlSeeds() {
+        return this->seedsControl;
 	}
 	/**
 	 * Sets the seeds for the controls
 	 *
-	 * @param seeds as std::vector<double>*
+     * @param seeds as const std::vector<double>&
 	 */
-	void setControlSeeds(std::vector<double>* seeds) {
-		this->seedsControl = *seeds;
+    void setControlSeeds(const std::vector<double>& seeds) {
+        this->seedsControl = seeds;
 	}
 
 	/**
 	 * Returns the seeds for exogenous uncertainties
 	 *
-	 * @return Seeds as std::vector<double>*
+     * @return Seeds as const std::vector<double>&
 	 */
-	std::vector<double>* getExogenousSeeds() {
-		return &this->seedsExogenous;
+    const std::vector<double>& getExogenousSeeds() {
+        return this->seedsExogenous;
 	}
 	/**
 	 * Sets the seeds for exogenous uncertainties
 	 *
-	 * @param seeds as std::vector<double>*
+     * @param seeds as const std::vector<double>&
 	 */
-	void setExogenousSeeds(std::vector<double>* seeds) {
-		this->seedsExogenous = *seeds;
+    void setExogenousSeeds(const std::vector<double>& seeds) {
+        this->seedsExogenous = seeds;
 	}
 
 	/**
 	 * Returns the seeds for endogenous uncertainties
 	 *
-	 * @return Seeds as std::vector<double>*
+     * @return Seeds as const std::vector<double>&
 	 */
-	std::vector<double>* getEndogenousSeeds() {
-		return &this->seedsEndogenous;
+    const std::vector<double>& getEndogenousSeeds() {
+        return this->seedsEndogenous;
 	}
 	/**
 	 * Sets the seeds for endogenous uncertainties
 	 *
-	 * @param seeds as std::vector<double>*
+     * @param seeds as const std::vector<double>&
 	 */
-	void setEndogenousSeeds(std::vector<double>* seeds) {
-		this->seedsEndogenous = *seeds;
+    void setEndogenousSeeds(const std::vector<double>& seeds) {
+        this->seedsEndogenous = seeds;
 	}
 
 	/**
@@ -157,18 +159,18 @@ public:
 	/**
 	 * Returns the values of every path generated and optimally controlled
 	 *
-	 * @return End values as Eigen::VectorXd*
+     * @return End values as const Eigen::VectorXd&
 	 */
-	Eigen::VectorXd* getValues() {
-		return &this->values;
+    const Eigen::VectorXd& getValues() {
+        return this->values;
 	}
 	/**
 	 * Sets the values of every path generated and optimally controlled
 	 *
-	 * @param values as Eigen::VectorXd*
+     * @param values as const Eigen::VectorXd&
 	 */
-	void setValues(Eigen::VectorXd* values) {
-		this->values = *values;
+    void setValues(const Eigen::VectorXd& values) {
+        this->values = values;
 	}
 
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
