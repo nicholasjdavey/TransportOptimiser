@@ -28,10 +28,12 @@ VerticalAlignment::~VerticalAlignment() {
 
 void VerticalAlignment::computeAlignment() {
 
+    RoadPtr roadPtrShared = this->road.lock();
+
 	// Create short names for input data
-    const Eigen::VectorXd& xFull = this->road->getXCoords();
-    const Eigen::VectorXd& yFull = this->road->getYCoords();
-    const Eigen::VectorXd& zFull = this->road->getZCoords();
+    const Eigen::VectorXd& xFull = roadPtrShared->getXCoords();
+    const Eigen::VectorXd& yFull = roadPtrShared->getYCoords();
+    const Eigen::VectorXd& zFull = roadPtrShared->getZCoords();
     std::vector<bool> duplicates(xFull.size(),false);
 	int uniqueEntries = 1;
 
@@ -68,23 +70,23 @@ void VerticalAlignment::computeAlignment() {
 		std::cerr << "X and Y vectors must be of the same length" << std::endl;
 	} else {
 		// Short names for parameters
-		double tr = this->road->getOptimiser()->getDesignParameters()
+        double tr = roadPtrShared->getOptimiser()->getDesignParameters()
 				->getReactionTime();
-		double acc = this->road->getOptimiser()->getDesignParameters()
+        double acc = roadPtrShared->getOptimiser()->getDesignParameters()
 				->getDeccelRate();
 
 		unsigned long ip = xCoords.size() - 2;
-        const Eigen::VectorXd& pocx = this->road->getHorizontalAlignment()
+        const Eigen::VectorXd& pocx = roadPtrShared->getHorizontalAlignment()
 				->getPOCX();
-        const Eigen::VectorXd& pocy = this->road->getHorizontalAlignment()
+        const Eigen::VectorXd& pocy = roadPtrShared->getHorizontalAlignment()
 				->getPOCX();
-        const Eigen::VectorXd& potx = this->road->getHorizontalAlignment()
+        const Eigen::VectorXd& potx = roadPtrShared->getHorizontalAlignment()
 				->getPOCX();
-        const Eigen::VectorXd& poty = this->road->getHorizontalAlignment()
+        const Eigen::VectorXd& poty = roadPtrShared->getHorizontalAlignment()
 				->getPOCX();
-        const Eigen::VectorXd& radii = this->road->getHorizontalAlignment()
+        const Eigen::VectorXd& radii = roadPtrShared->getHorizontalAlignment()
 				->getPOCX();
-        const Eigen::VectorXd& delta = this->road->getHorizontalAlignment()
+        const Eigen::VectorXd& delta = roadPtrShared->getHorizontalAlignment()
 				->getPOCX();
 
 		this->s.resize(ip+2);
@@ -124,7 +126,7 @@ void VerticalAlignment::computeAlignment() {
 
 		// Compute the corresponding required sight distance for each s other
 		// than the start and end points (where we do not fit a parabolic curve)
-        const Eigen::VectorXd& vel = this->road->getHorizontalAlignment()
+        const Eigen::VectorXd& vel = roadPtrShared->getHorizontalAlignment()
 				->getVelocities();
 
         this->ssd = (vel.array()) * tr + 0.5*(vel.array().pow(2))/acc;

@@ -222,7 +222,7 @@ public:
 	// CALCULATION ROUTINES ///////////////////////////////////////////////////
 
 private:
-    CommodityPtr fuel;						/**< Type of fuel used by the vehicle */
+    CommodityPtr fuel;					/**< Type of fuel used by the vehicle */
 	std::string name;					/**< Vehicle name */
 	double averageWidth;				/**< Average vehicle width (m) */
 	double averageLength;				/**< Average vehicle length (m) */

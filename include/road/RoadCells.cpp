@@ -9,14 +9,16 @@ RoadCells::~RoadCells() {
 
 void RoadCells::computeRoadCells() {
 
+    RoadPtr roadPtrShared = this->road.lock();
+
 	// Create short names for all important inputs
-    const Eigen::MatrixXd& X = this->road->getOptimiser()->getRegion()->getX();
-    const Eigen::MatrixXd& Y = this->road->getOptimiser()->getRegion()->getY();
-    const Eigen::VectorXd& x = this->road->getRoadSegments()->getX();
-    const Eigen::VectorXd& y = this->road->getRoadSegments()->getY();
-    const Eigen::VectorXd& z = this->road->getRoadSegments()->getZ();
-    const Eigen::VectorXd& w = this->road->getRoadSegments()->getWidths();
-    const Eigen::VectorXi& typ = this->road->getRoadSegments()->getType();
+    const Eigen::MatrixXd& X = roadPtrShared->getOptimiser()->getRegion()->getX();
+    const Eigen::MatrixXd& Y = roadPtrShared->getOptimiser()->getRegion()->getY();
+    const Eigen::VectorXd& x = roadPtrShared->getRoadSegments()->getX();
+    const Eigen::VectorXd& y = roadPtrShared->getRoadSegments()->getY();
+    const Eigen::VectorXd& z = roadPtrShared->getRoadSegments()->getZ();
+    const Eigen::VectorXd& w = roadPtrShared->getRoadSegments()->getWidths();
+    const Eigen::VectorXi& typ = roadPtrShared->getRoadSegments()->getType();
 
 	// First need to see if the grid is evenly-spaced
     unsigned int rx = X.rows();
@@ -301,7 +303,7 @@ void RoadCells::computeRoadCells() {
     this->areas = (this->len).array()*this->w.array();
 
     // Assign the corresponding habitat to each cell reference
-    const Eigen::MatrixXi& vegPtr = this->road->getOptimiser()->getRegion()
+    const Eigen::MatrixXi& vegPtr = roadPtrShared->getOptimiser()->getRegion()
             ->getVegetation();
     Eigen::VectorXi rows = gridRefs.block(0,0,nnew,1);
     Eigen::VectorXi cols = gridRefs.block(0,1,nnew,1);

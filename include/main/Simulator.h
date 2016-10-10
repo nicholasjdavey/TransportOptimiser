@@ -38,24 +38,25 @@ public:
 	 */
 	~Simulator();
 
-	// ACCESSORS //////////////////////////////////////////////////////////////
+    // ACCESSORS //////////////////////////////////////////////////////////////
 
-	/**
-	 * Returns the mean end population
-	 *
-	 * @return Mean end population as double
-	 */
-	double getEndPop() {
-		return this->endPop;
-	}
-	/**
-	 * Sets the mean end population
-	 *
-	 * @param endPop as double
-	 */
-	void setEndPop(double endPop) {
-		this->endPop = endPop;
-	}
+    /**
+     * Returns the road calling the simulator
+     *
+     * @return Road as RoadPtr
+     */
+    RoadPtr getRoad() {
+        return this->road.lock();
+    }
+    /**
+     * Sets the road calling the simulator
+     *
+     * @param road as RoadPtr
+     */
+    void setRoad(RoadPtr road) {
+        this->road.reset();
+        this->road = road;
+    }
 
 	/**
 	 * Returns the end population from all runs
@@ -112,10 +113,10 @@ public:
 	// CALCULATION ROUTINES ///////////////////////////////////////////////////
 
 private:
-	double endPop;						/**< Mean end population */
+    std::weak_ptr<Road> road;       /**< Road owning simulator */
 	Eigen::VectorXd endPops;		/**< End populations from all sims */
-	double initAAR;						/**< Initial animals at risk */
-	double penalty;						/**< Extinction penalty */
+    double initAAR;					/**< Initial animals at risk */
+    double penalty;					/**< Extinction penalty */
 };
 
 #endif

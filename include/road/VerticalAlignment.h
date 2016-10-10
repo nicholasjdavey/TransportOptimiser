@@ -37,6 +37,25 @@ public:
 
 	// ACCESSORS //////////////////////////////////////////////////////////////
 
+    /**
+     * Returns a shared pointer to the road
+     *
+     * @return Road as RoadPtr
+     */
+    RoadPtr getRoad() {
+        return this->road.lock();
+    }
+
+    /**
+     * Sets the road
+     *
+     * @param road as RoadPtr
+     */
+    void setRoad(RoadPtr road) {
+        this->road.reset();
+        this->road = road;
+    }
+
 	/**
 	 * Return distances of intersection points along HA
 	 *
@@ -218,17 +237,17 @@ public:
 	void computeAlignment();
 
 private:
-	RoadPtr road;							/**< Road */
-	Eigen::VectorXd s;						/**< Distance of intersection points along HA */
-	Eigen::VectorXd pvc;					/**< S points of vertical curvature */
-	Eigen::VectorXd pvt;					/**< S points of vertical tangency */
-	Eigen::VectorXd epvc;					/**< Elevations of PVCs */
-	Eigen::VectorXd epvt;					/**< Elevations of PVTs */
-	Eigen::MatrixXd a;						/**< Polynomial coefficients */
-	Eigen::VectorXd v;						/**< Velocities */
-	Eigen::VectorXd Ls;						/**< Curvature lengths */
-	Eigen::VectorXd gr;						/**< Segment grades */
-	Eigen::VectorXd ssd;					/**< Stopping sight distances */
+    std::weak_ptr<Road> road;   /**< Road */
+    Eigen::VectorXd s;			/**< Distance of intersection points along HA */
+    Eigen::VectorXd pvc;		/**< S points of vertical curvature */
+    Eigen::VectorXd pvt;		/**< S points of vertical tangency */
+    Eigen::VectorXd epvc;		/**< Elevations of PVCs */
+    Eigen::VectorXd epvt;		/**< Elevations of PVTs */
+    Eigen::MatrixXd a;			/**< Polynomial coefficients */
+    Eigen::VectorXd v;			/**< Velocities */
+    Eigen::VectorXd Ls;			/**< Curvature lengths */
+    Eigen::VectorXd gr;			/**< Segment grades */
+    Eigen::VectorXd ssd;		/**< Stopping sight distances */
 
 	// PRIVATE ROUTINES ///////////////////////////////////////////////////////
 };

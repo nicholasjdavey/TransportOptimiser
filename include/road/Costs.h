@@ -64,7 +64,7 @@ public:
 	 * @return Road fixed costs as RoadPtr
 	 */
 	RoadPtr getRoad() {
-		return this->road;
+        return this->road.lock();
 	}
 	/**
 	 * Sets the road
@@ -72,6 +72,7 @@ public:
 	 * @param road as RoadPtr
 	 */
 	void setRoad(RoadPtr road) {
+        this->road.reset();
 		this->road = road;
 	}
 
@@ -282,7 +283,7 @@ public:
     void computePenaltyCost();
 
 private:
-	RoadPtr road;						/**< Road with these costs */
+    std::weak_ptr<Road> road;			/**< Road with these costs */
 	double accidentFixed;				/**< Fixed component of accident cost */
 	double accidentVar;					/**< Variable accident cost per unit traffic */
 	double earthwork;					/**< Total earthworks cost */

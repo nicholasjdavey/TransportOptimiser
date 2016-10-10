@@ -67,7 +67,7 @@ public:
      * @return Road as RoadPtr
      */
     RoadPtr getRoad() {
-        return this->road;
+        return this->road.lock();
     }
     /**
      * Sets the Road
@@ -268,7 +268,7 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 private:
     SpeciesPtr species;                     /**< Speices used */
-    RoadPtr road;                           /**< Corresponding road */
+    std::weak_ptr<Road> road;               /**< Corresponding road */
     std::vector<HabitatPatchPtr> habPatch;  /**< Corresponding habitat patches */
     Eigen::MatrixXd dists;                  /**< Distances between patches */
     Eigen::MatrixXi crossings;              /**< Number of crossings for each journey */

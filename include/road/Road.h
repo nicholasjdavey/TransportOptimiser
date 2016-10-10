@@ -68,7 +68,7 @@ public:
 	 * @return Optimiser routine as OptimiserPtr
 	 */
 	OptimiserPtr getOptimiser() {
-		return this->optimiser;
+        return this->optimiser.lock();
 	}
 	/**
 	 * Sets the Optimiser object
@@ -347,7 +347,7 @@ public:
     void addSpeciesPatches(SpeciesPtr species);
 
 private:
-	OptimiserPtr optimiser;						/**< Calling Optimisation object */
+    std::weak_ptr<Optimiser> optimiser;			/**< Calling Optimisation object */
 	SimulatorPtr simulator;						/**< Simulator used to produce results */
 	PolicyMapPtr policyMap;						/**< PolicyMap generated from ROV simulation */
 	RoadSegmentsPtr segments;					/**< Road segments */

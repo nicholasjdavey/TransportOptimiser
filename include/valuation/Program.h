@@ -15,7 +15,7 @@ public:
 	/**
 	 * Constructor Constructs a %Program object with default values.
 	 */
-    Program(const Eigen::VectorXd& flowRates, const Eigen::MatrixXf&
+    Program(const Eigen::VectorXd& flowRates, const Eigen::MatrixXd&
             switching);
 
 	/**
@@ -53,17 +53,17 @@ public:
 	/**
 	 * Returns the matrix of switching costs
 	 *
-     * @return Switching matrix as const Eigen::MatrixXf&
+     * @return Switching matrix as const Eigen::MatrixXd&
 	 */
-    const Eigen::MatrixXf& getSwitchingCosts() {
+    const Eigen::MatrixXd& getSwitchingCosts() {
         return this->switching;
 	}
 	/**
 	 * Sets the matrix of switching costs
 	 *
-     * @param costs as const Eigen::MatrixXf&
+     * @param costs as const Eigen::MatrixXd&
 	 */
-    void setSwitchingCosts(const Eigen::MatrixXf& costs) {
+    void setSwitchingCosts(const Eigen::MatrixXd& costs) {
         this->switching = costs;
 	}
 
@@ -91,7 +91,7 @@ public:
 private:
 	unsigned long number;			/**< Program identifier */
 	Eigen::VectorXd flowRates;		/**< Flow rate options associated with program */
-	Eigen::MatrixXf switching;		/**< Switching costs between controls */
+    Eigen::MatrixXd switching;		/**< Switching costs between controls */
 	unsigned long selected;			/**< Currently selected option */
 	static unsigned long programs;	/**< Number of programs */
 };

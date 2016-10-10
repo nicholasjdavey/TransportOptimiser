@@ -1,6 +1,9 @@
 #ifndef ROADCELLS_H
 #define ROADCELLS_H
 
+class Road;
+typedef std::shared_ptr<Road> RoadPtr;
+
 class RoadCells;
 typedef std::shared_ptr<RoadCells> RoadCellsPtr;
 
@@ -24,6 +27,24 @@ public:
 	~RoadCells();
 	
 	// ACCESSORS //////////////////////////////////////////////////////////////
+
+    /**
+     * Returns the road
+     *
+     * @return Road as RoadPtr
+     */
+    RoadPtr getRoad() {
+        return this->road.lock();
+    }
+    /**
+     * Sets the road
+     *
+     * @param road as RoadPtr
+     */
+    void setRoad(RoadPtr road) {
+        this->road.reset();
+        this->road = road;
+    }
 
 	/**
 	 * Returns the x values
@@ -203,7 +224,7 @@ public:
 	void computeRoadCells();
 
 private:
-	RoadPtr road;						/**< Road */
+    std::weak_ptr<Road> road;			/**< Road */
 	Eigen::VectorXd x;					/**< X values */
 	Eigen::VectorXd y;					/**< Y values */
 	Eigen::VectorXd z;					/**< Z values */

@@ -21,12 +21,31 @@ public:
     ThreadManager(unsigned long max_threads);
 
 // ACCESSORS //////////////////////////////////////////////////////////////////
+    /**
+     * Returns the user-input desired number of threads
+     *
+     * @return User-requested number of threads as unsigned long
+     */
     unsigned long getMaxThreads() {
         return ThreadManager::max_threads;
     }
 
+    /**
+     * Returns the actual number of independent threads in the pool
+     *
+     * @return Number of independent threads in pool as unsigned long
+     */
     unsigned long getNoThreads() {
         return ThreadManager::noThreads;
+    }
+
+    /**
+     * Returns the thread pool
+     *
+     * @return Thread pool as PoolPtr
+     */
+    PoolPtr getPool() {
+        return this->pool;
     }
 
 // STATIC ROUTINES ////////////////////////////////////////////////////////////

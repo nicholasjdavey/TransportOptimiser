@@ -9,39 +9,40 @@ RoadSegments::~RoadSegments() {
 
 void RoadSegments::computeSegments() {
 	unsigned int noPoints = 2;
-	
+    RoadPtr roadPtrShared = this->road.lock();
+
 	// Set up short names
-    unsigned int ip = this->road->getHorizontalAlignment()->getPOTX().size();
-	double segLen = this->road->getOptimiser()->getDesignParameters()
+    unsigned int ip = roadPtrShared->getHorizontalAlignment()->getPOTX().size();
+    double segLen = roadPtrShared->getOptimiser()->getDesignParameters()
 			->getSegmentLength();
-	double vMax = this->road->getOptimiser()->getDesignParameters()
+    double vMax = roadPtrShared->getOptimiser()->getDesignParameters()
 			->getDesignVelocity();
 
-	double startX = this->road->getOptimiser()->getDesignParameters()
+    double startX = roadPtrShared->getOptimiser()->getDesignParameters()
 			->getStartX();
-	double startY = this->road->getOptimiser()->getDesignParameters()
+    double startY = roadPtrShared->getOptimiser()->getDesignParameters()
             ->getStartY();
-	double endX = this->road->getOptimiser()->getDesignParameters()
+    double endX = roadPtrShared->getOptimiser()->getDesignParameters()
 			->getEndX();
-	double endY = this->road->getOptimiser()->getDesignParameters()
+    double endY = roadPtrShared->getOptimiser()->getDesignParameters()
 			->getEndY();
-	double endZ = this->road->getOptimiser()->getDesignParameters()
+    double endZ = roadPtrShared->getOptimiser()->getDesignParameters()
 			->getEndZ();
-	double width = this->road->getOptimiser()->getDesignParameters()
+    double width = roadPtrShared->getOptimiser()->getDesignParameters()
 			->getRoadWidth();
-    const Eigen::VectorXd& pocx = (this->road->getHorizontalAlignment()->getPOCX());
-    const Eigen::VectorXd& pocy = (this->road->getHorizontalAlignment()->getPOCX());
-    const Eigen::VectorXd& potx = (this->road->getHorizontalAlignment()->getPOCX());
-    const Eigen::VectorXd& poty = (this->road->getHorizontalAlignment()->getPOCX());
-    const Eigen::VectorXd& radii = (this->road->getHorizontalAlignment()->getPOCX());
-    const Eigen::VectorXd& delta = (this->road->getHorizontalAlignment()->getPOCX());
-    const Eigen::VectorXd& delx = (this->road->getHorizontalAlignment()->getDelX());
-    const Eigen::VectorXd& dely = (this->road->getHorizontalAlignment()->getDelY());
-    const Eigen::VectorXd& pvc = (this->road->getVerticalAlignment()->getPVCs());
-    const Eigen::VectorXd& pvt = (this->road->getVerticalAlignment()->getPVTs());
-    const Eigen::VectorXd& epvt = (this->road->getVerticalAlignment()->getEPVTs());
-    const Eigen::VectorXd& gr = (this->road->getVerticalAlignment()->getGrades());
-    const Eigen::MatrixXd& a = (this->road->getVerticalAlignment()->getPolyCoeffs());
+    const Eigen::VectorXd& pocx = (roadPtrShared->getHorizontalAlignment()->getPOCX());
+    const Eigen::VectorXd& pocy = (roadPtrShared->getHorizontalAlignment()->getPOCX());
+    const Eigen::VectorXd& potx = (roadPtrShared->getHorizontalAlignment()->getPOCX());
+    const Eigen::VectorXd& poty = (roadPtrShared->getHorizontalAlignment()->getPOCX());
+    const Eigen::VectorXd& radii = (roadPtrShared->getHorizontalAlignment()->getPOCX());
+    const Eigen::VectorXd& delta = (roadPtrShared->getHorizontalAlignment()->getPOCX());
+    const Eigen::VectorXd& delx = (roadPtrShared->getHorizontalAlignment()->getDelX());
+    const Eigen::VectorXd& dely = (roadPtrShared->getHorizontalAlignment()->getDelY());
+    const Eigen::VectorXd& pvc = (roadPtrShared->getVerticalAlignment()->getPVCs());
+    const Eigen::VectorXd& pvt = (roadPtrShared->getVerticalAlignment()->getPVTs());
+    const Eigen::VectorXd& epvt = (roadPtrShared->getVerticalAlignment()->getEPVTs());
+    const Eigen::VectorXd& gr = (roadPtrShared->getVerticalAlignment()->getGrades());
+    const Eigen::MatrixXd& a = (roadPtrShared->getVerticalAlignment()->getPolyCoeffs());
 
 	Eigen::VectorXd thetaS(ip);
 	Eigen::VectorXd thetaE(ip);
@@ -182,7 +183,7 @@ void RoadSegments::computeSegments() {
 
 	// Compute the velocities of each of the segments based on the horizontal
     // alignment maximum speeds
-    const Eigen::VectorXd& velv = road->getVerticalAlignment()->getVelocities();
+    const Eigen::VectorXd& velv = roadPtrShared->getVerticalAlignment()->getVelocities();
 
 	// Ranges counter
 	unsigned int r1 = 0;
@@ -269,10 +270,12 @@ void RoadSegments::computeSegments() {
 
 void RoadSegments::placeNetwork() {
 
+    RoadPtr roadPtrShared = this->road.lock();
+
 	// Get pointers to region data
-    const Eigen::MatrixXd& X = this->road->getOptimiser()->getRegion()->getX();
-    const Eigen::MatrixXd& Y = this->road->getOptimiser()->getRegion()->getY();
-    const Eigen::MatrixXd& Z = this->road->getOptimiser()->getRegion()->getZ();
+    const Eigen::MatrixXd& X = roadPtrShared->getOptimiser()->getRegion()->getX();
+    const Eigen::MatrixXd& Y = roadPtrShared->getOptimiser()->getRegion()->getY();
+    const Eigen::MatrixXd& Z = roadPtrShared->getOptimiser()->getRegion()->getZ();
 
     unsigned int nxd = X.rows();
     unsigned int nyd = Y.cols();

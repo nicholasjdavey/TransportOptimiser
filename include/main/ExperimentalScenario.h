@@ -40,7 +40,7 @@ public:
      * @return Optimiser as OptimiserPtr
      */
     OptimiserPtr getOptimiser() {
-        return this->optimiser;
+        return this->optimiser.lock();
     }
     /**
      * Sets the Optimiser
@@ -211,16 +211,16 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 private:
-    OptimiserPtr optimiser;     /**< Calling Optimiser */
-    int program;                /**< Index of Program used */
-    int popLevel;               /**< Index of population level used */
-    int habPref;                /**< Index of habitat preference used */
-    int lambda;                 /**< Index of lambda used */
-    int rangingCoeff;           /**< Index of ranging coefficient used */
-    int animalBridge;           /**< Index of animal bridge test used */
-    int popGR;                  /**< Index of population growth uncertainty used (0 = no uncertainty) */
-    int fuel;                   /**< Index of fuel price uncertainty multiplier used (0 = no uncertainty) */
-    int commodity;              /**< Index of commodity price uncertainty multiplier used (0 = no uncertainty) */
+    std::weak_ptr<Optimiser> optimiser; /**< Calling Optimiser */
+    int program;                        /**< Index of Program used */
+    int popLevel;                       /**< Index of population level used */
+    int habPref;                        /**< Index of habitat preference used */
+    int lambda;                         /**< Index of lambda used */
+    int rangingCoeff;                   /**< Index of ranging coefficient used */
+    int animalBridge;                   /**< Index of animal bridge test used */
+    int popGR;                          /**< Index of population growth uncertainty used (0 = no uncertainty) */
+    int fuel;                           /**< Index of fuel price uncertainty multiplier used (0 = no uncertainty) */
+    int commodity;                      /**< Index of commodity price uncertainty multiplier used (0 = no uncertainty) */
 };
 
 #endif

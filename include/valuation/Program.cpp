@@ -3,7 +3,7 @@
 // Initialise static values
 unsigned long Program::programs = 0;
 
-Program::Program(const Eigen::VectorXd& flowRates, const Eigen::MatrixXf&
+Program::Program(const Eigen::VectorXd& flowRates, const Eigen::MatrixXd&
         switching) {
 
 	this->number = ++programs;

@@ -43,7 +43,7 @@ public:
 	 * @return Road as RoadPtr
 	 */
 	RoadPtr getRoad() {
-		return this->road;
+        return this->road.lock();
 	}
 	/**
 	 * Sets the road with this horizontal alignment
@@ -269,7 +269,7 @@ public:
 	void computeAlignment();
 
 private:
-	RoadPtr road;						/**< Road */
+    std::weak_ptr<Road> road;			/**< Road */
 	Eigen::VectorXd deltas;				/**< Arc angle of curve (rad) */
 	Eigen::VectorXd radii;				/**< Radii of curvature of PIs (rad) */
 	Eigen::VectorXd radiiReq;			/**< Required radii of curvature based on desired speed (rad) */

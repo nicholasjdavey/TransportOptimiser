@@ -4,9 +4,6 @@
 class Commodity;
 typedef std::shared_ptr<Commodity> CommodityPtr;
 
-class Fuel;
-typedef std::shared_ptr<Fuel> FuelPtr;
-
 class Economic;
 typedef std::shared_ptr<Economic> EconomicPtr;
 
@@ -30,7 +27,7 @@ public:
 	 * Constructs an %Economic object with assigned values
 	 */
     Economic(const std::vector<CommodityPtr>& commodities,
-            const std::vector<FuelPtr>& fuels, double rr, double ny);
+            const std::vector<CommodityPtr>& fuels, double rr, double ny);
 
 	/**
 	 * Destructor
@@ -59,17 +56,17 @@ public:
 	/**
 	 * Returns the fuels
 	 *
-     * @return Fuels as const std::vector<FuelPtr>&
+     * @return Fuels as const std::vector<CommodityPtr>&
 	 */
-    const std::vector<FuelPtr>& getFuels() {
+    const std::vector<CommodityPtr>& getFuels() {
         return this->fuels;
 	}
 	/**
 	 * Sets the fuels
 	 *
-     * @param fuels as const std::vector<FuelPtr>&
+     * @param fuels as const std::vector<CommodityPtr>&
 	 */
-    void setFuels(const std::vector<FuelPtr>& fuels) {
+    void setFuels(const std::vector<CommodityPtr>& fuels) {
         this->fuels = fuels;
 	}
 
@@ -113,7 +110,7 @@ public:
 
 private:
 	std::vector<CommodityPtr> commodities;	/**< Relevant commodities */
-	std::vector<FuelPtr> fuels;		/**< Relevant fuels */
+    std::vector<CommodityPtr> fuels;		/**< Relevant fuels */
 	double reqRate;				/**< Required rate of return p.a. */
 	double nYears;				/**< Design horizon */
 };

@@ -55,7 +55,9 @@ void Road::evaluateRoad() {
 
 void Road::computeOperating() {
 
-    switch (this->optimiser->getType()) {
+    OptimiserPtr optPtrShared = this->optimiser.lock();
+
+    switch (optPtrShared->getType()) {
         case Optimiser::SIMPLEPENALTY:
             // The penalty here refers to the end population being below the
             // required end population
@@ -64,15 +66,15 @@ void Road::computeOperating() {
             // If there is no uncertainty in the fuel or commodity prices,
             // just treat the operating valuation as a simple annuity. if there
             // is uncertainty, this
-            if ((this->getOptimiser()->getVariableParams()->getFuelVariable()
-                    .size() > 1) && (this->getOptimiser()->getVariableParams()
+            if ((optPtrShared->getVariableParams()->getFuelVariable()
+                    .size() > 1) && (optPtrShared->getVariableParams()
                     ->getCommodityVariable().size() > 1)) {
-                double r = this->getOptimiser()->getEconomic()->getRRR();
-                double t = this->getOptimiser()->getEconomic()->getYears();
-                double g = this->getOptimiser()->getTraffic()->getGR();
-                const Eigen::VectorXd& Qs = this->getOptimiser()
+                double r = optPtrShared->getEconomic()->getRRR();
+                double t = optPtrShared->getEconomic()->getYears();
+                double g = optPtrShared->getTraffic()->getGR();
+                const Eigen::VectorXd& Qs = optPtrShared
                         ->getTrafficProgram()->getFlowRates();
-                const std::vector<VehiclePtr>& vehicles = this->getOptimiser()
+                const std::vector<VehiclePtr>& vehicles = optPtrShared
                         ->getTraffic()->getVehicles();
                 double Q = Qs(Qs.size());
 
@@ -87,7 +89,7 @@ void Road::computeOperating() {
                 // Compute the price of a tonne of raw ore
                 double orePrice = 0.0;
 
-                const std::vector<CommodityPtr>& commodities = this->getOptimiser()
+                const std::vector<CommodityPtr>& commodities = optPtrShared
                         ->getEconomic()->getCommodities();
 
                 for (int ii = 0; ii < commodities.size(); ii++) {
@@ -127,7 +129,7 @@ void Road::addSpeciesPatches(SpeciesPtr species) {
 
 void Road::computeAlignment() {
 	// Initialise referenced parameters
-	//double* designVel = this->getOptimiser()->getDesignParameters()
+    //double* designVel = optPtrShared->getDesignParameters()
 	//		->getDesignVelocity();
 
 	// First ensure that no two or more successive points have the same x and

@@ -20,11 +20,12 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
     // First initialise the number of habitat patches. We expect there to be no
     // more than n x y where n is the number of habitat patches and y is the
     // number of grid cells.
-    RegionPtr region = this->road->getOptimiser()->getRegion();
+    RoadPtr roadPtrShared = this->road.lock();
+    RegionPtr region = roadPtrShared->getOptimiser()->getRegion();
     const Eigen::MatrixXd& X = region->getX();
     const Eigen::MatrixXd& Y = region->getY();
     const std::vector<HabitatTypePtr>& habTyps = this->species->getHabitatTypes();
-    int res = this->road->getOptimiser()->getGridRes();
+    int res = roadPtrShared->getOptimiser()->getGridRes();
 
     Eigen::VectorXd xspacing = (X.block(1,0,X.rows()-1,1)
             - X.block(0,0,X.rows()-1,1)).transpose();
@@ -41,9 +42,9 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
 
     const Eigen::MatrixXi modHab = this->species->getHabitatMap();
     Eigen::MatrixXi tempHabVec = Eigen::MatrixXi::Constant(1,
-            this->road->getRoadCells()->getUniqueCells().size(),
+            roadPtrShared->getRoadCells()->getUniqueCells().size(),
             (int)(HabitatType::ROAD));
-    igl::slice_into(modHab,this->road->getRoadCells()->getUniqueCells(),
+    igl::slice_into(modHab,roadPtrShared->getRoadCells()->getUniqueCells(),
             tempHabVec);
 
     // We create bins for each habitat type into which we place the patches. We
@@ -189,9 +190,11 @@ void SpeciesRoadPatches::habitatPatchDistances() {
 }
 
 void SpeciesRoadPatches::roadCrossings() {
-    const Eigen::VectorXd& px = this->road->getRoadSegments()->getX();
-    const Eigen::VectorXd& py = this->road->getRoadSegments()->getY();
-    const Eigen::VectorXi& typ = this->road->getRoadSegments()->getType();
+
+    RoadPtr roadPtrShared = this->road.lock();
+    const Eigen::VectorXd& px = roadPtrShared->getRoadSegments()->getX();
+    const Eigen::VectorXd& py = roadPtrShared->getRoadSegments()->getY();
+    const Eigen::VectorXi& typ = roadPtrShared->getRoadSegments()->getType();
     int noSegs = px.size()-1;
 /*
  DEPRECATED FROM MATLAB TEST CODE
@@ -218,8 +221,8 @@ void SpeciesRoadPatches::roadCrossings() {
     // that a transition is likely in the absence of a road). We use the 5th
     // percentile distance based on the simple exponential distribution used in
     // Rhodes et al. 2014.
-    double lda = (this->road->getOptimiser()->getVariableParams()
-            ->getLambda())(this->road->getOptimiser()->getScenario()
+    double lda = (roadPtrShared->getOptimiser()->getVariableParams()
+            ->getLambda())(roadPtrShared->getOptimiser()->getScenario()
             ->getLambda());
     double maxDist = log(0.05)/(-lda);
 
@@ -271,8 +274,11 @@ void SpeciesRoadPatches::roadCrossings() {
 }
 
 void SpeciesRoadPatches::computeTransitionProbabilities() {
-    double lda = (this->road->getOptimiser()->getVariableParams()
-            ->getLambda())(this->road->getOptimiser()->getScenario()
+
+    RoadPtr roadPtrShared = this->road.lock();
+
+    double lda = (roadPtrShared->getOptimiser()->getVariableParams()
+            ->getLambda())(roadPtrShared->getOptimiser()->getScenario()
             ->getLambda());
     double maxDist = log(0.05)/(-lda);
 
@@ -306,9 +312,10 @@ void SpeciesRoadPatches::computeTransitionProbabilities() {
 void SpeciesRoadPatches::computeSurvivalProbabilities() {
     double len = this->species->getLengthMean();
     double spd = this->species->getSpeedMean();
+    RoadPtr roadPtrShared = this->road.lock();
 
-    TrafficProgramPtr program = (this->road->getOptimiser()->getPrograms())[
-            this->road->getOptimiser()->getScenario()->getProgram()];
+    TrafficProgramPtr program = (roadPtrShared->getOptimiser()->getPrograms())[
+            roadPtrShared->getOptimiser()->getScenario()->getProgram()];
     const std::vector<VehiclePtr>& vehicles = program->getTraffic()->getVehicles();
 
     double avVehWidth = 0;
@@ -328,10 +335,11 @@ void SpeciesRoadPatches::computeSurvivalProbabilities() {
 
 void SpeciesRoadPatches::computeAAR(const Eigen::VectorXd& pops,
         Eigen::VectorXd& aar) {
+    RoadPtr roadPtrShared = this->road.lock();
     // No asserts are performed here as the population input vector must be
     // checked for sizing requirements before use by the calling function
-    TrafficProgramPtr program = (this->road->getOptimiser()->getPrograms())[
-            this->road->getOptimiser()->getScenario()->getProgram()];
+    TrafficProgramPtr program = (roadPtrShared->getOptimiser()->getPrograms())[
+            roadPtrShared->getOptimiser()->getScenario()->getProgram()];
     int controls = program->getFlowRates().size();
 
     double popInit = pops.sum();

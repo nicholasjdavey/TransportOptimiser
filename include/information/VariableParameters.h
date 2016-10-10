@@ -1,6 +1,9 @@
 #ifndef VARIABLEPARAMETERS_H
 #define VARIABLEPARAMETERS_H
 
+class VariableParameters;
+typedef std::shared_ptr<VariableParameters> VariableParametersPtr;
+
 /**
  * Class for storing details that can be varied for sensitivity analysis
  */

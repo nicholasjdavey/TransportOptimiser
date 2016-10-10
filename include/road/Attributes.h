@@ -44,7 +44,7 @@ public:
 	 * @return Road as RoadPtr
 	 */
 	RoadPtr getRoad() {
-		return this->road;
+        return this->road.lock();
 	}
 	/**
 	 * Sets the road
@@ -89,6 +89,23 @@ public:
 	void setEndPopMTE(double endpop) {
 		this->endPopMTE = endpop;
 	}
+
+    /**
+     * Returns the end population under controlled flow
+     *
+     * @return End population as double
+     */
+    double getEndPopROV() {
+        return this->endPopROV;
+    }
+    /**
+     * Sets the end population under controlled flow
+     *
+     * @param endpop as double
+     */
+    void setEndPopROV(double endpop) {
+        this->endPopROV = endpop;
+    }
 
     /**
      * Returns the road fixed costs
@@ -192,6 +209,23 @@ public:
 		this->totalValueMTE = tvmte;
 	}
 
+    /**
+     * Returns the total value standard deviation with MTE
+     *
+     * @return Total value standard deviation as double
+     */
+    double getTotalValueMTESD() {
+        return this->totalValueMTESD;
+    }
+    /**
+     * Sets the total value standard deviation with MTE
+     *
+     * @param tvmtesd;
+     */
+    void setTotalValueMTESD(double tvmtesd) {
+        this->totalValueMTESD = tvmtesd;
+    }
+
 	/**
 	 * Returns the total value with ROV
 	 *
@@ -208,21 +242,42 @@ public:
 	void setTotalValueROV(double tvrov) {
 		this->totalValueROV = tvrov;
 	}
+
+    /**
+     * Returns the total value standard deviation with ROV
+     *
+     * @return Total value standard deviation as double
+     */
+    double getTotalValueROVSD() {
+        return this->totalValueROVSD;
+    }
+    /**
+     * Sets the total value standard deviation with ROV
+     *
+     * @param tvrovsd;
+     */
+    void setTotalValueROVSD(double tvrovsd) {
+        this->totalValueROVSD = tvrovsd;
+    }
+
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
 
 	// CALCULATION ROUTINES ///////////////////////////////////////////////////
 	
 private:
-	RoadPtr road;					/**< Road with these attributes */
+    std::weak_ptr<Road> road;   	/**< Road with these attributes */
 	double initAAR;					/**< Initial animals at risk */
 	double endPopMTE;				/**< End population if constant full flow */
+    double endPopROV;				/**< Mean end population */
     double fixedCosts;              /**< Fixed road costs */
     double unitVarCosts;			/**< Variable costs per unit traffic per hour per year */
 	double unitVarRevenue;			/**< Variable revenue per unit traffic per hour per year */
 	double length;					/**< Total road length (m) */
     double varProfitIC;				/**< Operating value */
 	double totalValueMTE;			/**< Overall value, MTE */
+    double totalValueMTESD;         /**< Overall value standard deviation, MTE */
 	double totalValueROV;			/**< Overall value, ROV */
+    double totalValueROVSD;         /**< Overall value standard deviation, ROV */
 };
 
 #endif

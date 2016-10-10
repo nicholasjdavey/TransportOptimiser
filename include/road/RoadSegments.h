@@ -41,7 +41,7 @@ public:
 	 * @return Road as RoadPtr
 	 */
 	RoadPtr getRoad() {
-		return this->road;
+        return this->road.lock();
 	}
 	/**
 	 * Sets the road
@@ -227,16 +227,16 @@ public:
     void placeNetwork();
 
 private:
-    RoadPtr road;			/**< Road containing these segments */
-    Eigen::VectorXd x;		/**< X coordinates */
-    Eigen::VectorXd y;		/**< Y coordinates */
-    Eigen::VectorXd z;		/**< Z coordinates */
-    Eigen::VectorXd e;		/**< Natural elevation at x,y */
-    Eigen::VectorXd s;		/**< Distance along curve */
-    Eigen::VectorXd w;		/**< Road widths at each points */
-    Eigen::VectorXd v;		/**< Velocity at point */
-    Eigen::VectorXd spc;	/**< Distances to curve points */
-    Eigen::VectorXi typ;    /**< Type of segments */
+    std::weak_ptr<Road> road;	/**< Road containing these segments */
+    Eigen::VectorXd x;          /**< X coordinates */
+    Eigen::VectorXd y;          /**< Y coordinates */
+    Eigen::VectorXd z;          /**< Z coordinates */
+    Eigen::VectorXd e;          /**< Natural elevation at x,y */
+    Eigen::VectorXd s;          /**< Distance along curve */
+    Eigen::VectorXd w;          /**< Road widths at each points */
+    Eigen::VectorXd v;          /**< Velocity at point */
+    Eigen::VectorXd spc;        /**< Distances to curve points */
+    Eigen::VectorXi typ;        /**< Type of segments */
 
     // PRIVATE ROUTINES
 

@@ -28,10 +28,11 @@ HorizontalAlignment::~HorizontalAlignment() {
 
 void HorizontalAlignment::computeAlignment() {
 	int maxiter = 1;
+    RoadPtr roadPtrShared = this->road.lock();
 
 	// Create short names for input data
-    const Eigen::VectorXd& xFull = this->road->getXCoords();
-    const Eigen::VectorXd& yFull = this->road->getYCoords();
+    const Eigen::VectorXd& xFull = roadPtrShared->getXCoords();
+    const Eigen::VectorXd& yFull = roadPtrShared->getYCoords();
     std::vector<bool> duplicates(xFull.size(),false);
 	int uniqueEntries = 1;
 
@@ -61,10 +62,10 @@ void HorizontalAlignment::computeAlignment() {
 	if (xCoords.size() != yCoords.size()) {
 		std::cerr << "X and Y vectors must be of the same length" << std::endl;
 	} else {
-		double maxSE = this->road->getOptimiser()->getDesignParameters()->getMaxSE();
-		double designVel = this->road->getOptimiser()->getDesignParameters()
+        double maxSE = roadPtrShared->getOptimiser()->getDesignParameters()->getMaxSE();
+        double designVel = roadPtrShared->getOptimiser()->getDesignParameters()
 				->getDesignVelocity();
-		bool spiral = this->road->getOptimiser()->getDesignParameters()
+        bool spiral = roadPtrShared->getOptimiser()->getDesignParameters()
 				->getSpiral();
 
 		unsigned long ip = xCoords.size() - 2;

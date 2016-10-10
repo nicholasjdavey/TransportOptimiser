@@ -36,7 +36,7 @@ public:
 	 * @return Commodity as CommodityPtr
 	 */
 	CommodityPtr getCommodity1() {
-		return this->commodity1;
+        return this->commodity1.lock();
 	}
 	/**
 	 * Sets the first commodity
@@ -54,7 +54,7 @@ public:
 	 * @return Commodity as CommodityPtr
 	 */
 	CommodityPtr getCommodity2() {
-		return this->commodity2;
+        return this->commodity2.lock();
 	}
 	/**
 	 * Sets the second commodity
@@ -88,8 +88,8 @@ public:
 	// CALCULATION ROUTINES /////////////////////////////////////////////////////
 
 private:
-	CommodityPtr commodity1;			/**< First Commodity */
-	CommodityPtr commodity2;			/**< Second Commodity */
+    std::weak_ptr<Commodity> commodity1;/**< First Commodity */
+    std::weak_ptr<Commodity> commodity2;/**< Second Commodity */
 	double covariance;					/**< Covariance */
 };
 

@@ -42,34 +42,36 @@ void Costs::computeEarthworkCosts() {
 	// Get segment lengths and segment average depths.
 	// Negative values represent fill, positive values
 	// represent cuts.
-    long int segs = this->road->getRoadSegments()->getDists().size() - 1;
-    Eigen::VectorXd depth = this->road->getRoadSegments()->getE() -
-            road->getRoadSegments()->getZ();
-    Eigen::VectorXd segLen = this->road->getRoadSegments()->getDists().
-            segment(1,segs+1) - this->road->getRoadSegments()->getDists().
+    RoadPtr roadPtrShared = this->road.lock();
+
+    long int segs = roadPtrShared->getRoadSegments()->getDists().size() - 1;
+    Eigen::VectorXd depth = roadPtrShared->getRoadSegments()->getE() -
+            roadPtrShared->getRoadSegments()->getZ();
+    Eigen::VectorXd segLen = roadPtrShared->getRoadSegments()->getDists().
+            segment(1,segs+1) - roadPtrShared->getRoadSegments()->getDists().
 			segment(0,segs);
-    const Eigen::VectorXd& rw = this->road->getRoadSegments()->getWidths();
-	double repC = this->road->getOptimiser()->getDesignParameters()
+    const Eigen::VectorXd& rw = roadPtrShared->getRoadSegments()->getWidths();
+    double repC = roadPtrShared->getOptimiser()->getDesignParameters()
 			->getCutRep();
-	double repF = this->road->getOptimiser()->getDesignParameters()
+    double repF = roadPtrShared->getOptimiser()->getDesignParameters()
 			->getFillRep();
 
 	Eigen::VectorXd avDepth = 0.5*(depth.segment(1,segs+1)
 			+ depth.segment(0,segs));
     Eigen::VectorXi type = Eigen::VectorXi::Constant(segs,
             (int)(RoadSegments::ROAD));
-    this->road->getRoadSegments()->setType(type);
+    roadPtrShared->getRoadSegments()->setType(type);
 
 	// Costs are USD per m^3 in 2015 based on Chew, Goh & Fwa 1988 indexed.
     // When different soil types are used, they shall be included as well.
     // The first zero in each of the followin two vectors corresponds the to
     // the case where the segment is actually filled. This allows us to use
     // the vectors in matrix calculations to speed up the computation.
-    const Eigen::VectorXd& cDepths = this->road->getOptimiser()->
+    const Eigen::VectorXd& cDepths = roadPtrShared->getOptimiser()->
             getEarthworkCosts()->getDepths();
-    const Eigen::VectorXd& cCosts = this->road->getOptimiser()->
+    const Eigen::VectorXd& cCosts = roadPtrShared->getOptimiser()->
             getEarthworkCosts()->getCutCosts();
-	double fCost = this->road->getOptimiser()->getEarthworkCosts()
+    double fCost = roadPtrShared->getOptimiser()->getEarthworkCosts()
 			->getFillCost();
 
 	Eigen::VectorXd cut = (avDepth.array() > 0).cast<double>();
@@ -145,8 +147,10 @@ void Costs::computeEarthworkCosts() {
 }
 
 void Costs::computeLocationCosts() {
-    RoadCellsPtr segments = this->road->getRoadCells();
-    RegionPtr region = this->road->getOptimiser()->getRegion();
+    RoadPtr roadPtrShared = this->road.lock();
+
+    RoadCellsPtr segments = roadPtrShared->getRoadCells();
+    RegionPtr region = roadPtrShared->getOptimiser()->getRegion();
 
     Eigen::VectorXi purch(segments->getTypes().size());
     purch = (segments->getTypes().array() !=
@@ -172,11 +176,11 @@ void Costs::computeLocationCosts() {
             array()*(segments->getAreas()).array()).sum();
 
     // Species habitat damage costs (accumulates over each species)
-    const std::vector<SpeciesPtr>& species = this->road->getOptimiser()
+    const std::vector<SpeciesPtr>& species = roadPtrShared->getOptimiser()
             ->getSpecies();
 
     double regionPenaltyCost = 0;
-    if (this->road->getOptimiser()->getType() == Optimiser::SIMPLEPENALTY) {
+    if (roadPtrShared->getOptimiser()->getType() == Optimiser::SIMPLEPENALTY) {
 
         for (int ii = 0; ii < species.size(); ii++) {
             const Eigen::MatrixXi& habMapPtr = species[ii]->getHabitatMap();
@@ -200,15 +204,17 @@ void Costs::computeLocationCosts() {
 }
 
 void Costs::computeLengthCosts() {
-    RoadCellsPtr cells = this->road->getRoadCells();
-    double length = this->road->getAttributes()->getLength();
-    DesignParametersPtr desParams = this->road->getOptimiser()
+    RoadPtr roadPtrShared = this->road.lock();
+
+    RoadCellsPtr cells = roadPtrShared->getRoadCells();
+    double length = roadPtrShared->getAttributes()->getLength();
+    DesignParametersPtr desParams = roadPtrShared->getOptimiser()
             ->getDesignParameters();
-    UnitCostSPtr unitCosts = this->road->getOptimiser()
+    UnitCostSPtr unitCosts = roadPtrShared->getOptimiser()
             ->getUnitCosts();
-    const Eigen::VectorXd& z = this->road->getRoadSegments()->getZ();
-    const Eigen::VectorXd& s = this->road->getRoadSegments()->getDists();
-    const Eigen::VectorXd& v = this->road->getRoadSegments()->getVelocities();
+    const Eigen::VectorXd& z = roadPtrShared->getRoadSegments()->getZ();
+    const Eigen::VectorXd& s = roadPtrShared->getRoadSegments()->getDists();
+    const Eigen::VectorXd& v = roadPtrShared->getRoadSegments()->getVelocities();
     const Eigen::VectorXd& areas = cells->getAreas();
 
     this->lengthFixed = (desParams->getCostPerSM()*
@@ -229,11 +235,11 @@ void Costs::computeLengthCosts() {
             + unitCosts->getLandUse()
             + unitCosts->getSolidChemWaste());
 
-    double K = this->road->getOptimiser()->getTraffic()->
+    double K = roadPtrShared->getOptimiser()->getTraffic()->
             getPeakProportion();
-    double D = this->road->getOptimiser()->getTraffic()->
+    double D = roadPtrShared->getOptimiser()->getTraffic()->
             getDirectionality();
-    double Hp = this->road->getOptimiser()->getTraffic()->
+    double Hp = roadPtrShared->getOptimiser()->getTraffic()->
             getPeakHours();
 
     Eigen::VectorXd Q(3);
@@ -241,7 +247,7 @@ void Costs::computeLengthCosts() {
             1.0e-6*K*(1-D)*154.5,
             5.0e-7*(6570-309*Hp)*(1-K)/(18-Hp);
 
-    const std::vector<VehiclePtr>& vehicles = this->road->getOptimiser()
+    const std::vector<VehiclePtr>& vehicles = roadPtrShared->getOptimiser()
             ->getTraffic()->getVehicles();
 
     Eigen::MatrixXd coeffSE(vehicles.size(),4);
@@ -287,13 +293,15 @@ void Costs::computeLengthCosts() {
 }
 
 void Costs::computeAccidentCosts() {
+    RoadPtr roadPtrShared = this->road.lock();
+
     // 18 hour day
-    const Eigen::VectorXd& delta = this->road->getHorizontalAlignment()->getDeltas();
-    const Eigen::VectorXd& R = this->road->getHorizontalAlignment()->getRadii();
-    const Eigen::VectorXd& ssd = this->road->getVerticalAlignment()->getSSDs();
-    double width = this->road->getOptimiser()->getDesignParameters()
+    const Eigen::VectorXd& delta = roadPtrShared->getHorizontalAlignment()->getDeltas();
+    const Eigen::VectorXd& R = roadPtrShared->getHorizontalAlignment()->getRadii();
+    const Eigen::VectorXd& ssd = roadPtrShared->getVerticalAlignment()->getSSDs();
+    double width = roadPtrShared->getOptimiser()->getDesignParameters()
             ->getRoadWidth();
-    double accCost = this->road->getOptimiser()->getUnitCosts()
+    double accCost = roadPtrShared->getOptimiser()->getUnitCosts()
             ->getAccidentCost();
 
     double qfac = 6570*(1.0e-6);
@@ -312,12 +320,14 @@ void Costs::computeAccidentCosts() {
 }
 
 void Costs::computePenaltyCost() {
+    RoadPtr roadPtrShared = this->road.lock();
+
     const std::vector<SpeciesRoadPatchesPtr>& speciesRoadPatches =
-            this->road->getSpeciesRoadPatches();
+            roadPtrShared->getSpeciesRoadPatches();
 
     this->penaltyCost = 0;
     // The target confidence interval we are using
-    double cumpr = 1 - this->road->getOptimiser()->getConfidenceInterval();
+    double cumpr = 1 - roadPtrShared->getOptimiser()->getConfidenceInterval();
     double sd = Utility::NormalCDFInverse(cumpr);
 
     for (int ii = 0; ii < speciesRoadPatches.size(); ii++) {

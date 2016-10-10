@@ -6,7 +6,7 @@ Economic::Economic() {
 }
 
 Economic::Economic(const std::vector<CommodityPtr> &commodities,
-        const std::vector<FuelPtr> &fuels, double rr, double ny) {
+        const std::vector<CommodityPtr> &fuels, double rr, double ny) {
 
 	this->reqRate = rr;
 	this->nYears = ny;
