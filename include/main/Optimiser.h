@@ -43,6 +43,9 @@ typedef std::shared_ptr<Traffic> TrafficPtr;
 class Region;
 typedef std::shared_ptr<Region> RegionPtr;
 
+class ThreadManager;
+typedef std::shared_ptr<ThreadManager> ThreadManagerPtr;
+
 class Optimiser;
 typedef std::shared_ptr<Optimiser> OptimiserPtr;
 
@@ -73,7 +76,7 @@ public:
             traffic, RegionPtr region, double mr, unsigned long cf, unsigned
             long gens, unsigned long popSize, double stopTol, double confInt,
             double confLvl, unsigned long habGridRes, std::string solScheme,
-            unsigned long noRuns, Optimiser::Type type);
+            unsigned long noRuns, Optimiser::Type type, ThreadManagerPtr threader);
     /**
      * Destructor
      */
@@ -533,6 +536,24 @@ public:
 	    this->solutionScheme = scheme;
     }
 
+    /**
+     * Returns the Thread Manager
+     *
+     * @return ThreadManager as ThreadManagerPtr
+     */
+    ThreadManagerPtr getThreadManager() {
+        return this->threader;
+    }
+    /**
+     * Sets the ThreadManager
+     *
+     * @param threader as ThreadManagerPtr
+     */
+    void setThreadManager(ThreadManagerPtr threader) {
+        this->threader.reset();
+        this->threader = threader;
+    }
+
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -575,6 +596,7 @@ private:
     unsigned long habGridRes;						/**< Habitat grid 1D resolution */
     unsigned long noRuns;							/**< Number of runs to perform */
     std::string solutionScheme;						/**< Solution scheme used (i.e. name of experiment) */
+    ThreadManagerPtr threader;                      /**< Thread manager used for multithreading computations */
     OptimiserPtr me();                              /**< Creates a shared pointer from this */
 };
 

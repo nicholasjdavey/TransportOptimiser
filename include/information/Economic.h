@@ -104,6 +104,23 @@ public:
 		this->nYears = years;
 	}
 
+    /**
+     * Returns the step size used in simulations
+     *
+     * @return Step size as double
+     */
+    double getTimeStep() {
+        return this->timeStep;
+    }
+    /**
+     * Sets the step size used in simulations
+     *
+     * @param step as double
+     */
+    void setTimeStep(double step) {
+        this->timeStep = step;
+    }
+
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
 
 	// CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -113,6 +130,7 @@ private:
     std::vector<CommodityPtr> fuels;		/**< Relevant fuels */
 	double reqRate;				/**< Required rate of return p.a. */
 	double nYears;				/**< Design horizon */
+    double timeStep;            /**< Simulation step size in years */
 };
 
 #endif

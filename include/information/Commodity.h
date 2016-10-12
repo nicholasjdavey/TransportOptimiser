@@ -1,6 +1,9 @@
 #ifndef COMMODITY_H
 #define COMMODITY_H
 
+class Optimiser;
+typedef std::shared_ptr<Optimiser> OptimiserPtr;
+
 class Uncertainty;
 typedef std::shared_ptr<Uncertainty> UncertaintyPtr;
 
@@ -24,15 +27,16 @@ public:
 	 *
 	 * Constructs a %Commodity object with default values
 	 */
-	Commodity();
+    Commodity(OptimiserPtr optimiser);
 
 	/**
 	 * Constructor II
 	 *
 	 * Constructs a %Commodity object with assigned values
 	 */
-	Commodity(std::string nm, double mp, double sd, double rev,
-            const std::vector<CommodityCovariancePtr>& covs, bool active);
+    Commodity(OptimiserPtr optimiser, std::string nm, double mp, double sd,
+            double rev, const std::vector<CommodityCovariancePtr>& covs, bool
+            active);
 
 	/**
 	 * Destructor

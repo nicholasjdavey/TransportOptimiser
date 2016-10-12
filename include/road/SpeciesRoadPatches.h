@@ -1,6 +1,9 @@
 #ifndef SPECIESROADPATCHES_H
 #define SPECIESROADPATCHES_H
 
+class Optimiser;
+typedef std::shared_ptr<Optimiser> OptimiserPtr;
+
 class Uncertainty;
 typedef std::shared_ptr<Uncertainty> UncertaintyPtr;
 
@@ -27,15 +30,16 @@ public:
      *
      * Constructs a %SpeciesRoadPatches object with default values
      */
-    SpeciesRoadPatches(SpeciesPtr species, RoadPtr road);
+    SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr species, RoadPtr road);
 
     /**
      * Constructor II
      *
      * Constructs a %SpeciesRoadPatches object with assigned values
      */
-    SpeciesRoadPatches(SpeciesPtr species, RoadPtr road, bool active,
-            double mean, double stdDev, double rev, std::string nm);
+    SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr species, RoadPtr
+            road, bool active, double mean, double stdDev, double rev,
+            std::string nm);
     /**
      * Destructor
      */

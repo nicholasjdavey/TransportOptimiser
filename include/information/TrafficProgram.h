@@ -21,7 +21,7 @@ public:
 	 *
 	 * Constructs an empty %TrafficProgram object
 	 */
-    TrafficProgram(const Eigen::VectorXd& flowRates, const Eigen::MatrixXf&
+    TrafficProgram(const Eigen::VectorXd& flowRates, const Eigen::MatrixXd&
             switching);
 
 	/**
@@ -30,7 +30,7 @@ public:
 	 * Constructs a %TrafficProgram control object
 	 */
     TrafficProgram(bool br, TrafficPtr traffic, const Eigen::VectorXd&
-        flowRates, const Eigen::MatrixXf& switching);
+        flowRates, const Eigen::MatrixXd &switching);
 
 	/**
 	 * Destructor

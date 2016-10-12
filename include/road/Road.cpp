@@ -121,7 +121,8 @@ void Road::computeOperating() {
 }
 
 void Road::addSpeciesPatches(SpeciesPtr species) {
-    SpeciesRoadPatchesPtr srp(new SpeciesRoadPatches(species, this->me()));
+    SpeciesRoadPatchesPtr srp(new SpeciesRoadPatches(this->optimiser.lock(),
+        species, this->me()));
     this->srp.push_back(srp);
 }
 

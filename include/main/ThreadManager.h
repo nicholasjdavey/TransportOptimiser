@@ -52,10 +52,25 @@ public:
 
 // CALCULATION ROUTINES ///////////////////////////////////////////////////////
 
+    /**
+     * Pushes a function onto the thread pool
+     *
+     * @param F is a function that accepts an integer and then a variable
+     * number of other inputs of any typedef
+     * @param Rest is the argument list for the input function (excluding the
+     * initial int parameter)
+     */
+    template<typename F, typename... Rest>
+    auto push(F && f, Rest&&... rest) ->std::future<decltype(f(0, rest...))> {
+        this->pool->push(f, rest...);
+    }
+
+
+
 ///////////////////////////////////////////////////////////////////////////////
 private:
-    unsigned long max_threads;   /**< User-defined number of threads */
-    unsigned long noThreads;     /**< Actual number of threads */
-    PoolPtr pool;             /**< Pool for managing threads */
+    unsigned long max_threads;  /**< User-defined number of threads */
+    unsigned long noThreads;    /**< Actual number of threads */
+    PoolPtr pool;               /**< Pool for managing threads */
 };
 #endif

@@ -1,14 +1,15 @@
 #include "../transportbase.h"
 
-SpeciesRoadPatches::SpeciesRoadPatches(SpeciesPtr species, RoadPtr road) :
-        Uncertainty() {
+SpeciesRoadPatches::SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr
+        species, RoadPtr road) : Uncertainty(optimiser) {
     this->species = species;
     this->road = road;
 }
 
-SpeciesRoadPatches::SpeciesRoadPatches(SpeciesPtr species, RoadPtr road,
-        bool active, double mean, double stdDev, double rev,
-        std::string nm) : Uncertainty(nm, mean, stdDev, rev, active) {
+SpeciesRoadPatches::SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr
+        species, RoadPtr road, bool active, double mean, double stdDev, double
+        rev, std::string nm) : Uncertainty(optimiser, nm, mean, stdDev, rev,
+        active) {
 
     this->species = species;
     this->road = road;

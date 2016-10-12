@@ -1,11 +1,31 @@
 #ifndef UNCERTAINTY_H
 #define UNCERTAINTY_H
 
+class ThreadManager;
+typedef std::shared_ptr<ThreadManager> ThreadManagerPtr;
+
+class Economic;
+typedef std::shared_ptr<Economic> EconomicPtr;
+
+class Optimiser;
+typedef std::shared_ptr<Optimiser> OptimiserPtr;
+
 class Uncertainty;
 typedef std::shared_ptr<Uncertainty> UncertaintyPtr;
 
 /**
  * Class for managing %Uncertainty objects
+ *
+ * Uncertainties are modelled as Mean Reverting (Ornstein-Uhlenbeck processes)
+ * with jumps. The probability distribution for jumps is assumed independent of
+ * the mean reversion model.
+ *
+ * This model also includes diffusion.
+ *
+ * This will later include the ability to have non-stationary long-term means.
+ *
+ * See: http://marcoagd.usuarios.rdc.puc-rio.br/sim_stoc_proc.html
+ * Langrenet et al. 2015
  */
 class Uncertainty {
 
@@ -17,14 +37,15 @@ public:
 	 *
 	 * Constructs an %Uncertainty object with default values
 	 */
-	Uncertainty();
+    Uncertainty(OptimiserPtr optimiser);
 
 	/**
 	 * Constructor II
 	 *
 	 * Constructs an %Uncertainty object with assigned values
 	 */
-	Uncertainty(std::string nm, double mp, double sd, double rev, bool active);
+    Uncertainty(OptimiserPtr optimiser, std::string nm, double mp, double sd,
+            double rev, bool active);
 
 	/**
 	 * Destructor
@@ -33,6 +54,23 @@ public:
 
 	// ACCESSORS //////////////////////////////////////////////////////////////
 	
+    /**
+     * Returns the Optimiser
+     *
+     * @return Optimiser as OptimiserPtr
+     */
+    OptimiserPtr getOptimiser() {
+        return this->optimiser.lock();
+    }
+    /**
+     * Sets the Optimiser
+     *
+     * @param opt as OptimiserPtr
+     */
+    void setOptimiser(OptimiserPtr opt) {
+        this->optimiser = opt;
+    }
+
 	/**
 	 * Returns the name
 	 *
@@ -85,9 +123,11 @@ public:
 	}
 
 	/**
-	 * Returns standard deviation for noise
+     * Returns standard deviation for noise
 	 *
 	 * @return Standard deviation as double
+     * @note This process contains diffusion so this standard deviation is
+     * multiplied by the prevailing level of the uncertainty.
 	 */
 	double getNoiseSD() {
 		return this->standardDev;
@@ -152,6 +192,39 @@ public:
         this->expPV = pv;
     }
 
+    /**
+     * Returns the exponential distribution parameter for jump size
+     *
+     * @return Jump size distribution parameter as double
+     */
+    double getPoissonJump() {
+        return this->poissonJump;
+    }
+    /**
+     * Sets the exponential distribution parameter for jump sizeof
+     *
+     * @param p as double
+     */
+    void setPoissonJump(double p) {
+        this->poissonJump = p;
+    }
+    /**
+     * Returns the probability of a jump at each time step
+     *
+     * @return Jump probability as double
+     */
+    double getJumpProb() {
+        return this->jumpProb;
+    }
+    /**
+     * Sets the probability of a jump at each time step
+     *
+     * @param prob as double
+     */
+    void setJumpProb(double prob) {
+        this->jumpProb = prob;
+    }
+
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
 
 	// CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -165,19 +238,29 @@ public:
      * of usage for the design horizon. This function calls std::thread to run
      * the simulation values in parallel.
      *
+     * This is used to find the expected present value of a financial cost
+     * such as fuel price if it is used the same amount for every period on the
+     * horizon.
+     *
      * @note This function is called only once for a road optimisation and is
      * therefore not computed for every road.
      */
     void computeExpPV();
 
 private:
-    std::string name;	/**< Name of the product */
-    double current;		/**< Current level of uncertainty */
-    double meanP;		/**< Long-run mean */
-    double standardDev;	/**< Standard deviation */
-    double reversion;	/**< Strength of mean reversion */
-    double expPV;       /**< Expected PV of all future CF from MC sims per unit */
-    bool active;		/**< Used in problem? */
+    std::weak_ptr<Optimiser> optimiser; /**< */
+    std::string name;                   /**< Name of the product */
+    double current;                     /**< Current level of uncertainty */
+    double meanP;                       /**< Long-run mean */
+    double standardDev;                 /**< Standard deviation */
+    double reversion;                   /**< Strength of mean reversion */
+    double poissonJump;                 /**< Poisson parameter for jump sizes */
+    double jumpProb;                    /**< Probability of a jump at each time */
+    double expPV;                       /**< Expected PV of all future CF from MC sims per unit */
+    bool active;                        /**< Used in problem? */
+
+    // Private functions //////////////////////////////////////////////////////
+    double singlePathValue();
 };
 
 #endif

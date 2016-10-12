@@ -8,7 +8,7 @@ Optimiser::Optimiser(const std::vector<TrafficProgramPtr>& programs,
         double mr, unsigned long cf, unsigned long gens, unsigned long popSize,
         double stopTol, double confInt, double confLvl, unsigned long
         habGridRes, std::string solScheme, unsigned long noRuns,
-        Optimiser::Type type) {
+        Optimiser::Type type, ThreadManagerPtr threader) {
 
 //	std::vector<RoadPtr>* crp(new std::vector<RoadPtr>());
     this->type = type;
@@ -28,6 +28,7 @@ Optimiser::Optimiser(const std::vector<TrafficProgramPtr>& programs,
 	this->bestRoads = br;
 
 //	std::vector<ProgramPtr>* programs(new std::vector<ProgramPtr>());
+    this->threader = threader;
     this->programs = programs;
 	this->otherInputs = oInputs;
 	this->designParams = desParams;

@@ -1,11 +1,11 @@
 #include "../transportbase.h"
 
-Commodity::Commodity() : Uncertainty() {
+Commodity::Commodity(OptimiserPtr optimiser) : Uncertainty(optimiser) {
 }
 
-Commodity::Commodity(std::string nm, double mp, double sd, double rev,
-        const std::vector<CommodityCovariancePtr>& covs, bool active) :
-		Uncertainty(nm, mp, sd, rev, active) {
+Commodity::Commodity(OptimiserPtr optimiser, std::string nm, double mp, double
+        sd, double rev, const std::vector<CommodityCovariancePtr>& covs, bool
+        active) : Uncertainty(optimiser, nm, mp, sd, rev, active) {
     this->covariances = covs;
 }
 

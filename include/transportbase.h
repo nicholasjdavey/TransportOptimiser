@@ -25,6 +25,7 @@
 #include <fstream>
 #include <regex>
 #include <thread>
+#include <random>
 
 // HEADER-ONLY LIBRARIES //////////////////////////////////////////////////////
 // EIGEN

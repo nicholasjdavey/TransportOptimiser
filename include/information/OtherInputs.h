@@ -211,6 +211,24 @@ public:
 	void setHabGridRes(unsigned long hgr) {
 		this->habGridRes = hgr;
 	}
+
+    /**
+     * Returns the number of simulation paths to use
+     *
+     * @return Number of paths as unsigned long
+     */
+    unsigned long getNoPaths() {
+        return this->noPaths;
+    }
+    /**
+     * Sets the number of simulation paths to use
+     *
+     * @param paths as unsigned long
+     */
+    void setNoPaths(unsigned long paths) {
+        this->noPaths = paths;
+    }
+
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
 
 	// CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -227,6 +245,7 @@ private:
 	unsigned long latPoints;	/**< Number of latitude points for grid */
 	unsigned long lonPoints;	/**< Number of longitude points for grid */
 	unsigned long habGridRes;	/**< Habitat grid resolution in longest dimension */
+    unsigned long noPaths;      /**< Number of simulation paths */
 };
 
 #endif
