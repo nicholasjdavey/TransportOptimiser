@@ -17,6 +17,14 @@ SpeciesRoadPatches::SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr
 
 SpeciesRoadPatches::~SpeciesRoadPatches() {}
 
+void SpeciesRoadPatches::createSpeciesModel() {
+    this->generateHabitatPatchesGrid();
+    this->getDistances();
+    this->getCrossings();
+    this->computeTransitionProbabilities();
+    this->computeSurvivalProbabilities();
+}
+
 void SpeciesRoadPatches::generateHabitatPatchesGrid() {
     // First initialise the number of habitat patches. We expect there to be no
     // more than n x y where n is the number of habitat patches and y is the
@@ -304,7 +312,7 @@ void SpeciesRoadPatches::computeTransitionProbabilities() {
             }
         }
 
-        // Normalise all shares
+        // Normalise all weightings
         this->transProbs.block(ii,0,1,this->transProbs.cols()) =
                 this->transProbs.block(ii,0,1,this->transProbs.cols()) / summ;
     }
@@ -350,4 +358,16 @@ void SpeciesRoadPatches::computeAAR(const Eigen::VectorXd& pops,
                 this->survProbs[ii].transpose()*pops;
         aar(ii) = 1-newPops.sum()/popInit;
     }
+}
+
+void SpeciesRoadPatches::computeInitialAAR(Eigen::VectorXd &iar) {
+
+    int hps = this->habPatch.size();
+    Eigen::VectorXd pops(hps);
+
+    for (int ii = 0; ii < hps; ii++) {
+        pops(ii) = this->habPatch[ii]->getPopulation();
+    }
+
+    this->computeAAR(pops,iar);
 }

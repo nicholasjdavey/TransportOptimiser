@@ -28,6 +28,9 @@ typedef std::shared_ptr<Attributes> AttributesPtr;
 class Costs;
 typedef std::shared_ptr<Costs> CostsPtr;
 
+class Species;
+typedef std::shared_ptr<Species> SpeciesPtr;
+
 class SpeciesRoadPatches;
 typedef std::shared_ptr<SpeciesRoadPatches> SpeciesRoadPatchesPtr;
 
@@ -336,8 +339,13 @@ public:
      *    stage.
      * 2. Full traffic flow for entire horizon.
      * 3. Traffic control.
+     *
+     * If the function is called in learning mode (learning = true), then the
+     * full simulation model for the optimisation scenario is called.
+     * Otherwise, the default of using the surrogate function contained in
+     * Optimiser->ExperimentalScenario is used.
      */
-    void computeOperating();
+    void computeOperating(bool learning = false);
 
     /**
      * Adds simulation patches for a given Species
@@ -410,6 +418,19 @@ private:
 	 * Computes the road path from the horizontal and vertical alignments
 	 */
 	void plotRoadPath();
+
+    /**
+     * Creates the simulation patches for each Species in the Region.
+     */
+    void computeSimulationPatches();
+
+    /**
+     * Computes the initial animals at risk for a particular Species
+     *
+     * @param srp as SpeciesRoadPatchesPtr
+     * @return iar as Eigen::VectorXd&
+     */
+    void compueteInitialAAR(SpeciesRoadPatchesPtr srp, Eigen::VectorXd& iar);
 };
 
 #endif

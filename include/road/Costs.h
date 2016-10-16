@@ -232,7 +232,7 @@ public:
 	// STATIC ROUTINES ////////////////////////////////////////////////////////
 
     /**
-     * Computes the carrying amount per unit traffic
+     * Computes the carrying amount of ore per unit traffic
      */
     static void computeUnitRevenue(OptimiserPtr optimiser);
 

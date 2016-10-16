@@ -65,4 +65,18 @@ void Optimiser::computeHabitatMaps() {
     }
 }
 
-void Optimiser::optimiseRoad() {}
+void Optimiser::optimiseRoad() {
+
+    // FOR SIMPLEPENALTY  AND MTE /////////////////////////////////////////////
+    // If Fuel and commodity prices are stochastic, compute the mean expected
+    // PV of operating one unit of traffic consistently over the horizon:
+    // i.e. call <Uncertainty>->computeExpPV() for each uncertainty before
+    // starting the computation.
+
+    // FOR ROV ////////////////////////////////////////////////////////////////
+    // Uncertainties are calculated when simulating each road
+
+    // FOR MTE AND ROV ////////////////////////////////////////////////////////
+    // Compute using surrogate function, which we learn at each iteration.
+    // Perform sampling to ensure a good distribution of AARs.
+}

@@ -60,7 +60,9 @@ double Uncertainty::singlePathValue() {
     // Compute a single path
     double curr = this->current;
     double value = 0;
-    // Instantiate the inbuilt C++11 Mersenne twiser pseudo random number
+    OptimiserPtr optimiser = this->optimiser.lock();
+    double gr = optimiser->getTraffic()->getGR();
+    // Instantiate the default C++11 Mersenne twiser pseudo random number
     // generator
     std::mt19937_64 generator;
     // Brownian motion uncertainty
@@ -74,10 +76,10 @@ double Uncertainty::singlePathValue() {
 
     EconomicPtr economic = this->getOptimiser()->getEconomic();
 
-    for (int ii = 1; ii <= economic->getYears(); ii++) {
+    for (int ii = 0; ii < economic->getYears(); ii++) {
         curr += this->reversion*(this->meanP - curr)*economic->getTimeStep()
                 + curr*brownian(generator) + (exp(jumpSize(generator))-1)*
                 curr*jump(generator);
-        value += curr/pow((1+economic->getRRR()),ii);
+        value += pow(1+gr,ii)*curr/pow((1+economic->getRRR()),ii);
     }
 }

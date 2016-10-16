@@ -136,6 +136,7 @@ public:
 	 * Sets the unit variable costs
 	 *
 	 * @param uvc as double
+     * @note This does not include fuel, which is stochastic
 	 */
 	void setUnitVarCosts(double uvc) {
 		this->unitVarCosts = uvc;
@@ -145,6 +146,7 @@ public:
 	 * Returns the unit variable revenue
 	 *
 	 * @return Unit variable revenue as double
+     * @note Currently unused as revenue can be stochastic
 	 */
 	double getUnitVarRevenue() {
 		return this->unitVarRevenue;
@@ -270,8 +272,8 @@ private:
 	double endPopMTE;				/**< End population if constant full flow */
     double endPopROV;				/**< Mean end population */
     double fixedCosts;              /**< Fixed road costs */
-    double unitVarCosts;			/**< Variable costs per unit traffic per hour per year */
-	double unitVarRevenue;			/**< Variable revenue per unit traffic per hour per year */
+    double unitVarCosts;			/**< Variable costs per unit traffic per hour per year (excl. stochastic factors) */
+    double unitVarRevenue;			/**< Variable revenue per unit traffic per hour per year (unused) */
 	double length;					/**< Total road length (m) */
     double varProfitIC;				/**< Operating value */
 	double totalValueMTE;			/**< Overall value, MTE */

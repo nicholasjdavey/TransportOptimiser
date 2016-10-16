@@ -204,9 +204,9 @@ public:
     /**
      * Returns the initial proportion of animals at risk for the road and species
      *
-     * @return Initial animalas at risk as double
+     * @return Initial animalas at risk as const Eigen::VectorXd&
      */
-    double getInitAAR() {
+    const Eigen::VectorXd& getInitAAR() {
         return this->initAAR;
     }
     /**
@@ -214,13 +214,55 @@ public:
      *
      * @param aar as double
      */
-    void setInitAAR(double aar) {
+    void setInitAAR(const Eigen::VectorXd& aar) {
         this->initAAR = aar;
     }
 
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
+
+    /**
+     * Builds the animal movement and mortality model, initialising patches,
+     * crossings, distances, transition and survival probabilities.
+     */
+    void createSpeciesModel();
+
+    /**
+     * Computes the AAR and expected population for each control
+     *
+     * Computes the animals at risk (AAR) percentage and expected population
+     * This value is not stochastic. It takes into account all expected
+     * transition probabilities and survival probabilities of each transition
+     * as well as the prevailing population at the start of a period (i.e.
+     * before accounting for natural births and deaths).
+     *
+     * @param pops as const Eigen::VectorXd&
+     * @return AAR vector as Eigen::VectorXd&
+     */
+    void computeAAR(const Eigen::VectorXd& pops, Eigen::VectorXd& aar);
+
+    /**
+     * Returns the AARs for this species and road using initial populations
+     *
+     * @return Initial AAR as Eigen::VectorXd&
+     */
+    void computeInitialAAR(Eigen::VectorXd& iar);
+
+///////////////////////////////////////////////////////////////////////////////
+private:
+    SpeciesPtr species;                     /**< Speices used */
+    std::weak_ptr<Road> road;               /**< Corresponding road */
+    std::vector<HabitatPatchPtr> habPatch;  /**< Corresponding habitat patches */
+    Eigen::MatrixXd dists;                  /**< Distances between patches */
+    Eigen::MatrixXi crossings;              /**< Number of crossings for each journey */
+    Eigen::MatrixXd transProbs;             /**< Transition probabilities. Rows sum to 1 */
+    std::vector<Eigen::MatrixXd> survProbs; /**< Survival probabilities. Rows multiply to <= 1*/
+    double endPopMean;                      /**< Mean end population (for run to extinction) */
+    double endPopSD;                        /**< End population standard deviation */
+    Eigen::VectorXd initAAR;                /**< Initial AAR of the species for each control */
+
+    // PRIVATE ROUTINES ///////////////////////////////////////////////////////
 
     /**
      * Generates the habitat patches relating to this species for the road in
@@ -257,30 +299,6 @@ public:
      * Computes the survival probabilities for each transition for this road
      */
     void computeSurvivalProbabilities();
-
-    /**
-     * Computes the AAR and expected population for each control
-     *
-     * Computes the animals at risk (AAR) percentage and expected population
-     * This value is not stochastic. It takes into account all expected
-     * transition probabilities and survival probabilities of each transition
-     * as well as the prevailing population at the start of a period (i.e.
-     * before accounting for natural births and deaths).
-     */
-    void computeAAR(const Eigen::VectorXd& pops, Eigen::VectorXd& aar);
-
-///////////////////////////////////////////////////////////////////////////////
-private:
-    SpeciesPtr species;                     /**< Speices used */
-    std::weak_ptr<Road> road;               /**< Corresponding road */
-    std::vector<HabitatPatchPtr> habPatch;  /**< Corresponding habitat patches */
-    Eigen::MatrixXd dists;                  /**< Distances between patches */
-    Eigen::MatrixXi crossings;              /**< Number of crossings for each journey */
-    Eigen::MatrixXd transProbs;             /**< Transition probabilities. Rows sum to 1 */
-    std::vector<Eigen::MatrixXd> survProbs; /**< Survival probabilities. Rows multiply to <= 1*/
-    double endPopMean;                      /**< Mean end population (for run to extinction) */
-    double endPopSD;                        /**< End population standard deviation */
-    double initAAR;                         /**< Initial AAR of the species */
 };
 
 #endif
