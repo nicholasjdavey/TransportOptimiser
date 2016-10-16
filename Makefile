@@ -20,7 +20,7 @@ EXE = $(MAINFILE:.cpp=.exe)
 # Default is an incremental linking of dependencies
 $(EXE): $(OBJECTS) $(CURROBJS) force_look
 	$(ECHO) $(CXX) $(CXXFLAGS) $(OBJECTS) $(CURROBJS) -o $(EXE)
-	$(LD) $(OBJECTS) $(CURROBJS) -o $(EXE)
+	$(LD) $(OBJECTS) $(CURROBJS) $(LXXFLAGS) -o $(EXE)
 
 # Build for creating and linking libraries
 withlibs: $(LIBS) $(CURROBJS) force_look
