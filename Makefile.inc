@@ -10,7 +10,7 @@ OS := $(shell uname)
 
 ifeq ($(OS),MINGW32_NT-6.1)
 # For compilation using MinGW64 on Windows 7 or later
-	CFLAGS = -I C:/MinGW/include/cppLibraries/eigen -I C:/MinGW/include/cppLibraries/ -I C:/MinGW/include/cppLibraries/boost_1_58_0 -I C:/MinGW/include/cppLibraries/libigl-master/include/igl -I C:/MinGW/include/cppLibraries/OpenCV/include
+	CFLAGS = -I C:/MinGW/include/cppLibraries/eigen -I C:/MinGW/include/cppLibraries/ -I C:/MinGW/include/cppLibraries/boost_1_58_0 -I C:/MinGW/include/cppLibraries/libigl-master/include/igl
 	LFLAGS = -I C:/MinGW/include/cppLibraries/OpenCV/lib
 else
 # For compilation under Linux
@@ -18,7 +18,7 @@ else
 	LFLAGS = -I/usr/local/lib
 endif
 
-LDLIBS = -lopencv_ts
+LDLIBS = -lpthread
 CXXFLAGS = -std=gnu++11 -pthread -c $(CFLAGS) $(DEBUG)
 LXXFLAGS = -std=gnu++11 -pthread $(LFLAGS) $(LDLIBS) $(DEBUG)
 
