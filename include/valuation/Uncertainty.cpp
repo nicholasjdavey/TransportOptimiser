@@ -3,24 +3,24 @@
 Uncertainty::Uncertainty(OptimiserPtr optimiser) {
 
     this->optimiser = optimiser;
-	this->name = "";
-	this->current = 0;
-	this->meanP = 0;
-	this->standardDev = 0;
-	this->reversion = 0;
-	this->active = false;
+    this->name = "";
+    this->current = 0;
+    this->meanP = 0;
+    this->standardDev = 0;
+    this->reversion = 0;
+    this->active = false;
 }
 
 Uncertainty::Uncertainty(OptimiserPtr optimiser, std::string nm, double mp,
         double sd, double rev, bool active) {
 
     this->optimiser = optimiser;
-	this->name = nm;
-	this->current = 0;
-	this->meanP = mp;
-	this->standardDev = sd;
-	this->reversion = rev;
-	this->active = active;
+    this->name = nm;
+    this->current = 0;
+    this->meanP = mp;
+    this->standardDev = sd;
+    this->reversion = rev;
+    this->active = active;
 }
 
 Uncertainty::~Uncertainty() {

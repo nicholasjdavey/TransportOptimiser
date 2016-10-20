@@ -113,7 +113,7 @@ public:
 	// CALCULATION ROUTINES ///////////////////////////////////////////////////
 
 private:
-	std::vector<CommodityCovariancePtr> covariances;/**< Covariances with other commodities */
+    std::vector<CommodityCovariancePtr> covariances;/**< Covariances with other commodities */
     double oreContent;            /**< Mean proportion of raw ore made up by this commodity */
     double oreContentSD;          /**< Standard deviation of amount in ore */
 };

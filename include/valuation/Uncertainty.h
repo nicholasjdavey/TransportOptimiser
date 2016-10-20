@@ -30,30 +30,30 @@ typedef std::shared_ptr<Uncertainty> UncertaintyPtr;
 class Uncertainty {
 
 public:
-	// CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
+    // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
-	/**
-	 * Constructor I
-	 *
-	 * Constructs an %Uncertainty object with default values
-	 */
+    /**
+     * Constructor I
+     *
+     * Constructs an %Uncertainty object with default values
+     */
     Uncertainty(OptimiserPtr optimiser);
 
-	/**
-	 * Constructor II
-	 *
-	 * Constructs an %Uncertainty object with assigned values
-	 */
+    /**
+     * Constructor II
+     *
+     * Constructs an %Uncertainty object with assigned values
+     */
     Uncertainty(OptimiserPtr optimiser, std::string nm, double mp, double sd,
             double rev, bool active);
 
-	/**
-	 * Destructor
-	 */
-	~Uncertainty();
+    /**
+     * Destructor
+     */
+    ~Uncertainty();
 
-	// ACCESSORS //////////////////////////////////////////////////////////////
-	
+    // ACCESSORS //////////////////////////////////////////////////////////////
+
     /**
      * Returns the Optimiser
      *
@@ -71,109 +71,109 @@ public:
         this->optimiser = opt;
     }
 
-	/**
-	 * Returns the name
-	 *
-	 * @return Name as std::string
-	 */
-	std::string getName() {
-		return this->name;
-	}
-	/**
-	 * Sets the name
-	 *
-	 * @param nm as std::string
-	 */
-	void setName(std::string nm) {
-		this->name = nm;
-	}
+    /**
+     * Returns the name
+     *
+     * @return Name as std::string
+     */
+    std::string getName() {
+        return this->name;
+    }
+    /**
+     * Sets the name
+     *
+     * @param nm as std::string
+     */
+    void setName(std::string nm) {
+        this->name = nm;
+    }
 
-	/**
-	 * Returns the current level of the uncertainty
-	 *
-	 * @return Current as double
-	 */
-	double getCurrent() {
-		return this->current;
-	}
-	/**
-	 * Sets the current level of the uncertainty
-	 *
-	 * @param curr as double
-	 */
-	void setCurrent(double curr) {
-		this->current = curr;
-	}
+    /**
+     * Returns the current level of the uncertainty
+     *
+     * @return Current as double
+     */
+    double getCurrent() {
+        return this->current;
+    }
+    /**
+     * Sets the current level of the uncertainty
+     *
+     * @param curr as double
+     */
+    void setCurrent(double curr) {
+        this->current = curr;
+    }
 
-	/**
-	 * Returns the long run mean
-	 *
-	 * @return Long run mean as double
-	 */
-	double getMean() {
-		return this->meanP;
-	}
-	/**
-	 * Sets the long run mean
-	 *
-	 * @param mean as double
-	 */
-	void setMean(double mean) {
-		this->meanP = mean;
-	}
+    /**
+     * Returns the long run mean
+     *
+     * @return Long run mean as double
+     */
+    double getMean() {
+        return this->meanP;
+    }
+    /**
+     * Sets the long run mean
+     *
+     * @param mean as double
+     */
+    void setMean(double mean) {
+        this->meanP = mean;
+    }
 
-	/**
+    /**
      * Returns standard deviation for noise
-	 *
-	 * @return Standard deviation as double
+     *
+     * @return Standard deviation as double
      * @note This process contains diffusion so this standard deviation is
      * multiplied by the prevailing level of the uncertainty.
-	 */
-	double getNoiseSD() {
-		return this->standardDev;
-	}
-	/**
-	 * Sets the standard deviation for noise
-	 *
-	 * @param sd as double
-	 */
-	void setNoiseSD(double sd) {
-		this->standardDev = sd;
-	}
+     */
+    double getNoiseSD() {
+        return this->standardDev;
+    }
+    /**
+     * Sets the standard deviation for noise
+     *
+     * @param sd as double
+     */
+    void setNoiseSD(double sd) {
+        this->standardDev = sd;
+    }
 
-	/**
-	 * Returns the strength of mean reversion
-	 *
-	 * @return Mean reversion strength as double
-	 */
-	double getMRStrength() {
-		return this->reversion;
-	}
-	/**
-	 * Sets the strength of mean reversion
-	 *
-	 * @param mrs as double
-	 */
-	void setMRStrength(double mrs) {
-		this->reversion = mrs;
-	}
+    /**
+     * Returns the strength of mean reversion
+     *
+     * @return Mean reversion strength as double
+     */
+    double getMRStrength() {
+        return this->reversion;
+    }
+    /**
+     * Sets the strength of mean reversion
+     *
+     * @param mrs as double
+     */
+    void setMRStrength(double mrs) {
+        this->reversion = mrs;
+    }
 
-	/**
-	 * Returns whether the commodity is active
-	 *
-	 * @return Active status as bool
-	 */
-	bool getStatus() {
-		return this->active;
-	}
-	/**
-	 * Sets whether the commodity is active
-	 *
-	 * @param status as bool
-	 */
-	void setStatus(bool status) {
-		this->active = status;
-	}
+    /**
+     * Returns whether the commodity is active
+     *
+     * @return Active status as bool
+     */
+    bool getStatus() {
+        return this->active;
+    }
+    /**
+     * Sets whether the commodity is active
+     *
+     * @param status as bool
+     */
+    void setStatus(bool status) {
+        this->active = status;
+    }
 
     /**
      * Returns the expected present value of future cash flows of one unit use
@@ -225,9 +225,9 @@ public:
         this->jumpProb = prob;
     }
 
-	// STATIC ROUTINES ////////////////////////////////////////////////////////
+    // STATIC ROUTINES ////////////////////////////////////////////////////////
 
-	// CALCULATION ROUTINES ///////////////////////////////////////////////////
+    // CALCULATION ROUTINES ///////////////////////////////////////////////////
 
     /**
      * Runs Monte Carlo simulation to determine the expected present value

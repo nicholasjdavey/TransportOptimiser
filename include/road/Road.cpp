@@ -10,23 +10,23 @@ Road::Road(OptimiserPtr op, SimulatorPtr sim, std::string testName,
         const Eigen::VectorXd &xCoords, const Eigen::VectorXd &yCoords,
         const Eigen::VectorXd &zCoords) {
 
-	this->optimiser = op;
-	this->simulator = sim;
-	this->testName = testName;
+    this->optimiser = op;
+    this->simulator = sim;
+    this->testName = testName;
     this->xCoords = xCoords;
     this->yCoords = yCoords;
     this->zCoords = zCoords;
 
-	// Assign an empty Attributes object (always has the same size)
-	AttributesPtr att(new Attributes(this->me()));
-	this->attributes = att;
+    // Assign an empty Attributes object (always has the same size)
+    AttributesPtr att(new Attributes(this->me()));
+    this->attributes = att;
 }
 
 Road::~Road() {
 }
 
 RoadPtr Road::me() {
-	return shared_from_this();
+    return shared_from_this();
 }
 
 void Road::designRoad() {
@@ -112,7 +112,7 @@ void Road::computeOperating(bool learning) {
                     // feature, so the principle used in this software is
                     // actually useful in many other scenarios.
                     //
-                    // The routine must have been called prior
+                    // N.B. The routine must have been called prior
                     const Eigen::VectorXd& Qs = optPtrShared
                             ->getTrafficProgram()->getFlowRates();
                     const std::vector<VehiclePtr>& vehicles = optPtrShared
@@ -218,32 +218,32 @@ void Road::computeAlignment() {
 		}
 	}
 
-	// The code below must be run in order for a valid road
-	this->computeHorizontalAlignment();
-	this->computeVerticalAlignment();
-	this->plotRoadPath();
+    // The code below must be run in order for a valid road
+    this->computeHorizontalAlignment();
+    this->computeVerticalAlignment();
+    this->plotRoadPath();
     const Eigen::VectorXd& s = this->segments->getDists();
     this->attributes->setLength(s(s.size()));
 }
 
 void Road::computeHorizontalAlignment() {
-	HorizontalAlignmentPtr ha(new HorizontalAlignment(this->me()));
-	this->horizontalAlignment = ha;
-	this->horizontalAlignment->computeAlignment();
+    HorizontalAlignmentPtr ha(new HorizontalAlignment(this->me()));
+    this->horizontalAlignment = ha;
+    this->horizontalAlignment->computeAlignment();
 }
 
 void Road::computeVerticalAlignment() {
-	VerticalAlignmentPtr va(new VerticalAlignment(this->me()));
-	this->verticalAlignment = va;
-	this->verticalAlignment->computeAlignment();
+    VerticalAlignmentPtr va(new VerticalAlignment(this->me()));
+    this->verticalAlignment = va;
+    this->verticalAlignment->computeAlignment();
 }
 
 void Road::plotRoadPath() {
-	// First initialise values
-	RoadSegmentsPtr rs(new RoadSegments(this->me()));
-	this->segments = rs;
-	this->segments->computeSegments();
-	this->segments->placeNetwork();
+    // First initialise values
+    RoadSegmentsPtr rs(new RoadSegments(this->me()));
+    this->segments = rs;
+    this->segments->computeSegments();
+    this->segments->placeNetwork();
 }
 
 void Road::computeRoadCells() {

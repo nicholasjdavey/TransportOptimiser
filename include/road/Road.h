@@ -40,192 +40,192 @@ typedef std::shared_ptr<SpeciesRoadPatches> SpeciesRoadPatchesPtr;
 class Road : public std::enable_shared_from_this<Road> {
 
 public:
-	// CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
+    // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
-	/**
-	 * Constructor I
-	 *
-	 * Constructs an empty %Road object
-	 */
-	Road();
+    /**
+     * Constructor I
+     *
+     * Constructs an empty %Road object
+     */
+    Road();
 
-	/**
-	 * Constructor II
-	 *
-	 * Constructs a %Road object with assigned values
-	 */
-	Road(OptimiserPtr op, SimulatorPtr sim, std::string testName,
-            const Eigen::VectorXd& xCoords, const Eigen::VectorXd& yCoords,
-            const Eigen::VectorXd& zCoords);
+    /**
+     * Constructor II
+     *
+     * Constructs a %Road object with assigned values
+     */
+    Road(OptimiserPtr op, SimulatorPtr sim, std::string testName,
+        const Eigen::VectorXd& xCoords, const Eigen::VectorXd& yCoords,
+        const Eigen::VectorXd& zCoords);
 
-	/**
-	 * Destructor
-	 */
+    /**
+     * Destructor
+     */
     ~Road();
 
-	// ACCESSORS //////////////////////////////////////////////////////////////
-	
-	/**
-	 * Returns the Optimiser object
-	 *
-	 * @return Optimiser routine as OptimiserPtr
-	 */
-	OptimiserPtr getOptimiser() {
+    // ACCESSORS //////////////////////////////////////////////////////////////
+
+    /**
+     * Returns the Optimiser object
+     *
+     * @return Optimiser routine as OptimiserPtr
+     */
+    OptimiserPtr getOptimiser() {
         return this->optimiser.lock();
-	}
-	/**
-	 * Sets the Optimiser object
-	 *
-	 * @param op as OptimiserPtr
-	 */
-	void setOptimiser(OptimiserPtr op) {
+    }
+    /**
+     * Sets the Optimiser object
+     *
+     * @param op as OptimiserPtr
+     */
+    void setOptimiser(OptimiserPtr op) {
         this->optimiser.reset();
-		this->optimiser = op;
-	}
+        this->optimiser = op;
+    }
 
-	/**
-	 * Returns the Simulator object
-	 *
-	 * @return Simulator as SimulatorPtr
-	 */
-	SimulatorPtr getSimulator() {
-		return this->simulator;
-	}
-	/**
-	 * Sets the Simulator object
-	 *
-	 * @param sim as SimulatorPtr
-	 */
-	void setSimulator(SimulatorPtr sim) {
+    /**
+     * Returns the Simulator object
+     *
+     * @return Simulator as SimulatorPtr
+     */
+    SimulatorPtr getSimulator() {
+        return this->simulator;
+    }
+    /**
+     * Sets the Simulator object
+     *
+     * @param sim as SimulatorPtr
+     */
+    void setSimulator(SimulatorPtr sim) {
         this->simulator.reset();
-		this->simulator = sim;
-	}
+        this->simulator = sim;
+    }
 
-	/**
-	 * Returns the PolicyMap for ROV
-	 *
-	 * @return PolicyMap as PolicyMapPtr
-	 */
-	PolicyMapPtr getPolicyMap() {
-		return this->policyMap;
-	}
-	/**
-	 * Sets the PolicyMap for ROV
-	 *
-	 * @param pm as PolicyMapPtr
-	 */
-	void setPolicyMap(PolicyMapPtr pm) {
+    /**
+     * Returns the PolicyMap for ROV
+     *
+     * @return PolicyMap as PolicyMapPtr
+     */
+    PolicyMapPtr getPolicyMap() {
+        return this->policyMap;
+    }
+    /**
+     * Sets the PolicyMap for ROV
+     *
+     * @param pm as PolicyMapPtr
+     */
+    void setPolicyMap(PolicyMapPtr pm) {
         this->policyMap.reset();
-		this->policyMap = pm;
-	}
+        this->policyMap = pm;
+    }
 
-	/**
-	 * Returns the road segments from start to end
-	 *
-	 * @return Road segments as RoadSegmentsPtr
-	 */
-	RoadSegmentsPtr getRoadSegments() {
-		return this->segments;
-	}
-	/**
-	 * Sets the road segments from start to end
-	 *
-	 * @param segments as RoadSegmentsPtr
-	 */
-	void setRoadSegments(RoadSegmentsPtr segments) {
+    /**
+     * Returns the road segments from start to end
+     *
+     * @return Road segments as RoadSegmentsPtr
+     */
+    RoadSegmentsPtr getRoadSegments() {
+        return this->segments;
+    }
+    /**
+     * Sets the road segments from start to end
+     *
+     * @param segments as RoadSegmentsPtr
+     */
+    void setRoadSegments(RoadSegmentsPtr segments) {
         this->segments.reset();
-		this->segments = segments;
-	}
+        this->segments = segments;
+    }
 
-	/**
-	 * Returns the road cells from start to end
-	 *
-	 * @return Road cells as RoadCellsPtr
-	 */
-	RoadCellsPtr getRoadCells() {
-		return this->roadCells;
-	}
-	/**
-	 * Sets the road cells from start to end
-	 *
-	 * @param cells as RoadCellsPtr
-	 */
-	void setRoadCells(RoadCellsPtr cells) {
+    /**
+     * Returns the road cells from start to end
+     *
+     * @return Road cells as RoadCellsPtr
+     */
+    RoadCellsPtr getRoadCells() {
+        return this->roadCells;
+    }
+    /**
+     * Sets the road cells from start to end
+     *
+     * @param cells as RoadCellsPtr
+     */
+    void setRoadCells(RoadCellsPtr cells) {
         this->roadCells.reset();
-		this->roadCells = cells;
-	}
+        this->roadCells = cells;
+    }
 
-	/**
-	 * Returns the HorizontalAlignment
-	 *
-	 * @return Horizontal alignment as HorizontalAlignmentPtr
-	 */
-	HorizontalAlignmentPtr getHorizontalAlignment() {
-		return this->horizontalAlignment;
-	}
-	/**
-	 * Sets the HorizontalAlignment
-	 *
-	 * @param ha as HorizontalAlignmentPtr
-	 */
-	void setHorizontalAlignment(HorizontalAlignmentPtr ha) {
+    /**
+     * Returns the HorizontalAlignment
+     *
+     * @return Horizontal alignment as HorizontalAlignmentPtr
+     */
+    HorizontalAlignmentPtr getHorizontalAlignment() {
+        return this->horizontalAlignment;
+    }
+    /**
+     * Sets the HorizontalAlignment
+     *
+     * @param ha as HorizontalAlignmentPtr
+     */
+    void setHorizontalAlignment(HorizontalAlignmentPtr ha) {
         this->horizontalAlignment.reset();
-		this->horizontalAlignment = ha;
-	}
+        this->horizontalAlignment = ha;
+    }
 
-	/**
-	 * Returns the VerticalAlignment
-	 *
-	 * @return VerticalAlignment as VerticalAlignmentPtr
-	 */
-	VerticalAlignmentPtr getVerticalAlignment() {
-		return this->verticalAlignment;
-	}
-	/**
-	 * Sets the VerticalAlignment
-	 *
-	 * @param va as VerticalAlignmentPtr
-	 */
-	void setVerticalAlignment(VerticalAlignmentPtr va) {
+    /**
+     * Returns the VerticalAlignment
+     *
+     * @return VerticalAlignment as VerticalAlignmentPtr
+     */
+    VerticalAlignmentPtr getVerticalAlignment() {
+        return this->verticalAlignment;
+    }
+    /**
+     * Sets the VerticalAlignment
+     *
+     * @param va as VerticalAlignmentPtr
+     */
+    void setVerticalAlignment(VerticalAlignmentPtr va) {
         this->verticalAlignment.reset();
-		this->verticalAlignment = va;
-	}
+        this->verticalAlignment = va;
+    }
 
-	/**
-	 * Returns the computed road Attributes
-	 *
-	 * @return Attributes as AttributesPtr
-	 */
-	AttributesPtr getAttributes() {
-		return this->attributes;
-	}
-	/**
-	 * Sets the computed road Attributes
-	 *
-	 * @param att as AttributesPtr
-	 */
-	void setAttributes(AttributesPtr att) {
+    /**
+     * Returns the computed road Attributes
+     *
+     * @return Attributes as AttributesPtr
+     */
+    AttributesPtr getAttributes() {
+        return this->attributes;
+    }
+    /**
+     * Sets the computed road Attributes
+     *
+     * @param att as AttributesPtr
+     */
+    void setAttributes(AttributesPtr att) {
         this->attributes.reset();
-		this->attributes = att;
-	}
+        this->attributes = att;
+    }
 
-	/**
-	 * Returns the the computed costs
-	 *
-	 * @return Computes costs as CostsPtr
-	 */
-	CostsPtr getCosts() {
-		return this->costs;
-	}
-	/**
-	 * Sets the computed costs
-	 *
-	 * @param costs as CostsPtr
-	 */
-	void setCosts(CostsPtr costs) {
+    /**
+     * Returns the the computed costs
+     *
+     * @return Computes costs as CostsPtr
+     */
+    CostsPtr getCosts() {
+        return this->costs;
+    }
+    /**
+     * Sets the computed costs
+     *
+     * @param costs as CostsPtr
+     */
+    void setCosts(CostsPtr costs) {
         this->costs.reset();
-		this->costs = costs;
-	}
+        this->costs = costs;
+    }
 
     /**
      * Returns the habitat patches for each Species for this Road
@@ -244,77 +244,77 @@ public:
         this->srp = srp;
     }
 
-	/**
-	 * Returns the test name
-	 *
-	 * @return Test name as std::string
-	 */
-	std::string getTestName() {
-		return this->testName;
-	}
-	/**
-	 * Sets the test name
-	 *
-	 * @param tn as std:;string
-	 */
-	void setTestName(std::string tn) {
-		this->testName = tn;
-	}
+    /**
+     * Returns the test name
+     *
+     * @return Test name as std::string
+     */
+    std::string getTestName() {
+        return this->testName;
+    }
+    /**
+     * Sets the test name
+     *
+     * @param tn as std:;string
+     */
+    void setTestName(std::string tn) {
+        this->testName = tn;
+    }
 
-	/**
-	 * Returns X coordinates of the intersection points
-	 *
+    /**
+     * Returns X coordinates of the intersection points
+     *
      * @return X coordinates as const Eigen::VectorXd&
-	 */
+     */
     const Eigen::VectorXd& getXCoords() {
         return this->xCoords;
-	}
-	/**
-	 * Sets the X coordinates of the intersection points
-	 *
+    }
+    /**
+     * Sets the X coordinates of the intersection points
+     *
      * @param xc as const Eigen::VectorXd&
-	 */
+     */
     void setXCoords(const Eigen::VectorXd& xc) {
         this->xCoords = xc;
-	}
+    }
 
-	/**
-	 * Returns the Y coordinates of the intersection points
-	 *
+    /**
+     * Returns the Y coordinates of the intersection points
+     *
      * @return Y coordinates as const Eigen::VectorXd&
-	 */
+     */
     const Eigen::VectorXd& getYCoords() {
-		return this->yCoords;
-	}
-	/**
-	 * Sets the Y coordinates of the intersection points
-	 *
+        return this->yCoords;
+    }
+    /**
+     * Sets the Y coordinates of the intersection points
+     *
      * @param yc as const Eigen::VectorXd&
-	 */
+     */
     void setYCoordinates(const Eigen::VectorXd& yc) {
-		this->yCoords = yc;
-	}
+        this->yCoords = yc;
+    }
 
-	/**
-	 * Returns the Z coordinates of the intersection points
-	 *
-	 * @return Z coordinates of the the intersection points
-	 */
+    /**
+     * Returns the Z coordinates of the intersection points
+     *
+     * @return Z coordinates of the the intersection points
+     */
     const Eigen::VectorXd& getZCoords() {
         return this->zCoords;
-	}
-	/**
-	 * Sets the Z coordinates of the intersection points
-	 *
+    }
+    /**
+     * Sets the Z coordinates of the intersection points
+     *
      * @param zc as const Eigen::VectorXd&
-	 */
+     */
     void setZCoords(const Eigen::VectorXd& zc) {
         this->zCoords = zc;
-	}
+    }
 
-	// STATIC ROUTINES ////////////////////////////////////////////////////////
+    // STATIC ROUTINES ////////////////////////////////////////////////////////
 
-	// CALCULATION ROUTINES ///////////////////////////////////////////////////
+    // CALCULATION ROUTINES ///////////////////////////////////////////////////
 
     /**
      * Design and initialise a road.
@@ -355,23 +355,23 @@ public:
     void addSpeciesPatches(SpeciesPtr species);
 
 private:
-    std::weak_ptr<Optimiser> optimiser;			/**< Calling Optimisation object */
-	SimulatorPtr simulator;						/**< Simulator used to produce results */
-	PolicyMapPtr policyMap;						/**< PolicyMap generated from ROV simulation */
-	RoadSegmentsPtr segments;					/**< Road segments */
-	RoadCellsPtr roadCells;						/**< Cells occupied by road */
-	HorizontalAlignmentPtr horizontalAlignment;	/**< HorizontalAlignment */
-	VerticalAlignmentPtr verticalAlignment;		/**< VerticalAlignment */
-	AttributesPtr attributes;					/**< Attributes */
-	CostsPtr costs;								/**< Costs */
+    std::weak_ptr<Optimiser> optimiser;         /**< Calling Optimisation object */
+    SimulatorPtr simulator;                     /**< Simulator used to produce results */
+    PolicyMapPtr policyMap;                     /**< PolicyMap generated from ROV simulation */
+    RoadSegmentsPtr segments;                   /**< Road segments */
+    RoadCellsPtr roadCells;                     /**< Cells occupied by road */
+    HorizontalAlignmentPtr horizontalAlignment; /**< HorizontalAlignment */
+    VerticalAlignmentPtr verticalAlignment;     /**< VerticalAlignment */
+    AttributesPtr attributes;                   /**< Attributes */
+    CostsPtr costs;                             /**< Costs */
     std::vector<SpeciesRoadPatchesPtr> srp;     /**< Patches corresponding to each species */
-	std::string testName;						/**< Name of test */
-	Eigen::VectorXd xCoords;					/**< X coordinates of intersection points */
-	Eigen::VectorXd yCoords;					/**< Y coordinates of intersection points */
-	Eigen::VectorXd zCoords;					/**< Z coordinates of intersection points */
-	RoadPtr me();								/**< Enables sharing from within Road class */
+    std::string testName;                       /**< Name of test */
+    Eigen::VectorXd xCoords;                    /**< X coordinates of intersection points */
+    Eigen::VectorXd yCoords;                    /**< Y coordinates of intersection points */
+    Eigen::VectorXd zCoords;                    /**< Z coordinates of intersection points */
+    RoadPtr me();                               /**< Enables sharing from within Road class */
 
-	// PRIVATE ROUTINES ///////////////////////////////////////////////////////
+    // PRIVATE ROUTINES ///////////////////////////////////////////////////////
 
     /**
      * Builds the road alignment using the points of intersection. In order,
@@ -403,21 +403,21 @@ private:
      */
     void computeRoadCells();
 
-	/**
-	 * Computes the horizontal alignment
-	 */
-	void computeHorizontalAlignment();
+    /**
+     * Computes the horizontal alignment
+     */
+    void computeHorizontalAlignment();
 
-	/**
-	 * Computes the vertical alignment (requires the horizontal alignment to
-	 * have already been computed).
-	 */
-	void computeVerticalAlignment();
+    /**
+     * Computes the vertical alignment (requires the horizontal alignment to
+     * have already been computed).
+     */
+    void computeVerticalAlignment();
 
-	/**
-	 * Computes the road path from the horizontal and vertical alignments
-	 */
-	void plotRoadPath();
+    /**
+     * Computes the road path from the horizontal and vertical alignments
+     */
+    void plotRoadPath();
 
     /**
      * Creates the simulation patches for each Species in the Region.

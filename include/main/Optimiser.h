@@ -65,9 +65,39 @@ public:
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
     /**
-     * Constructor
+     * Constructor I
      *
      * Constructs an %Optimiser object with default values.
+     */
+    Optimiser();
+
+    /**
+     * Constructor II
+     *
+     * Constructs an %Optimiser object with assigned values
+     *
+     * @param programs as const std::vector<TrafficProgramPtr>&
+     * @param oInputs as OtherInputsPtr
+     * @param desParams as DesignParametersPtr
+     * @param earthworks as EarthworkCostsPtr
+     * @param unitCosts as UnitCostsPtr
+     * @param varParams as VariableParametersPtr
+     * @param species as const std::vector<SpeciesPtr>&
+     * @param economic as EconomicPtr
+     * @param traffic as TrafficPtr
+     * @param region as RegionPtr
+     * @param mr as double
+     * @param cf as unsigned long
+     * @param gens as unsigned long
+     * @param popSize as unsigned long
+     * @param stopTol as double
+     * @param confInt as double
+     * @param confLvl as double
+     * @param habGridRes as unsigned long
+     * @param solScheme as std::string
+     * @param noRuns as unsigned long
+     * @param type as Optimiser::Type
+     * @param threader as ThreadManagerPtr
      */
     Optimiser(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr oInputs,
             DesignParametersPtr desParams, EarthworkCostsPtr earthworks,
@@ -76,7 +106,7 @@ public:
             traffic, RegionPtr region, double mr, unsigned long cf, unsigned
             long gens, unsigned long popSize, double stopTol, double confInt,
             double confLvl, unsigned long habGridRes, std::string solScheme,
-            unsigned long noRuns, Optimiser::Type type, ThreadManagerPtr threader);
+            unsigned long noRuns, Optimiser::Type type);
     /**
      * Destructor
      */
@@ -127,6 +157,9 @@ public:
     /**
      * Returns the current GA population of roads. These roads are only defined
      * by their intersection points.
+     *
+     * All roads have the same start and end points (in three dimensions) but
+     * the optimisation algorithm only modifies the intervening points.
      *
      * @return Roads as const Eigen::MatrixXd&
      */
@@ -182,7 +215,7 @@ public:
      * @return Inputs as OtherInputsPtr
      */
     OtherInputsPtr getOtherInputs() {
-	    return this->otherInputs;
+        return this->otherInputs;
     }
     /**
      * Sets the miscellaneous inputs needed by the software
@@ -190,8 +223,8 @@ public:
      * @param inputs as OtherInputsPtr
      */
     void setOtherInputs(OtherInputsPtr inputs) {
-	    this->otherInputs.reset();
-	    this->otherInputs = inputs;
+        this->otherInputs.reset();
+        this->otherInputs = inputs;
     }
 
     /**
@@ -200,7 +233,7 @@ public:
      * @return Road design parameters as DesignParamsPtr
      */
     DesignParametersPtr getDesignParameters() {
-	    return this->designParams;
+        return this->designParams;
     }
     /**
      * Sets the road design parameters
@@ -208,8 +241,8 @@ public:
      * @param params as DesignParamsPtr
      */
     void setDesignParams(DesignParametersPtr params) {
-	    this->designParams.reset();
-	    this->designParams = params;
+        this->designParams.reset();
+        this->designParams = params;
     }
 
     /**
@@ -218,7 +251,7 @@ public:
      * @return Earthworks as EarthworkCostsPtr
      */
     EarthworkCostsPtr getEarthworkCosts() {
-	    return this->earthworks;
+        return this->earthworks;
     }
     /**
      * Sets the earthwork requirements used
@@ -226,8 +259,8 @@ public:
      * @param earthworks as EarthworkCostsPtr
      */
     void setEarthworkCosts(EarthworkCostsPtr earthworks) {
-	    this->earthworks.reset();
-	    this->earthworks = earthworks;
+        this->earthworks.reset();
+        this->earthworks = earthworks;
     }
 
     /**
@@ -236,7 +269,7 @@ public:
      * @return Unit costs as UnitCostsPtr
      */
     UnitCostsPtr getUnitCosts() {
-	    return this->unitCosts;
+        return this->unitCosts;
     }
     /**
      * Sets the unit costs
@@ -244,8 +277,8 @@ public:
      * @param costs as UnitCostsPtr
      */
     void setUnitCosts(UnitCostsPtr costs) {
-	    this->unitCosts.reset();
-	    this->unitCosts = costs;
+        this->unitCosts.reset();
+        this->unitCosts = costs;
     }
 
     /**
@@ -254,7 +287,7 @@ public:
      * @return Variable parameters as VariableParametersPtr
      */
     VariableParametersPtr getVariableParams() {
-	    return this->variableParams;
+        return this->variableParams;
     }
     /**
      * Sets the variable parameters
@@ -262,8 +295,8 @@ public:
      * @param varParams as VariableParametersPtr
      */
     void setVariableParams(VariableParametersPtr varParams) {
-	    this->variableParams.reset();
-	    this->variableParams = varParams;
+        this->variableParams.reset();
+        this->variableParams = varParams;
     }
 
     /**
@@ -289,7 +322,7 @@ public:
      * @return Economic data as EconomicPtr
      */
     EconomicPtr getEconomic() {
-	    return this->economic;
+        return this->economic;
     }
     /**
      * Sets the economic data
@@ -298,7 +331,7 @@ public:
      */
     void setEconomic(EconomicPtr econ) {
         this->economic.reset();
-	    this->economic = econ;
+        this->economic = econ;
     }
 
     /**
@@ -307,7 +340,7 @@ public:
      * @return Traffic data as TrafficPtr
      */
     TrafficPtr getTraffic() {
-	    return this->traffic;
+        return this->traffic;
     }
     /**
      * Sets the traffic data
@@ -316,7 +349,7 @@ public:
      */
     void setTraffic(TrafficPtr traffic) {
         this->traffic.reset();
-	    this->traffic = traffic;
+        this->traffic = traffic;
     }
 
     /**
@@ -343,7 +376,7 @@ public:
      * @return Region data as RegionPtr
      */
     RegionPtr getRegion() {
-	    return this->region;
+        return this->region;
     }
     /**
      * Sets the region data
@@ -352,7 +385,7 @@ public:
      */
     void setRegion(RegionPtr region) {
         this->region.reset();
-	    this->region = region;
+        this->region = region;
     }
 
     /**
@@ -361,7 +394,7 @@ public:
      * @return Mutation rate as double
      */
     double getMutationRate() {
-	    return this->mutationRate;
+        return this->mutationRate;
     }
     /**
      * Sets the GA mutation rate
@@ -369,7 +402,7 @@ public:
      * @param rate as double
      */
     void setMutationRate(double rate) {
-	    this->mutationRate = rate;
+        this->mutationRate = rate;
     }
 
     /**
@@ -379,7 +412,7 @@ public:
      * @return Number of runs as unsigned long
      */
     unsigned long getNoRuns() {
-	    return this->noRuns;
+        return this->noRuns;
     }
     /**
      * Sets the number of optimisation runs to perform.
@@ -387,7 +420,7 @@ public:
      * @param noRuns as unsigned long
      */
     void setNoRuns(unsigned long noRuns) {
-	    this->noRuns = noRuns;
+        this->noRuns = noRuns;
     }
 
     /**
@@ -396,7 +429,7 @@ public:
      * @return Crossover fraction as double
      */
     double getCrossoverFrac() {
-	    return this->crossoverFrac;
+        return this->crossoverFrac;
     }
     /**
      * Sets the GA crossover fraction
@@ -404,7 +437,7 @@ public:
      * @param frac as double
      */
     void setCrossoverFrac(double frac) {
-	    this->crossoverFrac = frac;
+        this->crossoverFrac = frac;
     }
 
     /**
@@ -413,7 +446,7 @@ public:
      * @return Generations as unsigned long
      */
     unsigned long getMaxGens() {
-	    return this->generations;
+        return this->generations;
     }
     /**
      * Sets the max number of GA generations
@@ -421,7 +454,7 @@ public:
      * @params gens as unsigned long
      */
     void setMaxGens(unsigned long gens) {
-	    this->generations = gens;
+        this->generations = gens;
     }
 
     /**
@@ -430,7 +463,7 @@ public:
      * @return Population size as unsigned long
      */
     unsigned long getGAPopSize() {
-	    return this->populationSizeGA;
+        return this->populationSizeGA;
     }
     /**
      * Sets the GA population size
@@ -438,7 +471,7 @@ public:
      * @param size as unsigned long
      */
     void setPopSize(unsigned long size) {
-	    this->populationSizeGA = size;
+        this->populationSizeGA = size;
     }
 
     /**
@@ -447,7 +480,7 @@ public:
      * @return Stopping tolerance as double
      */
     double getStoppingTol() {
-	    return this->stoppingTol;
+        return this->stoppingTol;
     }
     /**
      * Sets the optimiser stopping tolerance
@@ -455,7 +488,7 @@ public:
      * @param tol as double
      */
     void setStoppingTol(double tol) {
-	    this->stoppingTol = tol;
+        this->stoppingTol = tol;
     }
 
     /**
@@ -508,7 +541,7 @@ public:
      * @return Grid resolution as unsigned long
      */
     unsigned long getGridRes() {
-	    return this->habGridRes;
+        return this->habGridRes;
     }
     /**
      * Sets the habitat grid resolution
@@ -516,7 +549,7 @@ public:
      * @param res as double
      */
     void setGridRes(unsigned long res) {
-	    this->habGridRes = res;
+        this->habGridRes = res;
     }
 
     /**
@@ -525,7 +558,7 @@ public:
      * @return Solution scheme as std::string
      */
     std::string getSolutionScheme() {
-	    return this->solutionScheme;
+        return this->solutionScheme;
     }
     /**
      * Sets the solution scheme of the solver
@@ -533,7 +566,7 @@ public:
      * @param scheme as std::string
      */
     void setSolutionScheme(std::string scheme) {
-	    this->solutionScheme = scheme;
+        this->solutionScheme = scheme;
     }
 
     /**
@@ -569,33 +602,61 @@ public:
      */
     void computeHabitatMaps();
 
+    /**
+     * Computes the expected present value of a constant unit of use of every
+     * uncertain parameter over the design horizon.
+     */
+    void computeExpPv();
+
+    /**
+     * Returns a reference to the surrogate function so that it may be used
+     *
+     * @return Surrogate function as std::function<double(RoadPtr)>&
+     */
+    std::function<double(RoadPtr)>& getSurrogate() {
+        return this->surrogate;
+    }
+    /**
+     * Sets the surrogate function so that it may be called at a later stage
+     *
+     * The surrogate function accepts a pointer to a road object to compute its
+     * operating cost (based on a learned function), which is returned as a
+     * double.
+     *
+     * @param surrogate as std::function<double(RoadPtr)>&
+     */
+    void setSurrogate(std::function<double(RoadPtr)>& surrogate) {
+        this->surrogate = surrogate;
+    }
+
 ///////////////////////////////////////////////////////////////////////////////
-private:
+protected:
+    std::function<double(RoadPtr)> surrogate;       /**< Surrogate model for evaluating road */
     ExperimentalScenarioPtr scenario;               /**< Current experiment */
     Optimiser::Type type;                           /**< Type of ecological incorporation */
-    Eigen::MatrixXd currentRoadPopulation;			/**< Current encoded population of roads */
-    std::vector< std::vector<RoadPtr> > bestRoads;	/**< Best roads */
-    std::vector<TrafficProgramPtr> programs;		/**< Operational programs */
-    OtherInputsPtr otherInputs;						/**< Other inputs */
-    DesignParametersPtr designParams;				/**< Design parameters */
-    EarthworkCostsPtr earthworks;					/**< Earthwork requirements */
-    VariableParametersPtr variableParams;			/**< Parameters to vary */
-    std::vector<SpeciesPtr> species;				/**< Species studied */
-    EconomicPtr economic;							/**< Economic parameters */
-    TrafficPtr traffic;								/**< Traffic details */
+    Eigen::MatrixXd currentRoadPopulation;          /**< Current encoded population of roads */
+    std::vector< std::vector<RoadPtr> > bestRoads;  /**< Best roads */
+    std::vector<TrafficProgramPtr> programs;        /**< Operational programs */
+    OtherInputsPtr otherInputs;                     /**< Other inputs */
+    DesignParametersPtr designParams;               /**< Design parameters */
+    EarthworkCostsPtr earthworks;                   /**< Earthwork requirements */
+    VariableParametersPtr variableParams;           /**< Parameters to vary */
+    std::vector<SpeciesPtr> species;                /**< Species studied */
+    EconomicPtr economic;                           /**< Economic parameters */
+    TrafficPtr traffic;                             /**< Traffic details */
     TrafficProgramPtr trafficProgram;               /**< Traffic program used */
-    RegionPtr region;								/**< Region of interest */
+    RegionPtr region;                               /**< Region of interest */
     UnitCostsPtr unitCosts;                         /**< Unit Costs */
-    double mutationRate;							/**< Mutation rate */
-    double crossoverFrac;							/**< Crossover fraction */
-    unsigned long generations;						/**< Generations required */
-    unsigned long populationSizeGA;					/**< Population size for GA */
-    double stoppingTol;								/**< Stopping tolerance */
-    double confInt; 								/**< Required confidence interval */
+    double mutationRate;                            /**< Mutation rate */
+    double crossoverFrac;                           /**< Crossover fraction */
+    unsigned long generations;                      /**< Generations required */
+    unsigned long populationSizeGA;                 /**< Population size for GA */
+    double stoppingTol;                             /**< Stopping tolerance */
+    double confInt;                                 /**< Required confidence interval */
     double confLvl;                                 /**< Desired confidence level (default = 95%) */
-    unsigned long habGridRes;						/**< Habitat grid 1D resolution */
-    unsigned long noRuns;							/**< Number of runs to perform */
-    std::string solutionScheme;						/**< Solution scheme used (i.e. name of experiment) */
+    unsigned long habGridRes;                       /**< Habitat grid 1D resolution */
+    unsigned long noRuns;                           /**< Number of runs to perform */
+    std::string solutionScheme;                     /**< Solution scheme used (i.e. name of experiment) */
     ThreadManagerPtr threader;                      /**< Thread manager used for multithreading computations */
     OptimiserPtr me();                              /**< Creates a shared pointer from this */
 };

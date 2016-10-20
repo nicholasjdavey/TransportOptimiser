@@ -84,6 +84,7 @@
 #include "road/SpeciesRoadPatches.h"
 #include "utilities/labelmethod.h"
 #include "main/ThreadManager.h"
+#include "main/RoadGA.h"
 
 /*
 #include <gnuplot-iostream-master/gnuplot-iostream.h>
