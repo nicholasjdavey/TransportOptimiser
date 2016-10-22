@@ -19,6 +19,7 @@ RoadGA::RoadGA(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
 }
 
 void RoadGA::creation() {
+
     unsigned long individualsPerPop = this->populationSizeGA/5;
 
     double sx = this->designParams->getStartX();
@@ -44,20 +45,36 @@ void RoadGA::creation() {
                   << std::endl;
     }
 
-    // The length of the genome is essentially the points of intersection.
-    // However, the length of the individuals used as an input includes the
-    // start and end points. Furthermore, these are broken down into three
-    // coordinates for each point. We adjust to extract the real genome length
-    // from this information.
-    unsigned long genomeLength = this->designParams->getIntersectionPoints();
+    // The genome length is all of the design points, expressed in 3
+    // dimensions. As we also include the start and end points (which are also
+    // in 3 dimensions)
+    unsigned long intersectPts = this->designParams->getIntersectionPoints();
+    unsigned long genomeLength = 3*(intersectPts+2);
 
     // Create population using the initial population routine devised by
     // Jong et al. (2003)
 
     // First compute the elevations of the start and end points and place them
     // as the start and end points of the intersection points vectors that
-    // represent the population roads
-    this->currentRoadPopulation;
+    // represent the population roads.
+    this->currentRoadPopulation = Eigen::MatrixXd::Zero(this->populationSizeGA,
+            genomeLength);
+
+    double sz;
+    double ez;
+
+    region->placeNetwork(sx,sy,sz);
+    region->placeNetwork(ex,ey,ez);
+
+    Eigen::RowVectorXd starting(1,3);
+    Eigen::RowVectorXd ending(1,3);
+    starting << sx, sy, sz;
+    ending << ex, ey, ez;
+
+    this->currentRoadPopulation.block(0,0,this->populationSizeGA,3).rowwise() =
+            starting;
+    this->currentRoadPopulation.block(0,genomeLength-3,
+            this->populationSizeGA,3).rowwise() = ending;
 }
 
 void RoadGA::crossover() {}

@@ -194,6 +194,28 @@ public:
         this->inputFile = loc;
     }
 
+    /**
+     * Places a pair of X and Y coordinates onto the region to get the
+     * corresponding Z coordinates.
+     *
+     * @param x as const Eigen::VectorXd&
+     * @param y as const Eigen::VectorXd&
+     * @param z as Eigen::VectorXd&
+     */
+    void placeNetwork(const Eigen::VectorXd x, const Eigen::VectorXd y,
+            Eigen::VectorXd z);
+
+    /**
+     * Places a single X and Y coordinate onto the region to get the
+     * corresponding Z coordinate.
+     *
+     * @param x as double&
+     * @param y as double&
+     * @param z as double&
+     */
+    void placeNetwork(double& x, double& y, double& z);
+
+
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
