@@ -6,13 +6,10 @@ Road::Road() {
 	this->attributes = att;
 }
 
-Road::Road(OptimiserPtr op, SimulatorPtr sim, std::string testName,
-        const Eigen::VectorXd &xCoords, const Eigen::VectorXd &yCoords,
-        const Eigen::VectorXd &zCoords) {
+Road::Road(OptimiserPtr op,const Eigen::VectorXd &xCoords, const
+        Eigen::VectorXd &yCoords, const Eigen::VectorXd &zCoords) {
 
     this->optimiser = op;
-    this->simulator = sim;
-    this->testName = testName;
     this->xCoords = xCoords;
     this->yCoords = yCoords;
     this->zCoords = zCoords;
@@ -31,7 +28,9 @@ RoadPtr Road::me() {
 
 void Road::designRoad() {
     this->computeAlignment();
-    this->plotRoadPath();
+    this->plotRoadPath();    
+    const Eigen::VectorXd& s = this->segments->getDists();
+    this->attributes->setLength(s(s.size()));
     this->computeRoadCells();
     this->computeCostElements();
 }
@@ -221,9 +220,6 @@ void Road::computeAlignment() {
     // The code below must be run in order for a valid road
     this->computeHorizontalAlignment();
     this->computeVerticalAlignment();
-    this->plotRoadPath();
-    const Eigen::VectorXd& s = this->segments->getDists();
-    this->attributes->setLength(s(s.size()));
 }
 
 void Road::computeHorizontalAlignment() {

@@ -54,7 +54,7 @@ public:
      *
      * Constructs a %Road object with assigned values
      */
-    Road(OptimiserPtr op, SimulatorPtr sim, std::string testName,
+    Road(OptimiserPtr op,
         const Eigen::VectorXd& xCoords, const Eigen::VectorXd& yCoords,
         const Eigen::VectorXd& zCoords);
 
@@ -320,6 +320,10 @@ public:
      * Design and initialise a road.
      *
      * This routine computes all aspects of a road except operating value
+     * 1. computeAlignment
+     * 2. plotRoadPath
+     * 3. computeRoadCells
+     * 4. computeCostElements
      */
     void designRoad();
 
@@ -329,6 +333,14 @@ public:
      * Evaluates a road given a particular lifetime operating Program
      */
     void evaluateRoad();
+
+    /**
+     * Builds the road alignment using the points of intersection. In order,
+     * this routine calls:
+     * 1. horizontalAlignment
+     * 2. verticalAlignment
+     */
+    void computeAlignment();
 
     /**
      * Computes the operating costs and animal movement and mortality model
@@ -372,16 +384,6 @@ private:
     RoadPtr me();                               /**< Enables sharing from within Road class */
 
     // PRIVATE ROUTINES ///////////////////////////////////////////////////////
-
-    /**
-     * Builds the road alignment using the points of intersection. In order,
-     * this routine calls:
-     * 1. horizontalAlignment
-     * 2. verticalAlignment
-     * 3. plotRoadPath
-     * 4. placeNetwork
-     */
-    void computeAlignment();
 
     /**
      * Computes the road cost elements required for valuation: In order, this

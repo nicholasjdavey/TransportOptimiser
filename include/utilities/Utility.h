@@ -185,6 +185,40 @@ namespace Utility {
      * @return Relevant standard deviation as double
      */
     double RationalApproximation(double t);
+
+    /**
+     * Creates orthogonal cutting planes to the straight line joining the start
+     * and end points.
+     *
+     * This routine creates 'n' 2D cutting planes, where 'n' is the number of
+     * intersection points defining the road.
+     *
+     * @param xMin as const double&
+     * @param xMax as const double&
+     * @param yMin as const double&
+     * @param yMax as const double&
+     * @param zMin as const double&
+     * @param zMax as const double&
+     * @param xS as const double&
+     * @param yS as const double&
+     * @param zS as const double&
+     * @param xE as const double&
+     * @param yE as const double&
+     * @param zE as const double&
+     * @param n as const long&
+     * @param (output) xO as Eigen::VectorXd&
+     * @param (output) yO as Eigen::VectorXd&
+     * @param (output) zO as Eigen::VectorXd&
+     * @param (output) dU as Eigen::VectorXd&
+     * @param (output) dL as Eigen::VectorXd&
+     * @param (output) theta as const double&
+     */
+    void cuttingPlanes(const double& xMin, const double& xMax, const double&
+            yMin, const double& yMax, const double& xS, const double& yS,
+            const double& zS, const double& xE, const double& yE, const
+            double& zE, const long& n, Eigen::VectorXd& xO, Eigen::VectorXd&
+            yO, Eigen::VectorXd& zO, Eigen::VectorXd& dU, Eigen::VectorXd& dL,
+            double &theta);
 }
 
 #endif

@@ -26,6 +26,7 @@
 #include <regex>
 #include <thread>
 #include <random>
+#include <assert.h>
 
 // HEADER-ONLY LIBRARIES //////////////////////////////////////////////////////
 // EIGEN
@@ -40,6 +41,7 @@
 #include <igl/sort.h>
 #include <igl/sortrows.h>
 #include <igl/unique.h>
+#include <igl/find.h>
 // BOOST
 
 // CTPL

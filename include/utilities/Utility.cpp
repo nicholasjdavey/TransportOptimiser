@@ -96,24 +96,23 @@ void Utility::lineSegmentIntersect(
 // somewhat overkill for what we require.
 double Utility::NormalCDFInverse(double p) {
     if (p <= 0.0 || p >= 1.0)
-        {
-            std::stringstream os;
-            os << "Invalid input argument (" << p
-            << "); must be larger than 0 but less than 1.";
-            throw std::invalid_argument( os.str() );
-        }
+    {
+        std::stringstream os;
+        os << "Invalid input argument (" << p
+        << "); must be larger than 0 but less than 1.";
+        throw std::invalid_argument( os.str() );
+    }
 
-        // See article above for explanation of this section.
-        if (p < 0.5)
-        {
-            // F^-1(p) = - G^-1(p)
-            return -RationalApproximation( sqrt(-2.0*log(p)) );
-        }
-        else
-        {
-            // F^-1(p) = G^-1(1-p)
-            return RationalApproximation( sqrt(-2.0*log(1-p)) );
-        }
+    if (p < 0.5)
+    {
+        // F^-1(p) = - G^-1(p)
+        return -RationalApproximation( sqrt(-2.0*log(p)) );
+    }
+    else
+    {
+        // F^-1(p) = G^-1(1-p)
+        return RationalApproximation( sqrt(-2.0*log(1-p)) );
+    }
 }
 
 double Utility::RationalApproximation(double t) {
@@ -123,4 +122,40 @@ double Utility::RationalApproximation(double t) {
     double d[] = {1.432788, 0.189269, 0.001308};
     return t - ((c[2]*t + c[1])*t + c[0]) /
                 (((d[2]*t + d[1])*t + d[0])*t + 1.0);
+}
+
+void Utility::cuttingPlanes(const double &xMin, const double &xMax, const
+        double &yMin, const double &yMax, const double &xS, const double &yS,
+        const double &zS, const double &xE, const double &yE, const double &zE,
+        const long& n, Eigen::VectorXd &xO, Eigen::VectorXd &yO,
+        Eigen::VectorXd &zO, Eigen::VectorXd &dU, Eigen::VectorXd &dL, double
+        &theta) {
+
+    Eigen::VectorXd ii = Eigen::VectorXd::LinSpaced(n,1,n);
+
+    xO = xS + (ii.array()*(xE-xS))/(n+1);
+    yO = yS + (ii.array()*(yE-yS))/(n+1);
+    zO = zS + (ii.array()*(zE-zS))/(n+1);
+
+    // Angles between cutting planes and x-axis
+    theta = atan((yE-yS)/(xE-xS)) + M_PI/2;
+
+    // Compute upper and lower bounds for cutting planes
+    if(theta == 0 || theta == M_PI) {
+        dU = xMax - xO.array();
+        dL = xMin - xO.array();
+    } else if (0 < theta < M_PI/2) {
+        dU = ((xMax - xO.array())/cos(theta)).min(
+                (yMax - yO.array())/sin(theta));
+        dL = ((xMin - xO.array())/cos(theta)).max(
+                (yMin - yO.array())/sin(theta));
+    } else if (theta == M_PI/2) {
+        dU = yMax - yO.array();
+        dL = yMin - yO.array();
+    } else if (M_PI/2 < theta < M_PI) {
+        dU = ((xMin - xO.array())/cos(theta)).min(
+                (yMax - yO.array())/sin(theta));
+        dL = ((xMax - xO.array())/cos(theta)).max(
+                (yMin - yO.array())/sin(theta));
+    }
 }
