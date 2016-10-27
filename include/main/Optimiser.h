@@ -98,6 +98,7 @@ public:
      * @param noRuns as unsigned long
      * @param type as Optimiser::Type
      * @param threader as ThreadManagerPtr
+     * @param elite as double
      */
     Optimiser(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr oInputs,
             DesignParametersPtr desParams, EarthworkCostsPtr earthworks,
@@ -106,7 +107,7 @@ public:
             traffic, RegionPtr region, double mr, unsigned long cf, unsigned
             long gens, unsigned long popSize, double stopTol, double confInt,
             double confLvl, unsigned long habGridRes, std::string solScheme,
-            unsigned long noRuns, Optimiser::Type type);
+            unsigned long noRuns, Optimiser::Type type, double elite);
     /**
      * Destructor
      */
@@ -279,6 +280,23 @@ public:
     void setUnitCosts(UnitCostsPtr costs) {
         this->unitCosts.reset();
         this->unitCosts = costs;
+    }
+
+    /**
+     * Returns the current generation in the optimisation process
+     *
+     * @return Current generation as double
+     */
+    double getGeneration() {
+        return this->generation;
+    }
+    /**
+     * Sets the current generation in the optimisation process
+     *
+     * @param gen as double
+     */
+    void setGeneration(double gen) {
+        this->generation = gen;
     }
 
     /**
@@ -587,6 +605,23 @@ public:
         this->threader = threader;
     }
 
+    /**
+     * Returns the proportion of the population to retain as elite
+     *
+     * @return Elite individuals proportion as double
+     */
+    double getEliteIndividuals() {
+        return this->eliteIndividuals;
+    }
+    /**
+     * Sets the proportion of the population to retain as elite
+     *
+     * @param e as double
+     */
+    void setEliteIndividuals(double e) {
+        this->eliteIndividuals = e;
+    }
+
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -646,7 +681,8 @@ protected:
     TrafficPtr traffic;                             /**< Traffic details */
     TrafficProgramPtr trafficProgram;               /**< Traffic program used */
     RegionPtr region;                               /**< Region of interest */
-    UnitCostsPtr unitCosts;                         /**< Unit Costs */
+    UnitCostsPtr unitCosts;                         /**< Unit Costs */    
+    unsigned long generation;                       /**< Current generation in optimisation process */
     double mutationRate;                            /**< Mutation rate */
     double crossoverFrac;                           /**< Crossover fraction */
     unsigned long generations;                      /**< Generations required */
@@ -656,6 +692,7 @@ protected:
     double confLvl;                                 /**< Desired confidence level (default = 95%) */
     unsigned long habGridRes;                       /**< Habitat grid 1D resolution */
     unsigned long noRuns;                           /**< Number of runs to perform */
+    double eliteIndividuals;                        /**< Proportion of elite individuals to retain each generation */
     std::string solutionScheme;                     /**< Solution scheme used (i.e. name of experiment) */
     ThreadManagerPtr threader;                      /**< Thread manager used for multithreading computations */
     OptimiserPtr me();                              /**< Creates a shared pointer from this */
