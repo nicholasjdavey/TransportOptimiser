@@ -29,10 +29,6 @@ void RoadGA::creation() {
     double ex = this->designParams->getEndX();
     double ey = this->designParams->getEndY();
 
-    double gmax = this->designParams->getMaxGrade();
-    double eHigh = this->designParams->getMaxSE()/100;
-    double velDes = this->designParams->getDesignVelocity();
-
     // Region limits. We ignore the two outermost cell boundaries
     double minLon = (this->getRegion()->getX())(3,1);
     double maxLon = (this->getRegion()->getX())(this->getRegion()->getX().
@@ -300,7 +296,6 @@ void RoadGA::mutation(const Eigen::VectorXi &parentsIdx,
 
 
     unsigned long intersectPts = this->designParams->getIntersectionPoints();
-    unsigned long len = parents.cols();
 
     std::default_random_engine generator;
     std::uniform_int_distribution<int> mutateMethod(1,4);
@@ -350,7 +345,7 @@ void RoadGA::mutation(const Eigen::VectorXi &parentsIdx,
             Eigen::VectorXi twoPts = pts.segment(0,2);
             std::sort(twoPts.data(),twoPts.data()+2);
 
-            // If A and B will not be the same thanks to the random shuffle.
+            // A and B will not be the same thanks to the random shuffle.
             // This ensures that we do actually get mutation.
             if ((twoPts(1) - twoPts(0)) >= 2) {
                 int jj = twoPts(1);
@@ -488,15 +483,127 @@ void RoadGA::mutation(const Eigen::VectorXi &parentsIdx,
     this->replaceInvalidRoads(children, dummyCosts);
 }
 
-void RoadGA::optimise() {}
+void RoadGA::elite(const Eigen::VectorXi& parentsIdx,
+        Eigen::MatrixXd& children) {
 
-void RoadGA::output() {}
+    int cols = this->currentRoadPopulation.cols();
+    Eigen::RowVectorXi colIdx = Eigen::RowVectorXi::LinSpaced(cols,0,
+            cols-1);
+    int rows = parentsIdx.size();
+
+    Eigen::MatrixXi rowRefs = parentsIdx.rowwise().replicate(cols);
+    Eigen::MatrixXi colRefs = colIdx.colwise().replicate(rows);
+
+    igl::slice(this->currentRoadPopulation,rowRefs,colRefs,children);
+}
+
+void RoadGA::optimise() {
+    this->creation();
+
+    int status = 0;
+
+    while ((status <= 0) && (this->generation <= this->generations)) {
+        // Evaluate current generation
+        this->evaluateGeneration();
+        this->output();
+        this->assignBestRoad();
+        status = this->stopCheck();
+
+        if (status != 0) {
+            continue;
+        }
+
+        // Prepare for next generation
+        this->computeSurrogate();
+
+        int pc = (floor(this->populationSizeGA * this->crossoverFrac))*2;
+        int pm = floor(this->populationSizeGA * this->mutationRate);
+        int pe = this->populationSizeGA - pc - pm;
+        int cols = this->currentRoadPopulation.cols();
+
+        Eigen::VectorXi parentsCrossover(pc);
+        Eigen::VectorXi parentsMutation(pm);
+        Eigen::VectorXi parentsElite(pe);
+        Eigen::MatrixXd crossoverChildren(pc,cols);
+        Eigen::MatrixXd mutationChildren(pm,cols);
+        Eigen::MatrixXd eliteChildren(pe,cols);
+
+        // Select the parents for crossover, mutation and elite children
+        this->selection(parentsCrossover, parentsMutation, parentsElite,
+                RoadGA::TOURNAMENT);
+
+        // Perform crossover, mutation and elite subpopulation creation
+        this->crossover(parentsCrossover,crossoverChildren);
+        this->mutation(parentsMutation,mutationChildren);
+        this->elite(parentsElite,eliteChildren);
+
+        // Assign the new population
+        this->currentRoadPopulation.block(0,0,pc/2,cols) = crossoverChildren;
+        this->currentRoadPopulation.block(pc/2,0,pm,cols) = mutationChildren;
+        this->currentRoadPopulation.block(pc/2+pm,0,pe,cols) = eliteChildren;
+
+        this->generation++;
+    }
+}
+
+void RoadGA::assignBestRoad() {
+    int ps = this->variableParams->getPopulationLevels().size();
+    int hps = this->variableParams->getHabPref().size();
+    int ls = this->variableParams->getLambda().size();
+    int bs = this->variableParams->getBeta().size();
+    int grms = this->variableParams->getGrowthRatesMultipliers().size();
+    int grsdms = this->variableParams->getGrowthRateSDMultipliers().size();
+    int cms = this->variableParams->getCommodityMultipliers().size();
+    int csdms = this->variableParams->getCommoditySDMultipliers().size();
+    int abs = this->variableParams->getBridge().size();
+
+    // Experimental scenario also needs to save the surrogate model and performance metrics. Put this in the optimiser class.
+    int ii = this->scenario->getPopLevel();
+    int jj = this->scenario->getHabPref();
+    int kk = this->scenario->getLambda();
+    int ll = this->scenario->getRangingCoeff();
+    int mm = this->scenario->getPopGR();
+    int nn = this->scenario->getPopGRSD();
+    int oo = this->scenario->getCommodity();
+    int pp = this->scenario->getCommoditySD();
+    int qq = this->scenario->getAnimalBridge();
+    int run = this->scenario->getRun();
+
+    this->bestRoads[ps*ii + hps*jj + ls*kk + bs*ll + grms*mm + grsdms*nn +
+            cms*oo + csdms*pp + abs*qq][run];
+}
+
+void RoadGA::output() {
+
+}
 
 void RoadGA::computeSurrogate() {}
 
 void RoadGA::evaluateGeneration() {}
 
-void RoadGA::selection() {}
+void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
+        Eigen::VectorXi& pe, RoadGA::Selection selector) {
+
+    switch (selector) {
+
+    case TOURNAMENT:
+    {
+        break;
+    }
+    case 2:
+    {
+        break;
+    }
+    case 3:
+    {
+        break;
+    }
+    default:
+    {
+        break;
+    }
+    }
+}
 
 int RoadGA::stopCheck() {}
 
@@ -521,10 +628,10 @@ void RoadGA::randomXYOnPlanes(const long &individuals, const long&
             individuals).transpose().array()))).matrix();
 
     // Place the genome values in the initial population matrix
-    Eigen::VectorXi rowIdx = Eigen::VectorXi::LinSpaced(intersectPts,
-            startRow,startRow + intersectPts - 1);
-    Eigen::RowVectorXi colIdx = Eigen::RowVectorXi::LinSpaced(intersectPts,0,
-            intersectPts - 1);
+    Eigen::VectorXi rowIdx = Eigen::VectorXi::LinSpaced(individuals,
+            startRow,startRow + individuals - 1);
+    Eigen::RowVectorXi colIdx = Eigen::RowVectorXi::LinSpaced(intersectPts,3,
+            3*intersectPts);
 
     igl::slice_into(xvals,rowIdx.rowwise().replicate(intersectPts),
             colIdx.colwise().replicate(individuals),
@@ -557,8 +664,8 @@ void RoadGA::randomXYinRegion(const long &individuals, const long
     // Place the genome values in the initial population matrix
     Eigen::VectorXi rowIdx = Eigen::VectorXi::LinSpaced(intersectPts,
             startRow,startRow + intersectPts - 1);
-    Eigen::RowVectorXi colIdx = Eigen::RowVectorXi::LinSpaced(intersectPts,0,
-            intersectPts - 1);
+    Eigen::RowVectorXi colIdx = Eigen::RowVectorXi::LinSpaced(intersectPts,3,
+            3*intersectPts);
 
     igl::slice_into(xvals,rowIdx.rowwise().replicate(intersectPts),
             colIdx.colwise().replicate(individuals),

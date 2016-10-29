@@ -20,8 +20,13 @@ Optimiser::Optimiser(const std::vector<TrafficProgramPtr>& programs,
     this->currentRoadPopulation = currPop;
 
     unsigned long noTests = (varParams->getPopulationLevels().size())*
-            ((varParams->getHabPref()).size())*((varParams->getLambda()).
-            size())*((varParams->getBeta()).size());
+            (varParams->getHabPref().size())*(varParams->getLambda().
+            size())*(varParams->getBeta().size())*
+            (varParams->getGrowthRatesMultipliers().size())*
+            (varParams->getGrowthRateSDMultipliers().size())*
+            (varParams->getCommodityMultipliers().size())*
+            (varParams->getCommoditySDMultipliers().size())*
+            (varParams->getAnimalBridge().size());
 
     std::vector< std::vector<RoadPtr> > br(noTests);
 

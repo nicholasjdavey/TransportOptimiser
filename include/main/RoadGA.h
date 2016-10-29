@@ -16,6 +16,11 @@ class RoadGA : public Optimiser,
         public std::enable_shared_from_this<RoadGA> {
 
 public:
+    // ENUMERATIONS ///////////////////////////////////////////////////////////
+    typedef enum {
+        TOURNAMENT      /**< Tournament selection routine */
+    } Selection;
+
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
     /**
@@ -72,12 +77,22 @@ public:
     /**
      * Mutates population used in the optimisation process
      *
-     * @param
+     * @param (input) parentsIds as Eigen::VectorXi&
+     * @param (output) children as Eigen::MatrixXd&
+     *
      * @note This function overrides any base class function of the same name.
      */
     virtual void mutation(const Eigen::VectorXi &parentsIdx,
             Eigen::MatrixXd& children);
 
+    /**
+     * Creates the elite children from the current population
+     *
+     * @param (input) parentsIdx as Eigen::VectorXi&
+     * @param (output) children as Eigen::MatrixXd&
+     */
+    virtual void elite(const Eigen::VectorXi &parentsIdx,
+            Eigen::MatrixXd& children);
     /**
      * Runs the optimisation algorithm to devise the best Road
      */
@@ -91,18 +106,26 @@ public:
     /**
      * Routine to select between individuals to become parents for the GA
      */
-    virtual void selection();
+    virtual void selection(Eigen::VectorXi &pc, Eigen::VectorXi &pm,
+            Eigen::VectorXi &pe, RoadGA::Selection selector =
+            RoadGA::TOURNAMENT);
 
     /**
      * Returns the outputs at specific stages of the GA
+     *
+     * This function saves the best road cost, surrogate fitness, and
+     * average cost for each generation.
      */
     virtual void output();
 
     /**
      * Checks whether the program can stop and if so, under what conditions:
      * 1. 1 = Successfully found solution within stopping criteria
-     * 2. -1 = Number of generations exceeded
-     * 3. -2 = Fatal error
+     * 2. 0 = Number of generations exceeded
+     * 3. -1 = Fatal error
+     *
+     * This function also updates the surrogate model if the program needs
+     * to run for another generation.
      *
      * @return Stopping flag as int
      */
@@ -110,8 +133,15 @@ public:
 
     /**
      * Computes the surrogate function that is updated at each GA iteration
+     *
+     * @note This function also updates the costs for roads based on the
      */
     virtual void computeSurrogate();
+
+    /**
+     * Stores the best road to the matrix of bests roads per test
+     */
+    virtual void assignBestRoad();
 
 private:
     double scale;               /**< Cooling rate for mutation 3 */
@@ -122,7 +152,8 @@ private:
     Eigen::VectorXd dL;         /**< Lower limits for plane domains */
     double theta;               /**< Cutting plane angle (to x axis) */
     // Values for current road population /////////////////////////////////////
-    Eigen::VectorXd costs;      /**< Costs of current population */
+    Eigen::VectorXd costs;      /**< Total costs of current population */
+    Eigen::VectorXd profits;    /**< Unit operating profit per unit time for all roads */
     Eigen::MatrixXd iarsCurr;   /**< IARs of current population */
     Eigen::MatrixXd popsCurr;   /**< Full traffic flow end pops of current population */
     Eigen::VectorXd useCurr;    /**< Utility (ROV) of current population */

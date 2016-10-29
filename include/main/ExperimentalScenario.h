@@ -155,15 +155,15 @@ public:
     }
 
     /**
-     * Returns the population growth rate SD multiplier index
+     * Returns the population growth rate mean multiplier index
      *
-     * @return Population growth rate SD multiplier index as int
+     * @return Population growth rate mean multiplier index as int
      */
     int getPopGR () {
         return this->popGR;
     }
     /**
-     * Sets the population growth rate SD multiplier index
+     * Sets the population growth rate mean multiplier index
      *
      * @param popGR as int
      */
@@ -172,20 +172,37 @@ public:
     }
 
     /**
-     * Returns the fuel price SD multiplier index as int
+     * Returns the population growth rate SD multiplier index
      *
-     * @return Fuel price SD multiplier index as int
+     * @return Population growth rate SD multiplier index as int
      */
-    int getFuel() {
-        return this->fuel;
+    int getPopGRSD () {
+        return this->popGRSD;
     }
     /**
-     * Sets the fuel price SD multiplier index as int
+     * Sets the population growth rate SD multiplier index
      *
-     * @param fuel as int
+     * @param popGRSD as int
      */
-    void setFuel(int fuel) {
-        this->fuel = fuel;
+    void setPopGRSD(int popGRSD) {
+        this->popGRSD = popGRSD;
+    }
+
+    /**
+     * Returns the commodity price mean multiplier index as int
+     *
+     * @return Commodity price mean multiplier index as int
+     */
+    int getCommodity() {
+        return this->commodity;
+    }
+    /**
+     * Sets the commodity price mean multiplier index as int
+     *
+     * @param commodity as int
+     */
+    void setCommodity(int commodity) {
+        this->commodity = commodity;
     }
 
     /**
@@ -193,7 +210,7 @@ public:
      *
      * @return Commodity price SD multiplier index as int
      */
-    int getCommodity() {
+    int getCommoditySD() {
         return this->commodity;
     }
     /**
@@ -201,8 +218,25 @@ public:
      *
      * @param commodity as int
      */
-    void setCommodity(int commodity) {
-        this->commodity = commodity;
+    void setCommoditySd(int commoditySD) {
+        this->commoditySD = commoditySD;
+    }
+
+    /**
+     * Returns the run number for the current test scenario
+     *
+     * @return Run as int
+     */
+    int getRun() {
+        return this->run;
+    }
+    /**
+     * Sets the run number of the current test scenario
+     *
+     * @param run as int
+     */
+    void setRun(int run) {
+        this->run = run;
     }
 
     // STATIC ROUTINES ////////////////////////////////////////////////////////
@@ -212,15 +246,17 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 private:
     std::weak_ptr<Optimiser> optimiser; /**< Calling Optimiser */
-    int program;                        /**< Index of Program used */
-    int popLevel;                       /**< Index of population level used */
-    int habPref;                        /**< Index of habitat preference used */
-    int lambda;                         /**< Index of lambda used */
-    int rangingCoeff;                   /**< Index of ranging coefficient used */
-    int animalBridge;                   /**< Index of animal bridge test used */
-    int popGR;                          /**< Index of population growth uncertainty used (0 = no uncertainty) */
-    int fuel;                           /**< Index of fuel price uncertainty multiplier used (0 = no uncertainty) */
-    int commodity;                      /**< Index of commodity price uncertainty multiplier used (0 = no uncertainty) */
+    int run;            /**< Current run of scenario */
+    int program;        /**< Index of Program used */
+    int popLevel;       /**< Index of population level used */
+    int habPref;        /**< Index of habitat preference used */
+    int lambda;         /**< Index of lambda used */
+    int rangingCoeff;   /**< Index of ranging coefficient used */
+    int animalBridge;   /**< Index of animal bridge test used */
+    int popGR;          /**< Index of population growth uncertainty used */
+    int popGRSD;        /**< Index of population growth rate SD used (0 = no uncertainty) */
+    int commodity;      /**< Index of commodity price mean multiplier used */
+    int commoditySD;    /**< Index of commodity price uncertainty multiplier used (0 = no uncertainty) */
 };
 
 #endif

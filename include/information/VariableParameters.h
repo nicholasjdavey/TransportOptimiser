@@ -19,8 +19,8 @@ public:
 	 */
     VariableParameters(const Eigen::VectorXd& popLevels, const Eigen::VectorXd&
         bridge, const Eigen::VectorXd& hp, const Eigen::VectorXd& l, const
-        Eigen::VectorXd& b, const Eigen::VectorXd& pgr, const Eigen::VectorXd& f,
-        const Eigen::VectorXd& c);
+        Eigen::VectorXd& b, const Eigen::VectorXd& pgr,
+        const Eigen::VectorXd& c, const Eigen::VectorXd& csd);
     /**
      * Destructor
      */
@@ -48,17 +48,17 @@ public:
     /**
      * Returns animal bridge usage scenarios
      *
-     * @return Animal bridge usage scenarios as const Eigen::VectorXd&
+     * @return Animal bridge usage scenarios as const Eigen::VectorXi&
      */
-    const Eigen::VectorXd& getBridge() {
+    const Eigen::VectorXi& getBridge() {
         return this->animalBridge;
     }
     /**
      * Returns animal bridge usage scenarios
      *
-     * @param bridge as const Eigen::VectorXd&
+     * @param bridge as const Eigen::VectorXi&
      */
-    void setBridge(const Eigen::VectorXd& bridge) {
+    void setBridge(const Eigen::VectorXi& bridge) {
         this->animalBridge = bridge;
     }
 
@@ -120,6 +120,23 @@ public:
     }
 
     /**
+     * Returns the multipliers of the base growth rates used in the animal model
+     *
+     * @return Growth rate mean multipliers as const Eigen::VectorXd&
+     */
+    const Eigen::VectorXd& getGrowthRatesMultipliers() {
+        return this->popGR;
+    }
+    /**
+     * Sets the multipliers of the base growth rates used in the animal model
+     *
+     * @param rates as const Eigen::VectorXd&
+     */
+    void setGrowthRatesMultipliers(const Eigen::VectorXd& rates) {
+        this->popGR = rates;
+    }
+
+    /**
      * Returns the population growth rate standard deviation multiplier
      *
      * @return Growth rate standard deviation multiplier as const Eigen::VectorXd&
@@ -137,20 +154,20 @@ public:
     }
 
     /**
-     * Sets the fuel price standard deviation multiplier
+     * Returns the commodity price means
      *
-     * @return Fuell price standard deviation multiplier as const Eigen::VectorXd&
+     * @return Commodity price means as const Eigen::VectorXd&
      */
-    const Eigen::VectorXd& getFuelVariable() {
-        return this->fuel;
+    const Eigen::VectorXd& getCommodityMultipliers() {
+        return this->commodity;
     }
     /**
-     * Sets the fuel price standard deviation multiplier
+     * Sets the commodity price means
      *
-     * @param fuel as const Eigen::VectorXd&
+     * @param commodity as const Eigen::VectorXd&
      */
-    void setFuelVariable(const Eigen::VectorXd& fuel) {
-        this->fuel = fuel;
+    void setCommodityMultipliers(const Eigen::VectorXd& commodity) {
+        this->commodity = commodity;
     }
 
     /**
@@ -158,16 +175,33 @@ public:
      *
      * @return Commodity price standard deviation multiplier as const Eigen::VectorXd&
      */
-    const Eigen::VectorXd& getCommodityVariable() {
-        return this->commodity;
+    const Eigen::VectorXd& getCommoditySDMultipliers() {
+        return this->commoditySD;
     }
     /**
      * Sets the commodity price standard deviation multiplier
      *
      * @param commodity as const Eigen::VectorXd&
      */
-    void setCommodityVariable(const Eigen::VectorXd& commodity) {
-        this->commodity = commodity;
+    void setCommoditySDMultipliers(const Eigen::VectorXd& commoditysd) {
+        this->commoditySD = commoditysd;
+    }
+
+    /**
+     * Returns the maximum number of animal bridges to use
+     *
+     * @return Animal bridges to use as const Eigen::VectorXi&
+     */
+    const Eigen::VectorXi& getAnimalBridge() {
+        return this->animalBridge;
+    }
+    /**
+     * Sets the maximum number of animal bridges to use
+     *
+     * @param bridge as const Eigen::VectorXi& bridge&
+     */
+    void setAnimalBridge(const Eigen::VectorXi& bridge) {
+        this->animalBridge = bridge;
     }
 
     // STATIC ROUTINES ///////////////////////////////////////////////////////////
@@ -175,14 +209,15 @@ public:
     // CALCULATION ROUTINES //////////////////////////////////////////////////////
 
     private:
-    Eigen::VectorXd populationLevels;
-    Eigen::VectorXd habPref;
-    Eigen::VectorXd lambda;
-    Eigen::VectorXd beta;
-    Eigen::VectorXd animalBridge;
-    Eigen::VectorXd popGR;
-    Eigen::VectorXd fuel;
-    Eigen::VectorXd commodity;
+    Eigen::VectorXd populationLevels;   /**< Percentage required survival levels to test */
+    Eigen::VectorXd habPref;            /**< Standard deviations away from mean habitat preferences to use */
+    Eigen::VectorXd lambda;             /**< Standard deviations away from mean lambdas to use */
+    Eigen::VectorXd beta;               /**< Standard deviations away from mean betas to use */
+    Eigen::VectorXi animalBridge;       /**< Maximum number of animal bridges to use */
+    Eigen::VectorXd popGR;              /**< Percentage of base population growth rates to use */
+    Eigen::VectorXd popGRSD;            /**< Population growth rate standard deviation scalings to use */
+    Eigen::VectorXd commodity;          /**< Percentage of base commodity mean price to use */
+    Eigen::VectorXd commoditySD;        /**< Commodity price standard deviation scaling to use */
 };
 
 #endif
