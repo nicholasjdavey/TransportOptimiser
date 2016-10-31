@@ -1,7 +1,7 @@
 #include "../transportbase.h"
 
 VariableParameters::VariableParameters(const Eigen::VectorXd &popLevels,
-        const Eigen::VectorXd &bridge, const Eigen::VectorXd &hp, const
+        const Eigen::VectorXi &bridge, const Eigen::VectorXd &hp, const
         Eigen::VectorXd &l, const Eigen::VectorXd &b, const Eigen::VectorXd
         &pgr, const Eigen::VectorXd &c, const Eigen::VectorXd &csd) {
 	

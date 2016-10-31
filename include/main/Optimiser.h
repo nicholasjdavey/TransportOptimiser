@@ -622,6 +622,27 @@ public:
         this->eliteIndividuals = e;
     }
 
+    /**
+     * Returns the maximum rate at which to extract samples from a generation
+     *
+     * Returns the maximum rate at which to extract samples from a generation
+     * so as to determine the surrogate model for improving the performance of
+     * the GA.
+     *
+     * @return Max sample rate as double
+     */
+    double getMaxSampleRate() {
+        return this->maxSampleRate;
+    }
+    /**
+     * Sets the sampling rate for building surrogate models
+     *
+     * @param msr as double
+     */
+    void setMaxSampleRate(double msr) {
+        this->maxSampleRate = msr;
+    }
+
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -646,9 +667,9 @@ public:
     /**
      * Returns a reference to the surrogate function so that it may be used
      *
-     * @return Surrogate function as std::function<double(RoadPtr)>&
+     * @return Surrogate function as std::vector< std::vector< std::function<double(RoadPtr)> > >&
      */
-    std::function<double(RoadPtr)>& getSurrogate() {
+    std::vector< std::vector< std::function<double(RoadPtr)> > >& getSurrogate() {
         return this->surrogate;
     }
     /**
@@ -658,44 +679,45 @@ public:
      * operating cost (based on a learned function), which is returned as a
      * double.
      *
-     * @param surrogate as std::function<double(RoadPtr)>&
+     * @param surrogate as std::vector< std::vector< std::function<double(RoadPtr)> > >&
      */
-    void setSurrogate(std::function<double(RoadPtr)>& surrogate) {
+    void setSurrogate(std::vector< std::vector< std::function<double(RoadPtr)> > >& surrogate) {
         this->surrogate = surrogate;
     }
 
 ///////////////////////////////////////////////////////////////////////////////
 protected:
-    std::function<double(RoadPtr)> surrogate;       /**< Surrogate model for evaluating road */
-    ExperimentalScenarioPtr scenario;               /**< Current experiment */
-    Optimiser::Type type;                           /**< Type of ecological incorporation */
-    Eigen::MatrixXd currentRoadPopulation;          /**< Current encoded population of roads */
-    std::vector< std::vector<RoadPtr> > bestRoads;  /**< Best roads */
-    std::vector<TrafficProgramPtr> programs;        /**< Operational programs */
-    OtherInputsPtr otherInputs;                     /**< Other inputs */
-    DesignParametersPtr designParams;               /**< Design parameters */
-    EarthworkCostsPtr earthworks;                   /**< Earthwork requirements */
-    VariableParametersPtr variableParams;           /**< Parameters to vary */
-    std::vector<SpeciesPtr> species;                /**< Species studied */
-    EconomicPtr economic;                           /**< Economic parameters */
-    TrafficPtr traffic;                             /**< Traffic details */
-    TrafficProgramPtr trafficProgram;               /**< Traffic program used */
-    RegionPtr region;                               /**< Region of interest */
-    UnitCostsPtr unitCosts;                         /**< Unit Costs */    
-    unsigned long generation;                       /**< Current generation in optimisation process */
-    double mutationRate;                            /**< Mutation rate */
-    double crossoverFrac;                           /**< Crossover fraction */
-    unsigned long generations;                      /**< Generations required */
-    unsigned long populationSizeGA;                 /**< Population size for GA */
-    double stoppingTol;                             /**< Stopping tolerance */
-    double confInt;                                 /**< Required confidence interval */
-    double confLvl;                                 /**< Desired confidence level (default = 95%) */
-    unsigned long habGridRes;                       /**< Habitat grid 1D resolution */
-    unsigned long noRuns;                           /**< Number of runs to perform */
-    double eliteIndividuals;                        /**< Proportion of elite individuals to retain each generation */
-    std::string solutionScheme;                     /**< Solution scheme used (i.e. name of experiment) */
-    ThreadManagerPtr threader;                      /**< Thread manager used for multithreading computations */
-    OptimiserPtr me();                              /**< Creates a shared pointer from this */
+    std::vector< std::vector< std::function<double(RoadPtr)> > > surrogate; /**< Surrogate model for evaluating road (for each run) */
+    ExperimentalScenarioPtr scenario;                                       /**< Current experiment */
+    Optimiser::Type type;                                                   /**< Type of ecological incorporation */
+    Eigen::MatrixXd currentRoadPopulation;                                  /**< Current encoded population of roads */
+    std::vector< std::vector<RoadPtr> > bestRoads;                          /**< Best roads */
+    std::vector<TrafficProgramPtr> programs;                                /**< Operational programs */
+    OtherInputsPtr otherInputs;                                             /**< Other inputs */
+    DesignParametersPtr designParams;                                       /**< Design parameters */
+    EarthworkCostsPtr earthworks;                                           /**< Earthwork requirements */
+    VariableParametersPtr variableParams;                                   /**< Parameters to vary */
+    std::vector<SpeciesPtr> species;                                        /**< Species studied */
+    EconomicPtr economic;                                                   /**< Economic parameters */
+    TrafficPtr traffic;                                                     /**< Traffic details */
+    TrafficProgramPtr trafficProgram;                                       /**< Traffic program used */
+    RegionPtr region;                                                       /**< Region of interest */
+    UnitCostsPtr unitCosts;                                                 /**< Unit Costs */
+    unsigned long generation;                                               /**< Current generation in optimisation process */
+    double mutationRate;                                                    /**< Mutation rate */
+    double crossoverFrac;                                                   /**< Crossover fraction */
+    unsigned long generations;                                              /**< Generations required */
+    unsigned long populationSizeGA;                                         /**< Population size for GA */
+    double stoppingTol;                                                     /**< Stopping tolerance */
+    double confInt;                                                         /**< Required confidence interval */
+    double confLvl;                                                         /**< Desired confidence level (default = 95%) */
+    unsigned long habGridRes;                                               /**< Habitat grid 1D resolution */
+    unsigned long noRuns;                                                   /**< Number of runs to perform */
+    double eliteIndividuals;                                                /**< Proportion of elite individuals to retain each generation */
+    double maxSampleRate;                                                   /**< Maximum rate at which to perform sampling for surrogate models */
+    std::string solutionScheme;                                             /**< Solution scheme used (i.e. name of experiment) */
+    ThreadManagerPtr threader;                                              /**< Thread manager used for multithreading computations */
+    OptimiserPtr me();                                                      /**< Creates a shared pointer from this */
 };
 
 #endif

@@ -42,6 +42,7 @@
 #include <igl/sortrows.h>
 #include <igl/unique.h>
 #include <igl/find.h>
+#include <igl/mat_max.h>
 // BOOST
 
 // CTPL

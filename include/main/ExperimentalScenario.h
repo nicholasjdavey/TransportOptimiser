@@ -26,7 +26,7 @@ public:
      */
     ExperimentalScenario(OptimiserPtr optimiser, int program, int popLevel,
             int habPrefSD, int lambdaSD, int rangingCoeffSD, int animalBridge,
-            int popGR, int fuel, int commodity);
+            int popGR, int popGRSD, int commodity, int commoditySD, int run);
     /**
      * Destructor
      */
@@ -239,9 +239,33 @@ public:
         this->run = run;
     }
 
+    /**
+     * Returns the index (row number) of the current scenario
+     *
+     * @return Index of current scenario as int
+     */
+    int getCurrentScenario() {
+        return this->currentScenario;
+    }
+    /**
+     * Sets the index (row number) of the current scenario
+     *
+     * @param cs as int
+     */
+    void setCurrentScenario(int cs) {
+        this->currentScenario = cs;
+    }
+
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
+
+    /**
+     * Computes the row number for the experimental scenario
+     */
+    void computeScenarioNumber();
+
+    // OPERATORS //////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
 private:
@@ -257,6 +281,7 @@ private:
     int popGRSD;        /**< Index of population growth rate SD used (0 = no uncertainty) */
     int commodity;      /**< Index of commodity price mean multiplier used */
     int commoditySD;    /**< Index of commodity price uncertainty multiplier used (0 = no uncertainty) */
+    int currentScenario;/**< Index of current scenario. Used for saving results */
 };
 
 #endif

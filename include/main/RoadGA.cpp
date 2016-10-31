@@ -16,8 +16,31 @@ RoadGA::RoadGA(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
             species, economic, traffic, region, mr, cf, gens, popSize, stopTol,
             confInt, confLvl, habGridRes, solScheme, noRuns, type, elite) {
 
+    this->theta = 0;
     this->generation = 0;
     this->scale = scale;
+    this->xO = Eigen::VectorXd::Zero(this->designParams->getIntersectionPoints());
+    this->yO = Eigen::VectorXd::Zero(this->designParams->getIntersectionPoints());
+    this->zO = Eigen::VectorXd::Zero(this->designParams->getIntersectionPoints());
+    this->dU = Eigen::VectorXd::Zero(this->designParams->getIntersectionPoints());
+    this->dL = Eigen::VectorXd::Zero(this->designParams->getIntersectionPoints());
+
+    int noSpecies = this->species.size();
+    this->costs = Eigen::VectorXd::Zero(this->populationSizeGA);
+    this->profits = Eigen::VectorXd::Zero(this->populationSizeGA);
+    this->iarsCurr = Eigen::MatrixXd::Zero(this->populationSizeGA,noSpecies);
+    this->popsCurr = Eigen::MatrixXd::Zero(this->populationSizeGA,noSpecies);
+    this->useCurr = Eigen::VectorXd::Zero(this->populationSizeGA);
+
+    this->best = Eigen::VectorXd::Zero(this->generations);
+    this->av = Eigen::VectorXd::Zero(this->generations);
+
+    this->iars = Eigen::MatrixXd::Zero(this->generations*this->populationSizeGA*
+            this->maxSampleRate,noSpecies);
+    this->pops = Eigen::MatrixXd::Zero(this->generations*this->populationSizeGA*
+            this->maxSampleRate,noSpecies);
+    this->use = Eigen::VectorXd::Zero(this->generations*this->populationSizeGA*
+            this->maxSampleRate);
 }
 
 void RoadGA::creation() {
@@ -547,34 +570,49 @@ void RoadGA::optimise() {
 }
 
 void RoadGA::assignBestRoad() {
-    int ps = this->variableParams->getPopulationLevels().size();
-    int hps = this->variableParams->getHabPref().size();
-    int ls = this->variableParams->getLambda().size();
-    int bs = this->variableParams->getBeta().size();
-    int grms = this->variableParams->getGrowthRatesMultipliers().size();
-    int grsdms = this->variableParams->getGrowthRateSDMultipliers().size();
-    int cms = this->variableParams->getCommodityMultipliers().size();
-    int csdms = this->variableParams->getCommoditySDMultipliers().size();
-    int abs = this->variableParams->getBridge().size();
 
-    // Experimental scenario also needs to save the surrogate model and performance metrics. Put this in the optimiser class.
-    int ii = this->scenario->getPopLevel();
-    int jj = this->scenario->getHabPref();
-    int kk = this->scenario->getLambda();
-    int ll = this->scenario->getRangingCoeff();
-    int mm = this->scenario->getPopGR();
-    int nn = this->scenario->getPopGRSD();
-    int oo = this->scenario->getCommodity();
-    int pp = this->scenario->getCommoditySD();
-    int qq = this->scenario->getAnimalBridge();
-    int run = this->scenario->getRun();
+    // For some reason, igl does not allow passing a vector as the template
+    // does not state the first input as a derived type
+    Eigen::Matrix<double,Eigen::Dynamic,1> Y(1);
+    Eigen::Matrix<int,Eigen::Dynamic,1> I(1);
+    Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> costs(
+            this->populationSizeGA,1);
+    costs = this->costs;
 
-    this->bestRoads[ps*ii + hps*jj + ls*kk + bs*ll + grms*mm + grsdms*nn +
-            cms*oo + csdms*pp + abs*qq][run];
+    igl::mat_max(costs,2,Y,I);
+/*
+    int intersectPts = this->designParams->getIntersectionPoints() + 2;
+    Eigen::VectorXd xCoords(intersectPts);
+    Eigen::VectorXd yCoords(intersectPts);
+    Eigen::VectorXd zCoords(intersectPts);
+    Eigen::VectorXi colIdx = Eigen::VectorXi::LinSpaced(intersectPts,0,
+            intersectPts-1);
+    Eigen::VectorXi rowIdx = Eigen::VectorXi::Const(intersectPts,this->
+            scenario->getCurrentScenario());
+
+    igl::slice(this->currentRoadPopulation(),rowIdx,colIdx,xCoords);
+    igl::slice(this->currentRoadPopulation(),rowIdx,colIdx+1,yCoords);
+    igl::slice(this->currentRoadPopulation(),rowIdx,colIdx+2,zCoords);
+
+    RoadPtr road(new Road(this->me(),xCoords,yCoords,zCoords));
+
+    this->bestRoads[this->scenario->getCurrentScenario()][this->scenario->
+            getRun()] = road;*/
 }
 
 void RoadGA::output() {
+/*
+    this->best(this->generation) = *std::min_element(this->costs.begin(),
+            this->costs.end());
+    this->av(this->generation) = std::accumulate(this->costs.begin(),
+            this->costs.end(),0.0) / costs.size();
 
+    // Save the surrogate model as well
+
+
+    // Include code to plot using gnuplot utilising POSIX pipes to plot the
+    // best road
+    */
 }
 
 void RoadGA::computeSurrogate() {}

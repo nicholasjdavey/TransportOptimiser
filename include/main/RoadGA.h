@@ -7,6 +7,9 @@ typedef std::shared_ptr<Optimiser> OptimiserPtr;
 class RoadGA;
 typedef std::shared_ptr<RoadGA> RoadGAPtr;
 
+class Road;
+typedef std::shared_ptr<Road> RoadPtr;
+
 /**
  * Class for managing the optimal road design process using Genetic Algorithms
  *
@@ -164,6 +167,7 @@ private:
     Eigen::MatrixXd iars;       /**< IARS for surrogate model (each column for each species) */
     Eigen::MatrixXd pops;       /**< Full traffic flow end pops for surrogate model */
     Eigen::VectorXd use;        /**< Utilities (ROV) for surrogate models */
+    unsigned long noSamples;    /**< Current number of samples available for building surrogates */
 
 // PRIVATE ROUTINES ///////////////////////////////////////////////////////////
 

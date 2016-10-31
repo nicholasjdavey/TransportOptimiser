@@ -68,9 +68,8 @@ void Road::computeOperating(bool learning) {
                 // there is uncertainty, simulate the fuel and commodity prices
                 // first to get expected values of one unit of constant use
                 // over the entire horizon.
-                if ((optPtrShared->getVariableParams()->getFuelVariable()
-                        .size() == 1) && (optPtrShared->getVariableParams()
-                        ->getCommodityVariable().size() == 1)) {
+                if ((optPtrShared->getVariableParams()
+                        ->getCommoditySDMultipliers().size() == 1)) {
                     double r = optPtrShared->getEconomic()->getRRR();
                     double t = optPtrShared->getEconomic()->getYears();
                     double g = optPtrShared->getTraffic()->getGR();
