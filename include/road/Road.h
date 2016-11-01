@@ -59,6 +59,13 @@ public:
         const Eigen::VectorXd& zCoords);
 
     /**
+     * Constructor II
+     *
+     * Constructs a %Road object using the encoded genome
+     */
+    Road(OptimiserPtr op, Eigen::RowVectorXd genome);
+
+    /**
      * Destructor
      */
     ~Road();
@@ -330,9 +337,12 @@ public:
     /**
      * Evaluate a road.
      *
-     * Evaluates a road given a particular lifetime operating Program
+     * Evaluates a road given a particular lifetime operating Program. If we
+     * are learning the surrogate model, this function is passed the value
+     * TRUE
+     * @param learning as bool (default = false)
      */
-    void evaluateRoad();
+    void evaluateRoad(bool learning = false);
 
     /**
      * Builds the road alignment using the points of intersection. In order,

@@ -59,13 +59,20 @@ public:
      * number of other inputs of any typedef
      * @param Rest is the argument list for the input function (excluding the
      * initial int parameter)
+     *
+     * @return Results as std::vector< std::future< <void> > >
      */
     template<typename F, typename... Rest>
     auto push(F && f, Rest&&... rest) ->std::future<decltype(f(0, rest...))> {
         this->pool->push(f, rest...);
     }
 
-
+    /**
+     * Empties the thread pool queue
+     */
+    void clearQueue() {
+        this->pool->clear_queue();
+    }
 
 ///////////////////////////////////////////////////////////////////////////////
 private:

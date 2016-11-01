@@ -1,9 +1,9 @@
 #include "../transportbase.h"
 
 Road::Road() {
-	// Assign an empty Attributes object (always has the same size)
-	AttributesPtr att(new Attributes(this->me()));
-	this->attributes = att;
+    // Assign an empty Attributes object (always has the same size)
+    AttributesPtr att(new Attributes(this->me()));
+    this->attributes = att;
 }
 
 Road::Road(OptimiserPtr op,const Eigen::VectorXd &xCoords, const
@@ -13,6 +13,38 @@ Road::Road(OptimiserPtr op,const Eigen::VectorXd &xCoords, const
     this->xCoords = xCoords;
     this->yCoords = yCoords;
     this->zCoords = zCoords;
+
+    // Assign optimiser
+    this->optimiser = op;
+
+    // Assign an empty Attributes object (always has the same size)
+    AttributesPtr att(new Attributes(this->me()));
+    this->attributes = att;
+}
+
+Road::Road(OptimiserPtr op, Eigen::RowVectorXd genome) {
+    // First, ensure that the genome length is a multiple of three
+    int intersectPts = op->getDesignParameters()->getIntersectionPoints() + 2;
+
+    if (genome.size() != 3*(intersectPts)) {
+        throw std::invalid_argument("Genome must be a multiple of three.");
+    }
+
+    this->xCoords.resize(intersectPts);
+    this->yCoords.resize(intersectPts);
+    this->zCoords.resize(intersectPts);
+
+    Eigen::VectorXi colIdx = Eigen::VectorXi::LinSpaced(intersectPts,0,
+            intersectPts-1);
+
+    igl::slice(genome,colIdx,this->xCoords);
+    colIdx = (colIdx.array() + 1).matrix();
+    igl::slice(genome,colIdx,this->yCoords);
+    colIdx = (colIdx.array() + 1).matrix();
+    igl::slice(genome,colIdx,this->zCoords);
+
+    // Assign optimiser
+    this->optimiser = op;
 
     // Assign an empty Attributes object (always has the same size)
     AttributesPtr att(new Attributes(this->me()));
@@ -35,7 +67,7 @@ void Road::designRoad() {
     this->computeCostElements();
 }
 
-void Road::evaluateRoad() {
+void Road::evaluateRoad(bool learning) {
     // Compute unit cost and revenue
     // Compute the following line only once
     this->getAttributes()->setFixedCosts(1.05*(this->getCosts()->getEarthwork()
@@ -49,7 +81,7 @@ void Road::evaluateRoad() {
             + this->getCosts()->getLengthVariable());
     this->getAttributes()->setUnitVarRevenue(this->getCosts()->getUnitRevenue());
 
-    this->computeOperating();
+    this->computeOperating(learning);
 }
 
 void Road::computeOperating(bool learning) {
@@ -158,6 +190,9 @@ void Road::computeOperating(bool learning) {
                 // optimisation process. By default, we compute the full model
                 // for the best three roads in the GA population to verify the
                 // model accuracy.
+                // Whether the full model is called now or not is based on
+                // whether the function is called from within the population
+                // evaluation routine or the surrogate model learning routine.
 
                 // We use the largest, uninhibited traffic flow in the
                 // simulations
@@ -179,9 +214,21 @@ void Road::computeOperating(bool learning) {
                     aar[ii] = speciesAARs;
                 }
 
-                // Make a decision to simulate the model. As this function is
-                // in a multithreaded environment, we need to put a mutex around
-                // any calls that
+                // Call the surrogate model or full simulation.
+                if (learning) {
+                    // Full simulation
+
+                    // Need to write the routine for full simulation in the Simulation class
+                } else {
+                    // Surrogate model
+                    std::vector< std::vector< std::function<double(RoadPtr)> > >
+                            surrogate = this->optimiser.lock()->getSurrogate();
+                    int run = this->optimiser.lock()->getScenario()->getRun();
+                    int scenario = this->optimiser.lock()->getScenario()->
+                            getCurrentScenario();
+                    auto surrogateFunc = surrogate[scenario][run];
+                    surrogateFunc(this->me());
+                }
             }
             break;            
         case Optimiser::CONTROLLED:

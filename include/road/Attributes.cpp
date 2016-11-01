@@ -1,9 +1,7 @@
 #include "../transportbase.h"
 
 Attributes::Attributes(RoadPtr road) {
-	this->road = road;
-	this->initAAR = 0.0;
-	this->endPopMTE = 0.0;
+        this->road = road;
 	this->unitVarCosts = 0.0;
 	this->unitVarRevenue = 0.0;
 	this->length = 0.0;
@@ -12,12 +10,9 @@ Attributes::Attributes(RoadPtr road) {
 	this->totalValueROV = 0.0;
 }
 
-Attributes::Attributes(double iar, double endpop, double uvc, double uvr,
-		double length, double vpic, double tvmte, double tvrov,
-		RoadPtr road) {
-	this->road = road;
-	this->initAAR = iar;
-	this->endPopMTE = endpop;
+Attributes::Attributes(double uvc, double uvr, double length, double vpic,
+        double tvmte, double tvrov, RoadPtr road) {
+        this->road = road;
 	this->unitVarCosts = uvc;
 	this->unitVarRevenue = uvr;
 	this->length = length;

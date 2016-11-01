@@ -111,6 +111,22 @@ public:
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
+    // These simulation routines are only called when learning the surrogate
+    // model used after each generation in the optimisation routine.
+
+    /**
+     * Runs the full flow simulation over the entire design horizon for all
+     * species encountered by the road.
+     *
+     * This method computes the expected end populations and their standard
+     * deviations that are then used to compute the road value.
+     */
+    void simulateMTE();
+
+    /**
+     * Runs the optimal control simulation
+     */
+    void simulateROVCR();
 
 private:
     std::weak_ptr<Road> road;   /**< Road owning simulator */

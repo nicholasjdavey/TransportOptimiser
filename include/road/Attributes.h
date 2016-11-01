@@ -13,97 +13,97 @@ typedef std::shared_ptr<Attributes> AttributesPtr;
 class Attributes : public std::enable_shared_from_this<Attributes> {
 
 public:
-	// CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
+    // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
-	/**
-	 * Constructor I
-	 *
-	 * Constructs an empty %Attributes object
-	 */
-	Attributes(RoadPtr road);
+    /**
+     * Constructor I
+     *
+     * Constructs an empty %Attributes object
+     */
+    Attributes(RoadPtr road);
 
-	/**
-	 * Constructor II
-	 *
-	 * Constructs an %Attributes object with assigned values
-	 */
-	Attributes(double iar, double endpop, double uvc, double uvr,
-			double length, double vpic, double tvmte, double tvrov,
-			RoadPtr road);
+    /**
+     * Constructor II
+     *
+     * Constructs an %Attributes object with assigned values
+     */
+    Attributes(double uvc, double uvr,
+                    double length, double vpic, double tvmte, double tvrov,
+                    RoadPtr road);
 
-	/**
-	 * Destructor
-	 */
-	~Attributes();
+    /**
+     * Destructor
+     */
+    ~Attributes();
 
-	// ACCESSORS //////////////////////////////////////////////////////////////
+    // ACCESSORS //////////////////////////////////////////////////////////////
 
-	/**
-	 * Returns the road
-	 *
-	 * @return Road as RoadPtr
-	 */
-	RoadPtr getRoad() {
-        return this->road.lock();
-	}
-	/**
-	 * Sets the road
-	 *
-	 * @param road as RoadPtr
-	 */
-	void setRoad(RoadPtr road) {
-        this->road.reset();
-		this->road = road;
-	}
+    /**
+     * Returns the road
+     *
+     * @return Road as RoadPtr
+     */
+    RoadPtr getRoad() {
+    return this->road.lock();
+    }
+    /**
+     * Sets the road
+     *
+     * @param road as RoadPtr
+     */
+    void setRoad(RoadPtr road) {
+    this->road.reset();
+            this->road = road;
+    }
 
-	/**
-	 * Returns the initial animals at risk
-	 *
-	 * @return IAR as double
-	 */
-	double getIAR() {
-		return this->initAAR;
-	}
-	/**
-	 * Sets the initial animals at risk
-	 *
-	 * @param iar as double
-	 */
-	void setIAR(double iar) {
-		this->initAAR = iar;
-	}
+    /**
+     * Returns the initial animals at risk
+     *
+     * @return IAR as Eigen::VectorXd&
+     */
+    Eigen::VectorXd& getIAR() {
+            return this->initAAR;
+    }
+    /**
+     * Sets the initial animals at risk
+     *
+     * @param iar as Eigen::VectorXd&
+     */
+    void setIAR(Eigen::VectorXd& iar) {
+            this->initAAR = iar;
+    }
 
-	/**
-	 * Returns the end population at full traffic flow
-	 *
-	 * @return End population as double
-	 */
-	double getEndPopMTE() {
-		return this->endPopMTE;
-	}
-	/**
-	 * Sets the end population at full traffic flow
-	 *
-	 * @param endpop as double
-	 */
-	void setEndPopMTE(double endpop) {
-		this->endPopMTE = endpop;
-	}
+    /**
+     * Returns the end population at full traffic flow
+     *
+     * @return End population as Eigen::VectorXd&
+     */
+    Eigen::VectorXd& getEndPopMTE() {
+            return this->endPopMTE;
+    }
+    /**
+     * Sets the end population at full traffic flow
+     *
+     * @param endpop as Eigen::VectorXd&
+     */
+    void setEndPopMTE(Eigen::VectorXd& endpop) {
+            this->endPopMTE = endpop;
+    }
 
     /**
      * Returns the end population under controlled flow
      *
-     * @return End population as double
+     * @return End population as Eigen::VectorXd&
      */
-    double getEndPopROV() {
+    Eigen::VectorXd& getEndPopROV() {
         return this->endPopROV;
     }
     /**
      * Sets the end population under controlled flow
      *
-     * @param endpop as double
+     * @param endpop as Eigen::VectorXd&
      */
-    void setEndPopROV(double endpop) {
+    void setEndPopROV(Eigen::VectorXd& endpop) {
         this->endPopROV = endpop;
     }
 
@@ -124,162 +124,162 @@ public:
         this->fixedCosts = fc;
     }
 
-	/**
-	 * Returns the unit variable costs
-	 *
-	 * @return Unit variable costs as double
-	 */
-	double getUnitVarCosts() {
-		return this->unitVarCosts;
-	}
-	/**
-	 * Sets the unit variable costs
-	 *
-	 * @param uvc as double
+    /**
+     * Returns the unit variable costs
+     *
+     * @return Unit variable costs as double
+     */
+    double getUnitVarCosts() {
+            return this->unitVarCosts;
+    }
+    /**
+     * Sets the unit variable costs
+     *
+     * @param uvc as double
      * @note This does not include fuel, which is stochastic
-	 */
-	void setUnitVarCosts(double uvc) {
-		this->unitVarCosts = uvc;
-	}
+     */
+    void setUnitVarCosts(double uvc) {
+            this->unitVarCosts = uvc;
+    }
 
-	/**
-	 * Returns the unit variable revenue
-	 *
-	 * @return Unit variable revenue as double
+    /**
+     * Returns the unit variable revenue
+     *
+     * @return Unit variable revenue as double
      * @note Currently unused as revenue can be stochastic
-	 */
-	double getUnitVarRevenue() {
-		return this->unitVarRevenue;
-	}
-	/**
-	 * Sets the unit variable revenue
-	 *
-	 * @param uvr as double
-	 */
-	void setUnitVarRevenue(double uvr) {
-		this->unitVarRevenue = uvr;
-	}
-
-	/**
-	 * Returns the road length
-	 *
-	 * @return Length as double
-	 */
-	double getLength() {
-		return this->length;
-	}
-	/**
-	 * Sets the road length
-	 *
-	 * @param len as double
-	 */
-	void setLength(double len) {
-		this->length = len;
-	}
-
-	/**
-	 * Returns the variable profit using ROV
-	 *
-	 * @return ROV profit as double
-	 */
-	double getVarProfitIC() {
-		return this->varProfitIC;
-	}
-	/**
-	 * Sets the variable profit using ROV
-	 *
-	 * @param vpic as double
-	 */
-	void setVarProfitIC(double vpic) {
-		this->varProfitIC = vpic;
-	}
-
-	/**
-	 * Returns the total value with fixed traffic flow
-	 *
-	 * @return Total value as double
-	 */
-	double getTotalValueMTE() {
-		return this->totalValueMTE;
-	}
-	/**
-	 * Sets the total value with fixed traffic flow
-	 *
-	 * @param tvmte as double
-	 */
-	void setTotalValueMTE(double tvmte) {
-		this->totalValueMTE = tvmte;
-	}
+     */
+    double getUnitVarRevenue() {
+            return this->unitVarRevenue;
+    }
+    /**
+     * Sets the unit variable revenue
+     *
+     * @param uvr as double
+     */
+    void setUnitVarRevenue(double uvr) {
+            this->unitVarRevenue = uvr;
+    }
 
     /**
-     * Returns the total value standard deviation with MTE
+     * Returns the road length
+     *
+     * @return Length as double
+     */
+    double getLength() {
+            return this->length;
+    }
+    /**
+     * Sets the road length
+     *
+     * @param len as double
+     */
+    void setLength(double len) {
+            this->length = len;
+    }
+
+    /**
+     * Returns the variable profit using ROV
+     *
+     * @return ROV profit as double
+     */
+    double getVarProfitIC() {
+            return this->varProfitIC;
+    }
+    /**
+     * Sets the variable profit using ROV
+     *
+     * @param vpic as double
+     */
+    void setVarProfitIC(double vpic) {
+            this->varProfitIC = vpic;
+    }
+
+    /**
+     * Returns the total value
+     *
+     * @return Total value as double
+     */
+    double getTotalValueMean() {
+            return this->totalValueMean;
+    }
+    /**
+     * Sets the total value
+     *
+     * @param tvm as double
+     */
+    void setTotalValueMean(double tvm) {
+            this->totalValueMean = tvm;
+    }
+
+    /**
+     * Returns the total value standard deviation
      *
      * @return Total value standard deviation as double
      */
-    double getTotalValueMTESD() {
-        return this->totalValueMTESD;
+    double getTotalValueSD() {
+        return this->totalValueSD;
     }
     /**
-     * Sets the total value standard deviation with MTE
+     * Sets the total value standard deviation
      *
-     * @param tvmtesd;
+     * @param tvsd;
      */
-    void setTotalValueMTESD(double tvmtesd) {
-        this->totalValueMTESD = tvmtesd;
+    void setTotalValueSD(double tvsd) {
+        this->totalValueSD = tvsd;
     }
-
-	/**
-	 * Returns the total value with ROV
-	 *
-	 * @return Total value as double
-	 */
-	double getTotalValueROV() {
-		return this->totalValueROV;
-	}
-	/**
-	 * Sets the total value with ROV
-	 *
-	 * @param tvrov as double
-	 */
-	void setTotalValueROV(double tvrov) {
-		this->totalValueROV = tvrov;
-	}
 
     /**
-     * Returns the total value standard deviation with ROV
+     * Returns the total utilisation with ROV
      *
-     * @return Total value standard deviation as double
+     * @return Total utilisation as double
      */
-    double getTotalValueROVSD() {
-        return this->totalValueROVSD;
+    double getTotalUtilisationROV() {
+            return this->totalUtilisationROV;
     }
     /**
-     * Sets the total value standard deviation with ROV
+     * Sets the total utilisation with ROV
      *
-     * @param tvrovsd;
+     * @param turov as double
      */
-    void setTotalValueROVSD(double tvrovsd) {
-        this->totalValueROVSD = tvrovsd;
+    void setTotalUtilisationROV(double turov) {
+            this->totalUtilisationROV = turov;
     }
 
-	// STATIC ROUTINES ////////////////////////////////////////////////////////
+    /**
+     * Returns the total utilisation standard deviation with ROV
+     *
+     * @return Total utilisation standard deviation as double
+     */
+    double getTotalUtilisationROVSD() {
+        return this->totalUtilisationROVSD;
+    }
+    /**
+     * Sets the total utilisation standard deviation with ROV
+     *
+     * @param turovsd;
+     */
+    void setTotalUtilisationROVSD(double turovsd) {
+        this->totalUtilisationROVSD = turovsd;
+    }
 
-	// CALCULATION ROUTINES ///////////////////////////////////////////////////
+    // STATIC ROUTINES ////////////////////////////////////////////////////////
+
+    // CALCULATION ROUTINES ///////////////////////////////////////////////////
 	
 private:
-    std::weak_ptr<Road> road;   	/**< Road with these attributes */
-	double initAAR;					/**< Initial animals at risk */
-	double endPopMTE;				/**< End population if constant full flow */
-    double endPopROV;				/**< Mean end population */
+    std::weak_ptr<Road> road;       /**< Road with these attributes */
+    Eigen::VectorXd initAAR;        /**< Initial animals at risk */
+    Eigen::VectorXd endPopMTE;      /**< End population if constant full flow */
+    Eigen::VectorXd endPopROV;      /**< Mean end population */
     double fixedCosts;              /**< Fixed road costs */
-    double unitVarCosts;			/**< Variable costs per unit traffic per hour per year (excl. stochastic factors) */
-    double unitVarRevenue;			/**< Variable revenue per unit traffic per hour per year (unused) */
-	double length;					/**< Total road length (m) */
-    double varProfitIC;				/**< Operating value */
-	double totalValueMTE;			/**< Overall value, MTE */
-    double totalValueMTESD;         /**< Overall value standard deviation, MTE */
-	double totalValueROV;			/**< Overall value, ROV */
-    double totalValueROVSD;         /**< Overall value standard deviation, ROV */
+    double unitVarCosts;            /**< Variable costs per unit traffic per hour per year (excl. stochastic factors) */
+    double unitVarRevenue;          /**< Variable revenue per unit traffic per hour per year (unused) */
+    double length;                  /**< Total road length (m) */
+    double varProfitIC;             /**< Operating value */
+    double totalValueMean;          /**< Overall value mean */
+    double totalValueSD;            /**< Overall value standard deviation */
+    double totalUtilisationROV;     /**< Overall utilisation mean, ROV */
+    double totalUtilisationROVSD;   /**< Overall utilisation standard deviation, ROV */
 };
 
 #endif

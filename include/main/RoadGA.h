@@ -46,7 +46,8 @@ public:
             long cf, unsigned long gens, unsigned long popSize, double stopTol,
             double confInt, double confLvl, unsigned long habGridRes,
             std::string solScheme, unsigned long noRuns, Optimiser::Type type,
-            double elite, double scale);
+            double elite, double scale, unsigned long learnPeriod, double
+            surrThresh, unsigned long maxLearnNo, unsigned long minLearnNo);
 
     // ACCESSORS //////////////////////////////////////////////////////////////
 
@@ -116,8 +117,8 @@ public:
     /**
      * Returns the outputs at specific stages of the GA
      *
-     * This function saves the best road cost, surrogate fitness, and
-     * average cost for each generation.
+     * This function saves the best road cost, and average cost for each
+     * generation.
      */
     virtual void output();
 
@@ -135,9 +136,16 @@ public:
     virtual int stopCheck();
 
     /**
+     * Creates a default surrogate function for the first iteration of the
+     * road design model.
+     */
+    virtual void defaultSurrogate();
+
+    /**
      * Computes the surrogate function that is updated at each GA iteration
      *
-     * @note This function also updates the costs for roads based on the
+     * @note This function also updates the costs for roads based on the new
+     * surrogate as well as records the fitness.
      */
     virtual void computeSurrogate();
 
@@ -154,6 +162,11 @@ private:
     Eigen::VectorXd dU;         /**< Upper limits for plane domains */
     Eigen::VectorXd dL;         /**< Lower limits for plane domains */
     double theta;               /**< Cutting plane angle (to x axis) */
+    unsigned long learnPeriod;  /**< Maximum period over which to learn surrogate */
+    double surrErr;             /**< Current surrogate standard error */
+    double surrThresh;          /**< Maximum surrogate error allowed */
+    unsigned long maxLearnNo;   /**< Maximum number of roads on which to perform full model */
+    unsigned long minLearnNo;   /**< Minimum number of roads on which to perform full model (best roads found) */
     // Values for current road population /////////////////////////////////////
     Eigen::VectorXd costs;      /**< Total costs of current population */
     Eigen::VectorXd profits;    /**< Unit operating profit per unit time for all roads */
@@ -163,6 +176,7 @@ private:
     // Values for progression of GA ///////////////////////////////////////////
     Eigen::VectorXd best;       /**< Best cost for each generation */
     Eigen::VectorXd av;         /**< Average cost for each generation */
+    Eigen::VectorXd surrFit;    /**< Fitness of the surrogate model */
     // Retained values for surrogates models //////////////////////////////////
     Eigen::MatrixXd iars;       /**< IARS for surrogate model (each column for each species) */
     Eigen::MatrixXd pops;       /**< Full traffic flow end pops for surrogate model */
@@ -236,6 +250,27 @@ private:
      */
     void curveEliminationProcedure(int ii, int jj, int kk, int ll,
             Eigen::MatrixXd& children);
+
+    // Unfortunately, for now the two functions below will result in an extra
+    // copy each. We will look to fix this in future iterations.
+
+    /**
+     * Computes the data from a full simulation of one road for building the
+     * surrogate model for the full traffic flow case.
+     *
+     * @param road as RoadPtr
+     * @return Matrix of data for building surrogate function for MTE
+     */
+    Eigen::MatrixXd surrogateResultsMTE(RoadPtr road);
+
+    /**
+     * Computes the data from a full simulation of one road for building the
+     * surrogate model for the optimally-controllable traffic flow case.
+     *
+     * @param road as RoadPtr
+     * @return Matrix of data for building surrogate function for ROVCR
+     */
+    Eigen::MatrixXd surrogateResultsROVCR(RoadPtr road);
 };
 
 #endif
