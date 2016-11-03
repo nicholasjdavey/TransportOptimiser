@@ -152,7 +152,40 @@ public:
     /**
      * Stores the best road to the matrix of bests roads per test
      */
-    virtual void assignBestRoad();
+    virtual void assignBestRoad();    
+
+    // Unfortunately, for now the two functions below will result in an extra
+    // copy each. We will look to fix this in future iterations.
+
+    /**
+     * Computes the data from a full simulation of one road for building the
+     * surrogate model for the full traffic flow case.
+     *
+     * @param road as RoadPtr
+     * @return Matrix of data for building surrogate function for MTE
+     */
+    virtual Eigen::MatrixXd surrogateResultsMTE(RoadPtr road);
+
+    /**
+     * Computes the data from a full simulation of one road for building the
+     * surrogate model for the optimally-controllable traffic flow case.
+     *
+     * @param road as RoadPtr
+     * @return Matrix of data for building surrogate function for ROVCR
+     */
+    virtual Eigen::MatrixXd surrogateResultsROVCR(RoadPtr road);
+
+    /**
+     * Builds the 2D cubic splines representing the surrogate model for the
+     * fixed traffic flow case
+     */
+    virtual void buildSurrogateModelMTE();
+
+    /**
+     * Builds the ND interpolants representing the surrogate model for the
+     * controllable traffic flow case
+     */
+    virtual void buildSurrogateModelROVCR();
 
 private:
     double scale;               /**< Cooling rate for mutation 3 */
@@ -252,59 +285,6 @@ private:
      */
     void curveEliminationProcedure(int ii, int jj, int kk, int ll,
             Eigen::MatrixXd& children);
-
-    // Unfortunately, for now the two functions below will result in an extra
-    // copy each. We will look to fix this in future iterations.
-
-    /**
-     * Computes the data from a full simulation of one road for building the
-     * surrogate model for the full traffic flow case.
-     *
-     * @param road as RoadPtr
-     * @return Matrix of data for building surrogate function for MTE
-     */
-    Eigen::MatrixXd surrogateResultsMTE(RoadPtr road);
-
-    /**
-     * Computes the data from a full simulation of one road for building the
-     * surrogate model for the optimally-controllable traffic flow case.
-     *
-     * @param road as RoadPtr
-     * @return Matrix of data for building surrogate function for ROVCR
-     */
-    Eigen::MatrixXd surrogateResultsROVCR(RoadPtr road);
-
-    /**
-     * Builds the 2D cubic splines representing the surrogate model for the
-     * fixed traffic flow case
-     */
-    void buildSurrogateModelMTE();
-
-    /**
-     * Builds the ND interpolants representing the surrogate model for the
-     * controllable traffic flow case
-     */
-    void buildSurrogateModelROVCR();
-
-    /**
-     * Evaluates the surrogate model for a given road in the fixed traffic flow
-     * case.
-     *
-     * For each species, a cubic spline of the BSpline class is evaluated
-     *
-     * @param (input) road as RoadPtr
-     * @param (output) pops as Eigen::VectorXd&
-     */
-    void evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd&
-            pops);
-    /**
-     * Evaluates the surrogate model for a given road in the fixed traffic flow
-     * case.
-     *
-     * @param (input) road as RoadPtr
-     * @param (output) use as double&
-     */
-    void evaluateSurrogateModelROVCR(RoadPtr road, double use);
 };
 
 #endif

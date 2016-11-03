@@ -688,6 +688,26 @@ public:
         this->surrogate = surrogate;
     }
 
+    /**
+     * Evaluates the surrogate model for a given road in the fixed traffic flow
+     * case.
+     *
+     * For each species, a cubic spline of the BSpline class is evaluated
+     *
+     * @param (input) road as RoadPtr
+     * @param (output) pops as Eigen::VectorXd&
+     */
+    void evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd&
+            pops);
+    /**
+     * Evaluates the surrogate model for a given road in the fixed traffic flow
+     * case.
+     *
+     * @param (input) road as RoadPtr
+     * @param (output) use as double&
+     */
+    void evaluateSurrogateModelROVCR(RoadPtr road, double use);
+
 ///////////////////////////////////////////////////////////////////////////////
 protected:
     std::vector<std::vector<std::vector<alglib::spline1dinterpolant>>> surrogate;   /**< Surrogate model for evaluating road (for each run) stored as a collection of splines*/

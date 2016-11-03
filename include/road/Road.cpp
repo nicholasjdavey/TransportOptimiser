@@ -218,16 +218,15 @@ void Road::computeOperating(bool learning) {
                 if (learning) {
                     // Full simulation
 
-                    // Need to write the routine for full simulation in the Simulation class
+                    // Need to write the routine for full simulation in the
+                    // Simulation class
                 } else {
                     // Surrogate model
-                    std::vector<std::vector<std::vector<BSplinePtr>>>
-                            surrogate = this->optimiser.lock()->getSurrogate();
-                    int run = this->optimiser.lock()->getScenario()->getRun();
-                    int scenario = this->optimiser.lock()->getScenario()->
-                            getCurrentScenario();
-                    auto surrogateFunc = surrogate[scenario][run];
-                    //surrogateFunc(this->me());
+                    // Vector of end populations
+                    Eigen::VectorXd endPops(this->optimiser.lock()->
+                            getSpecies().size());
+                    this->optimiser.lock()->evaluateSurrogateModelMTE(
+                            this->me(),endPops);
                 }
             }
             break;            

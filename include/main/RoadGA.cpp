@@ -1184,22 +1184,3 @@ void RoadGA::buildSurrogateModelROVCR() {
             this->scenario->getRun()][0];
     */
 }
-
-void RoadGA::evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd& pops) {
-
-    std::vector<SpeciesRoadPatchesPtr> speciesRoadPatches =
-            road->getSpeciesRoadPatches();
-
-    for (int ii = 0; ii < this->species.size(); ii++) {
-
-        Eigen::VectorXd initAAR = speciesRoadPatches[ii]->getInitAAR();
-
-        pops(ii) = alglib::spline1dcalc(this->surrogate[this->scenario->
-                getCurrentScenario()][this->scenario->getRun()][ii],initAAR(
-                initAAR.size()));
-    }
-}
-
-void RoadGA::evaluateSurrogateModelROVCR(RoadPtr road, double use) {
-
-}
