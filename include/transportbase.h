@@ -48,6 +48,12 @@
 // CTPL
 #include <CTPL-master/ctpl.h>
 
+// EXTERNAL PROJECTS INCLUDED IN SOURCE CODE (AS PER USAGE INSTRUCTIONS) //////
+#include "utilities/labelmethod.h"
+#include "utilities/r8lib.hpp"
+#include "utilities/pwl_interp_2d.hpp"
+#include "utilities/interpolation.h"
+
 // PROJECT-SPECIFIC HEADERS (MUST MAINTAIN ORDER SHOWN HERE ) /////////////////
 #include "main/Optimiser.h"
 #include "main/ExperimentalScenario.h"
@@ -81,11 +87,8 @@
 #include "road/Road.h"
 #include "ecology/HabitatType.h"
 #include "ecology/HabitatPatch.h"
-#include "utilities/r8lib.hpp"
-#include "utilities/pwl_interp_2d.hpp"
 #include "utilities/Utility.h"
 #include "road/SpeciesRoadPatches.h"
-#include "utilities/labelmethod.h"
 #include "main/ThreadManager.h"
 #include "main/RoadGA.h"
 

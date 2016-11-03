@@ -1,7 +1,16 @@
 #include "../transportbase.h"
 
 RoadGA::RoadGA() : Optimiser() {
-
+    // Do not use for now
+    this->theta = 0;
+    this->generation = 0;
+    this->scale = scale;
+    this->surrErr = 1;
+    this->noSamples = 0;
+    this->maxLearnNo = 100;
+    this->minLearnNo = 10;
+    this->learnPeriod = 10;
+    this->surrThresh = 0.05;
 }
 
 RoadGA::RoadGA(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
@@ -11,8 +20,9 @@ RoadGA::RoadGA(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
     RegionPtr region, double mr, unsigned long cf, unsigned long gens, unsigned
     long popSize, double stopTol, double confInt, double confLvl, unsigned long
     habGridRes, std::string solScheme, unsigned long noRuns,
-    Optimiser::Type type, double elite, double scale, unsigned long learnPeriod,
-    double surrThresh, unsigned long maxLearnNo, unsigned long minLearnNo) :
+    Optimiser::Type type, double elite, double scale, unsigned long
+    learnPeriod, double surrThresh, unsigned long maxLearnNo, unsigned long
+    minLearnNo) :
     Optimiser(programs, oInputs, desParams, earthworks, unitCosts, varParams,
             species, economic, traffic, region, mr, cf, gens, popSize, stopTol,
             confInt, confLvl, habGridRes, solScheme, noRuns, type, elite) {
@@ -20,11 +30,16 @@ RoadGA::RoadGA(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
     this->theta = 0;
     this->generation = 0;
     this->scale = scale;
-    this->xO = Eigen::VectorXd::Zero(this->designParams->getIntersectionPoints());
-    this->yO = Eigen::VectorXd::Zero(this->designParams->getIntersectionPoints());
-    this->zO = Eigen::VectorXd::Zero(this->designParams->getIntersectionPoints());
-    this->dU = Eigen::VectorXd::Zero(this->designParams->getIntersectionPoints());
-    this->dL = Eigen::VectorXd::Zero(this->designParams->getIntersectionPoints());
+    this->xO = Eigen::VectorXd::Zero(this->designParams->
+            getIntersectionPoints());
+    this->yO = Eigen::VectorXd::Zero(this->designParams->
+            getIntersectionPoints());
+    this->zO = Eigen::VectorXd::Zero(this->designParams->
+            getIntersectionPoints());
+    this->dU = Eigen::VectorXd::Zero(this->designParams->
+            getIntersectionPoints());
+    this->dL = Eigen::VectorXd::Zero(this->designParams->
+            getIntersectionPoints());
 
     int noSpecies = this->species.size();
     this->costs = Eigen::VectorXd::Zero(this->populationSizeGA);
@@ -36,18 +51,23 @@ RoadGA::RoadGA(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
     this->best = Eigen::VectorXd::Zero(this->generations);
     this->av = Eigen::VectorXd::Zero(this->generations);
 
-    this->iars = Eigen::MatrixXd::Zero(this->generations*this->populationSizeGA*
-            this->maxSampleRate,noSpecies);
-    this->pops = Eigen::MatrixXd::Zero(this->generations*this->populationSizeGA*
-            this->maxSampleRate,noSpecies);
+    this->iars = Eigen::MatrixXd::Zero(this->generations*this->
+            populationSizeGA*this->maxSampleRate,noSpecies);
+    this->pops = Eigen::MatrixXd::Zero(this->generations*this->
+            populationSizeGA*this->maxSampleRate,noSpecies);
     this->use = Eigen::VectorXd::Zero(this->generations*this->populationSizeGA*
             this->maxSampleRate);
+    this->popsSD = Eigen::MatrixXd::Zero(this->generations*this->
+            populationSizeGA*this->maxSampleRate,noSpecies);
+    this->useSD = Eigen::VectorXd::Zero(this->generations*this->
+            populationSizeGA*this->maxSampleRate);
 
     this->maxLearnNo = maxLearnNo;
     this->minLearnNo = minLearnNo;
     this->learnPeriod = learnPeriod;
     this->surrThresh = surrThresh;
     this->surrErr = 1;
+    this->noSamples = 0;
 }
 
 void RoadGA::creation() {
@@ -653,8 +673,8 @@ void RoadGA::computeSurrogate() {
     }
 
     // Actual number of roads to sample
-    this->noSamples = ceil(pFull * this->populationSizeGA);
-    Eigen::VectorXi sampleRoads(this->noSamples);
+    int newSamples = ceil(pFull * this->populationSizeGA);
+    Eigen::VectorXi sampleRoads(newSamples);
 
     // Select individuals for computing learning from the full model
     // We first sort the roads by cost
@@ -668,19 +688,19 @@ void RoadGA::computeSurrogate() {
     // Now fill up the test road indices
     std::random_shuffle(sortedIdx.data()+3,sortedIdx.data() +
             this->populationSizeGA);
-    sampleRoads.segment(3,this->noSamples-1) = sortedIdx.segment(3,
-            this->noSamples-1);
+    sampleRoads.segment(3,newSamples-1) = sortedIdx.segment(3,
+            newSamples-1);
 
     // Call the thread pool. The computed function and form of the surrogate
     // models are different under each scenario (MTE vs CONTROLLED).
     if (this->type = Optimiser::MTE) {
 
         std::vector< std::future< Eigen::MatrixXd > >
-                results(this->noSamples);
+                results(newSamples);
 
 
         if (this->threader != nullptr) {
-            for (unsigned long ii = 0; ii < this->noSamples; ii++) {
+            for (unsigned long ii = 0; ii < newSamples; ii++) {
 
                 // Lambda function to be passed to threadpool
                 // This lambda function is MIMO. That is, we pass in the AAR of
@@ -695,20 +715,24 @@ void RoadGA::computeSurrogate() {
                 });
             }
 
-            for (unsigned long ii = 0; ii < this->noSamples; ii++) {
-                results[ii].get();
+            for (unsigned long ii = 0; ii < newSamples; ii++) {
+                Eigen::MatrixXd result = results[ii].get();
+                this->iars.row(this->noSamples + ii) = result.row(0);
+                this->pops.row(this->noSamples + ii) = result.row(1);
+                this->popsSD.row(this->noSamples + ii) = result.row(2);
             }
         }
 
         // Now that we have the results, let's build the surrogate model!!!
 
+
     } else if (this->type = Optimiser::CONTROLLED) {
 
         std::vector< std::future< Eigen::MatrixXd > >
-                results(this->noSamples);
+                results(newSamples);
 
         if (this->threader != nullptr) {
-            for (unsigned long ii = 0; ii < this->noSamples; ii++) {
+            for (unsigned long ii = 0; ii < newSamples; ii++) {
 
                 // Lambda function to be passed to threadpool
                 // This lambda function is MISO. That is, we pass in the AAR of
@@ -725,13 +749,20 @@ void RoadGA::computeSurrogate() {
                 });
             }
 
-            for (unsigned long ii = 0; ii < this->noSamples; ii++) {
-                results[ii].get();
+            for (unsigned long ii = 0; ii < newSamples; ii++) {
+                Eigen::MatrixXd result = results[ii].get();
+                this->iars.row(this->noSamples + ii) = result.block(0,2,1,
+                        result.cols()-2);
+                this->use(this->noSamples + ii) = result(0);
+                this->useSD(this->noSamples + ii) = result(1);
             }
         }
 
         // Now that we have the results, let's build the surrogate model!!!
+
     }
+
+    this->noSamples += newSamples;
 }
 
 void RoadGA::evaluateGeneration() {}
@@ -1053,4 +1084,122 @@ Eigen::MatrixXd RoadGA::surrogateResultsROVCR(RoadPtr road) {
     }
 
     return mteResult;
+}
+
+void RoadGA::buildSurrogateModelMTE() {
+    // This function takes in full model data and the generation and computes
+    // a surrogate model that is used in the Road Fitness function to determine
+    // the end populations based on species AARs.
+
+    // Compute the window size
+    int ww;
+    if (this->noSamples < 50) {
+        ww = 5;
+    } else if (this->noSamples < 100) {
+        ww = 7;
+    } else if (this->noSamples < 500) {
+        ww = std::ceil(0.02*(this->noSamples - 100) + 5);
+    } else {
+        ww = std::ceil(0.01*(this->noSamples - 500) + 15);
+    }
+
+    for (int ii = 0; ii < this->species.size(); ii++) {
+        // Compute the surrogate model training points
+        // Surrogate domain resolution is currently 100 basis functions/nodes
+        // but this can be altered at a later stage to optimiser the number.
+        alglib::ae_int_t m = 100;
+        // Amount to penalise non-linearity. We elect small penalisation.
+        double rho = 0;
+        // Exit status of spline fitting
+        alglib::ae_int_t info;
+
+        // Create the cubic splines and save them
+        /*
+        Utility::ksrlin_vw(this->iars.col(ii),this->pops.col(ii), ww, 100, rx,
+                ry);
+        */
+
+        // Convert sample data to usable form for ALGLIB
+        alglib::real_1d_array inputX;
+        alglib::real_1d_array inputY;
+
+        Eigen::VectorXd abscissa = this->iars.col(ii);
+        Eigen::VectorXd ordinate = this->pops.col(ii);
+
+        inputX.setcontent(this->noSamples,abscissa.data());
+        inputY.setcontent(this->noSamples,ordinate.data());
+
+        alglib::spline1dfitreport report;
+
+        // We call the 1D penalised spline fitting routine of AGLIB to fit a
+        // curve to the data. We will need to tweak this as we investigate the
+        // method some more. Hopefully we can optimise the smoothing parameter.
+        // If this is inadequate, we will revert to the locally-linear kernel
+        // technique, which will require more code or another library.
+        alglib::spline1dfitpenalized(inputX,inputY,m,rho,info,this->surrogate[
+                this->scenario->getCurrentScenario()][this->scenario->getRun()]
+                [ii],report);
+        /**
+        alglib::spline1dbuildcubic(inputX,inputY,5,natural_bound_type,0.0,
+                natural_bound_type, 0.0, this->surrogate[this->scenario->
+                getCurrentScenario()][this->scenario->getRun()][ii]);
+        */
+    }
+}
+
+void RoadGA::buildSurrogateModelROVCR() {
+    // This function takes in full model data and the generation and computes a
+    // surrogate model that is used in the Road Fitness function to determine
+    // the road utility based on species AARs.
+
+    // Compute the window size
+    int ww;
+    if (this->noSamples < 50) {
+        ww = 5;
+    } else if (this->noSamples < 100) {
+        ww = 7;
+    } else if (this->noSamples < 500) {
+        ww = std::ceil(0.02*(this->noSamples - 100) + 5);
+    } else {
+        ww = std::ceil(0.01*(this->noSamples - 500) + 15);
+    }
+
+    /*
+     * Need to figure out a MISO surrogate
+    // Compute the surrogate model training points
+    // Surrogate domain resolution is 100 values
+    Eigen::VectorXd rx(100);
+    Eigen::VectorXd ry(100);
+
+    // Create the cubic splines and save them
+    Utility::ksrlin_vw(this->iars.col(ii),this->pops.col(ii), ww, 100, rx,
+            ry);
+
+    alglib::ae_int_t natural_bound_type = 2;
+    alglib::spline1dbuildcubic(rx,ry,5,natural_bound_type,0.0,
+            natural_bound_type, 0.0, this->surrogate[this->scenario][][]);
+    //BSplinePtr surrSpline(new BSpline<double>(rx.data(),rx.size(),ry.data(),0.0));
+
+    this->surrogate[this->scenario->getCurrentScenario()][
+            this->scenario->getRun()][0];
+    */
+}
+
+void RoadGA::evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd& pops) {
+
+    std::vector<SpeciesRoadPatchesPtr> speciesRoadPatches =
+            road->getSpeciesRoadPatches();
+
+    for (int ii = 0; ii < this->species.size(); ii++) {
+
+        Eigen::VectorXd initAAR = speciesRoadPatches[ii]->getInitAAR();
+
+        pops(ii) = alglib::spline1dcalc(this->surrogate[this->scenario->
+                getCurrentScenario()][this->scenario->getRun()][ii],initAAR(
+                initAAR.size()));
+    }
+}
+
+void RoadGA::evaluateSurrogateModelROVCR(RoadPtr road, double use) {
+
 }

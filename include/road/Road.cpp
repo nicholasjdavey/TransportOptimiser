@@ -221,13 +221,13 @@ void Road::computeOperating(bool learning) {
                     // Need to write the routine for full simulation in the Simulation class
                 } else {
                     // Surrogate model
-                    std::vector< std::vector< std::function<double(RoadPtr)> > >
+                    std::vector<std::vector<std::vector<BSplinePtr>>>
                             surrogate = this->optimiser.lock()->getSurrogate();
                     int run = this->optimiser.lock()->getScenario()->getRun();
                     int scenario = this->optimiser.lock()->getScenario()->
                             getCurrentScenario();
                     auto surrogateFunc = surrogate[scenario][run];
-                    surrogateFunc(this->me());
+                    //surrogateFunc(this->me());
                 }
             }
             break;            

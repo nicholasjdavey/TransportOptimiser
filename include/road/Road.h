@@ -34,6 +34,7 @@ typedef std::shared_ptr<Species> SpeciesPtr;
 class SpeciesRoadPatches;
 typedef std::shared_ptr<SpeciesRoadPatches> SpeciesRoadPatchesPtr;
 
+
 /**
  * Class for managing %Road objects
  */

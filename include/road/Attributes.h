@@ -28,8 +28,8 @@ public:
      * Constructs an %Attributes object with assigned values
      */
     Attributes(double uvc, double uvr,
-                    double length, double vpic, double tvmte, double tvrov,
-                    RoadPtr road);
+            double length, double vpic, double tvm, double tvsd, double
+            turov, double turovsd, RoadPtr road);
 
     /**
      * Destructor

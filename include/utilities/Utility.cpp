@@ -159,3 +159,25 @@ void Utility::cuttingPlanes(const double &xMin, const double &xMax, const
                 (yMin - yO.array())/sin(theta));
     }
 }
+
+void Utility::ksrlin_vw(const Eigen::VectorXd& x, const Eigen::VectorXd& y,
+        const int ww, const int n, Eigen::VectorXd& rx, Eigen::VectorXd& ry) {
+
+    // Check input vectors are of the same size
+    if (x.size() != y.size()) {
+        throw std::invalid_argument("The input x and y vectors must be of type double and the same length.");
+    }
+
+    // Check output vectors are of the required length
+    if ((rx.size() != n) || (ry.size() != n)) {
+        throw std::invalid_argument("The output rx and ry vectors must be the same as the desired resolution (n)");
+    }
+
+    // Resolution must be specified
+
+    // Gaussian kernel function
+    auto kerf = [](double z){return exp(-z*z)/sqrt(2*M_PI);};
+
+    rx = Eigen::VectorXd::LinSpaced(n,x.minCoeff(),x.maxCoeff());
+    ry = Eigen::VectorXd::Zero(n);
+}

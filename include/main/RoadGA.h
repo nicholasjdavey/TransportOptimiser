@@ -180,7 +180,9 @@ private:
     // Retained values for surrogates models //////////////////////////////////
     Eigen::MatrixXd iars;       /**< IARS for surrogate model (each column for each species) */
     Eigen::MatrixXd pops;       /**< Full traffic flow end pops for surrogate model */
+    Eigen::MatrixXd popsSD;     /**< Standard deviations of above */
     Eigen::VectorXd use;        /**< Utilities (ROV) for surrogate models */
+    Eigen::VectorXd useSD;      /**< Utilities standard deviations */
     unsigned long noSamples;    /**< Current number of samples available for building surrogates */
 
 // PRIVATE ROUTINES ///////////////////////////////////////////////////////////
@@ -271,6 +273,38 @@ private:
      * @return Matrix of data for building surrogate function for ROVCR
      */
     Eigen::MatrixXd surrogateResultsROVCR(RoadPtr road);
+
+    /**
+     * Builds the 2D cubic splines representing the surrogate model for the
+     * fixed traffic flow case
+     */
+    void buildSurrogateModelMTE();
+
+    /**
+     * Builds the ND interpolants representing the surrogate model for the
+     * controllable traffic flow case
+     */
+    void buildSurrogateModelROVCR();
+
+    /**
+     * Evaluates the surrogate model for a given road in the fixed traffic flow
+     * case.
+     *
+     * For each species, a cubic spline of the BSpline class is evaluated
+     *
+     * @param (input) road as RoadPtr
+     * @param (output) pops as Eigen::VectorXd&
+     */
+    void evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd&
+            pops);
+    /**
+     * Evaluates the surrogate model for a given road in the fixed traffic flow
+     * case.
+     *
+     * @param (input) road as RoadPtr
+     * @param (output) use as double&
+     */
+    void evaluateSurrogateModelROVCR(RoadPtr road, double use);
 };
 
 #endif

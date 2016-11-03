@@ -219,6 +219,28 @@ namespace Utility {
             double& zE, const long& n, Eigen::VectorXd& xO, Eigen::VectorXd&
             yO, Eigen::VectorXd& zO, Eigen::VectorXd& dU, Eigen::VectorXd& dL,
             double &theta);
+
+    /**
+     * Computes local linear kernel smoothing regression with variable window
+     * width, producing a vector of inputs (x) mapped to a vector of outputs
+     *
+     * This routine is adapted from the MATLAB code of Fernando Duarte (Feb 24,
+     * 2012)
+     *
+     * Additional reference for mathematics:
+     *
+     * 1. Nonparametric econometrics, by Adrian Pagan and Aman Ullah,
+     *      Cambridge University Press, 1999, ISBN 0521586119, 9780521586115
+     *
+     * @param (input) x as const Eigen::VectorXd&
+     * @param (input) y as const Eigen::VectorXd&
+     * @param (input) ww is the window size as int
+     * @param (input) n is the number of x values as int
+     * @param (output) rx as Eigen::VectorXd&
+     * @param (output) ry as Eigen::VectorXd&
+     */
+    void ksrlin_vw(const Eigen::VectorXd& x, const Eigen::VectorXd& y, const
+            int ww, const int n, Eigen::VectorXd& rx, Eigen::VectorXd& ry);
 }
 
 #endif
