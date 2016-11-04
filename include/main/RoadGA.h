@@ -164,7 +164,7 @@ public:
      * @param road as RoadPtr
      * @return Matrix of data for building surrogate function for MTE
      */
-    virtual Eigen::MatrixXd surrogateResultsMTE(RoadPtr road);
+    virtual void surrogateResultsMTE(RoadPtr road, Eigen::MatrixXd &mteResult);
 
     /**
      * Computes the data from a full simulation of one road for building the
@@ -173,7 +173,7 @@ public:
      * @param road as RoadPtr
      * @return Matrix of data for building surrogate function for ROVCR
      */
-    virtual Eigen::MatrixXd surrogateResultsROVCR(RoadPtr road);
+    virtual void surrogateResultsROVCR(RoadPtr road, Eigen::MatrixXd &rovResult);
 
     /**
      * Builds the 2D cubic splines representing the surrogate model for the

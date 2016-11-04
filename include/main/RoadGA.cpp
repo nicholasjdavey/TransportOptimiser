@@ -699,29 +699,29 @@ void RoadGA::computeSurrogate() {
                 results(newSamples);
 
 
-        if (this->threader != nullptr) {
-            for (unsigned long ii = 0; ii < newSamples; ii++) {
+    if (this->threader != nullptr) {
+        for (unsigned long ii = 0; ii < newSamples; ii++) {
 
-                // Lambda function to be passed to threadpool
-                // This lambda function is MIMO. That is, we pass in the AAR of
-                // each species in the region at time t=0 and the respective
-                // resulting end populations to build f_i for each species,
-                // where
-                //      endPop_i = f_i(aar_i)
-                results[ii] = this->threader->push([this](int id) {
-                    RoadPtr road(new Road(this->me(),
-                            this->currentRoadPopulation.row(id)));
-                    return this->surrogateResultsMTE(road);
-                });
-            }
-
-            for (unsigned long ii = 0; ii < newSamples; ii++) {
-                Eigen::MatrixXd result = results[ii].get();
-                this->iars.row(this->noSamples + ii) = result.row(0);
-                this->pops.row(this->noSamples + ii) = result.row(1);
-                this->popsSD.row(this->noSamples + ii) = result.row(2);
-            }
+            // Lambda function to be passed to threadpool
+            // This lambda function is MIMO. That is, we pass in the AAR of
+            // each species in the region at time t=0 and the respective
+            // resulting end populations to build f_i for each species,
+            // where
+            //      endPop_i = f_i(aar_i)
+            results[ii] = this->threader->push([this](int id) {
+                RoadPtr road(new Road(this->me(),
+                        this->currentRoadPopulation.row(id)));
+                return this->surrogateResultsMTE(road);
+            });
         }
+
+        for (unsigned long ii = 0; ii < newSamples; ii++) {
+            Eigen::MatrixXd result = results[ii].get();
+            this->iars.row(this->noSamples + ii) = result.row(0);
+            this->pops.row(this->noSamples + ii) = result.row(1);
+            this->popsSD.row(this->noSamples + ii) = result.row(2);
+        }
+    }
 
         // Now that we have the results, let's build the surrogate model!!!
 
@@ -1050,8 +1050,7 @@ void RoadGA::curveEliminationProcedure(int ii, int jj, int kk, int ll,
     }
 }
 
-Eigen::MatrixXd RoadGA::surrogateResultsMTE(RoadPtr road) {
-    Eigen::MatrixXd mteResult(3,this->species.size());
+void RoadGA::surrogateResultsMTE(RoadPtr road, Eigen::MatrixXd& mteResult) {
 
     road->designRoad();
     road->evaluateRoad(true);
@@ -1064,26 +1063,21 @@ Eigen::MatrixXd RoadGA::surrogateResultsMTE(RoadPtr road) {
         mteResult(1,ii) = species[ii]->getEndPopMean();
         mteResult(2,ii) = species[ii]->getEndPopSD();
     }
-
-    return mteResult;
 }
 
-Eigen::MatrixXd RoadGA::surrogateResultsROVCR(RoadPtr road) {
-    Eigen::MatrixXd mteResult(1,this->species.size()+2);
+void RoadGA::surrogateResultsROVCR(RoadPtr road, Eigen::MatrixXd& rovResult) {
 
     road->designRoad();
     road->evaluateRoad(true);
     std::vector<SpeciesRoadPatchesPtr> species =
             road->getSpeciesRoadPatches();
 
-    mteResult(0,1) = road->getAttributes()->getTotalUtilisationROV();
-    mteResult(0,2) = road->getAttributes()->getTotalUtilisationROVSD();
+    rovResult(0,1) = road->getAttributes()->getTotalUtilisationROV();
+    rovResult(0,2) = road->getAttributes()->getTotalUtilisationROVSD();
     for (int ii = 0; ii < this->species.size(); ii++) {
         Eigen::VectorXd iars = species[ii]->getInitAAR();
-        mteResult(0,ii+2) = iars(iars.size()-1);
+        rovResult(0,ii+2) = iars(iars.size()-1);
     }
-
-    return mteResult;
 }
 
 void RoadGA::buildSurrogateModelMTE() {
