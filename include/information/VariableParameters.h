@@ -172,6 +172,8 @@ public:
     /**
      * Returns the commodity price standard deviation multiplier
      *
+     * @note This vector's first element is always 0 (i.e. no
+     * uncertainty case).
      * @return Commodity price standard deviation multiplier as const Eigen::VectorXd&
      */
     const Eigen::VectorXd& getCommoditySDMultipliers() {

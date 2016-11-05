@@ -104,9 +104,8 @@ void Optimiser::optimiseRoad() {
     // Perform sampling to ensure a good distribution of AARs.
 }
 
-
-
-void Optimiser::evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd& pops) {
+void Optimiser::evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd
+        &pops, Eigen::VectorXd& popsSD) {
 
     std::vector<SpeciesRoadPatchesPtr> speciesRoadPatches =
             road->getSpeciesRoadPatches();
@@ -115,12 +114,16 @@ void Optimiser::evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd& pops) {
 
         Eigen::VectorXd initAAR = speciesRoadPatches[ii]->getInitAAR();
 
-        pops(ii) = alglib::spline1dcalc(this->surrogate[this->scenario->
+        pops(ii) = alglib::spline1dcalc(this->surrogate[2*this->scenario->
                 getCurrentScenario()][this->scenario->getRun()][ii],initAAR(
+                initAAR.size()));
+        popsSD(ii) = alglib::spline1dcalc(this->surrogate[2*this->scenario->
+                getCurrentScenario()+1][this->scenario->getRun()][ii],initAAR(
                 initAAR.size()));
     }
 }
 
-void Optimiser::evaluateSurrogateModelROVCR(RoadPtr road, double use) {
+void Optimiser::evaluateSurrogateModelROVCR(RoadPtr road, double use, double
+        usesd) {
 
 }

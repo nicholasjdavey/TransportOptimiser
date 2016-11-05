@@ -35,6 +35,7 @@ void Uncertainty::computeExpPV() {
 
     // Place to store simulation results
     std::vector< std::future<double> > results(paths);
+    Eigen::VectorXd finalResults(paths);
 
     if (threader != nullptr) {
         for (unsigned long ii = 0; ii < paths; ii++)  {
@@ -45,6 +46,7 @@ void Uncertainty::computeExpPV() {
 
         for (unsigned long ii = 0; ii < paths; ii++) {
             total += results[ii].get();
+            finalResults(ii) = results[ii].get();
         }
 
     } else {
@@ -54,6 +56,7 @@ void Uncertainty::computeExpPV() {
     }
 
     this->expPV = total/paths;
+    this->expPVSD = sqrt(((finalResults.array() - expPV).square()).sum());
 }
 
 double Uncertainty::singlePathValue() {

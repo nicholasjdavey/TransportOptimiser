@@ -123,11 +123,6 @@ public:
      */
     void simulateMTE();
 
-    /**
-     * Runs the optimal control simulation
-     */
-    void simulateROVCR();
-
 private:
     std::weak_ptr<Road> road;   /**< Road owning simulator */
     Eigen::VectorXd endPops;    /**< End populations from all sims */

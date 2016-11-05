@@ -444,6 +444,11 @@ private:
      * @return iar as Eigen::VectorXd&
      */
     void compueteInitialAAR(SpeciesRoadPatchesPtr srp, Eigen::VectorXd& iar);
+
+    /**
+     * Computes the operating profit for fixed traffic flow
+     */
+    void computeVarProfitICFixedFlow();
 };
 
 #endif

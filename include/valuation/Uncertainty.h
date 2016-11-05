@@ -193,6 +193,23 @@ public:
     }
 
     /**
+     * Returns the SD of present value of future cash flows of one unit use
+     *
+     * @return Present value SD as double
+     */
+    double getExpPVSD() {
+        return this->expPVSD;
+    }
+    /**
+     * Sets the SD of present value of future cash flows of one unit use
+     *
+     * @param pvsd as double
+     */
+    void setExpPVSD(double pvsd) {
+        this->expPVSD = pvsd;
+    }
+
+    /**
      * Returns the exponential distribution parameter for jump size
      *
      * @return Jump size distribution parameter as double
@@ -257,6 +274,7 @@ private:
     double poissonJump;                 /**< Poisson parameter for jump sizes */
     double jumpProb;                    /**< Probability of a jump at each time */
     double expPV;                       /**< Expected PV of all future CF from MC sims per unit */
+    double expPVSD;                     /**< Standard deviation of PV of all future CF from MC sims */
     bool active;                        /**< Used in problem? */
 
     // Private functions //////////////////////////////////////////////////////

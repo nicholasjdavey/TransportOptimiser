@@ -79,9 +79,13 @@ void Road::evaluateRoad(bool learning) {
     this->getAttributes()->setUnitVarCosts(
             this->getCosts()->getAccidentVariable()
             + this->getCosts()->getLengthVariable());
-    this->getAttributes()->setUnitVarRevenue(this->getCosts()->getUnitRevenue());
+    this->getAttributes()->setUnitVarRevenue(this->getCosts()->
+            getUnitRevenue());
 
     this->computeOperating(learning);
+
+    this->getAttributes()->setTotalValueMean(this->attributes->
+            getVarProfitIC() + this->attributes->getFixedCosts());
 }
 
 void Road::computeOperating(bool learning) {
@@ -91,8 +95,10 @@ void Road::computeOperating(bool learning) {
     switch (optPtrShared->getType()) {
         case Optimiser::SIMPLEPENALTY:
             {
-                // The penalty here refers to the end population being below
-                // the required end population
+                // The penalty here refers to the road passing through habitat
+                // areas. Therefore, the separate penalty related to the actual.
+                // population number is already accounted for and is not
+                // computed here.
                 this->getCosts()->setPenalty(0.0);
 
                 // If there is no uncertainty in the fuel or commodity prices,
@@ -135,47 +141,19 @@ void Road::computeOperating(bool learning) {
                             ->getCosts()->getUnitFuelCost()).transpose()*
                             fuelPrices - this->getCosts()->getUnitRevenue()*
                             orePrice)*factor);
+
+                    // There is no variability in the final value of the
+                    // operating stage
+                    this->getAttributes()->setTotalValueSD(0.0);
+
                 } else {
-                    // Call the simulation routine to vary the commodity prices
-                    // using Monte Carlo simulation. N.B. These commodity
-                    // prices could represent any sort of benefit or economic
-                    // feature, so the principle used in this software is
-                    // actually useful in many other scenarios.
-                    //
-                    // N.B. The routine must have been called prior
-                    const Eigen::VectorXd& Qs = optPtrShared
-                            ->getTrafficProgram()->getFlowRates();
-                    const std::vector<VehiclePtr>& vehicles = optPtrShared
-                            ->getTraffic()->getVehicles();
-                    double Q = Qs(Qs.size());
+                    // Call the routine to evaluate operating costs
+                    this->computeVarProfitICFixedFlow();
 
-                    Eigen::VectorXd fuelExpPV1UnitTraffic;
-
-                    for (int ii = 0; ii < vehicles.size(); ii++) {
-                        fuelExpPV1UnitTraffic(ii) = vehicles[ii]->getFuel()->
-                                getExpPV();
-                    }
-
-                    // Compute the price of a tonne of raw ore
-                    double orePrice = 0.0;
-                    double r = optPtrShared->getEconomic()->getRRR();
-                    double t = optPtrShared->getEconomic()->getYears();
-                    double g = optPtrShared->getTraffic()->getGR();
-                    double factor = (1/(r-g) - (1/(r-g))*pow((1+g)/(1+r),t));
-
-                    const std::vector<CommodityPtr>& commodities = optPtrShared
-                            ->getEconomic()->getCommodities();
-
-                    for (int ii = 0; ii < commodities.size(); ii++) {
-                        orePrice += commodities[ii]->getOreContent()*
-                                commodities[ii]->getExpPV();
-                    }
-
-                    this->getAttributes()->setVarProfitIC(Q*(this
-                            ->getAttributes()->getUnitVarCosts()*factor
-                            + (this->getCosts()->getUnitFuelCost()).transpose()
-                            *fuelExpPV1UnitTraffic - this->getCosts()
-                            ->getUnitRevenue()*orePrice));
+                    // We need to extend this to account for variability. This
+                    // will need to take into account covariances and is left
+                    // as future work. For now, we set the variability to zero
+                    this->getAttributes()->setTotalValueSD(0.0);
                 }
             }
             break;
@@ -196,16 +174,107 @@ void Road::computeOperating(bool learning) {
 
                 // We use the largest, uninhibited traffic flow in the
                 // simulations
+
+                // Call the surrogate model or full simulation.
+
+                if (learning) {
+                    // Animal penalty component
+                    // Full simulation
+                    SimulatorPtr simulator(new Simulator(this->me()));
+                    this->simulator.reset();
+                    this->simulator = simulator;
+                    this->simulator->simulateMTE();
+                    // Need to write the routine for full simulation in the
+                    // Simulation class
+                    // NOTE: THIS ROUTINE IS RUN IN PARALLEL!!!!!!!!!!!!!!!!!!!
+                    // Profits, populations, penalties, iar etc. are computed
+                    // within the full model, and not here as is the case when
+                    // we use a surrogate instead.
+
+                } else {
+                    // Surrogate model
+
+                    TrafficProgramPtr program = (this->getOptimiser()
+                            ->getPrograms())[this->getOptimiser()->getScenario()
+                            ->getProgram()];
+                    int controls = program->getFlowRates().size();
+
+                    // First compute initial AAR (this is an input to the
+                    // surrogate)
+                    this->computeSimulationPatches();
+                    int noSpecies = this->optimiser.lock()->getSpecies().size();
+
+                    Eigen::VectorXd aar(noSpecies);
+
+                    for (int ii = 0; ii < noSpecies; ii++) {
+                        Eigen::VectorXd speciesAARs(controls);
+                        this->srp[ii]->computeInitialAAR(speciesAARs);
+                        aar[ii] = speciesAARs(speciesAARs.size());
+                    }
+                    this->attributes->setIAR(aar);
+
+                    // Vector of end populations
+                    Eigen::VectorXd endPops(this->optimiser.lock()->
+                            getSpecies().size());
+                    Eigen::VectorXd endPopsSD(this->optimiser.lock()->
+                            getSpecies().size());
+                    this->optimiser.lock()->evaluateSurrogateModelMTE(
+                            this->me(),endPops,endPopsSD);
+
+                    this->attributes->setEndPopMTE(endPops);
+                    this->attributes->setEndPopMTESD(endPopsSD);
+
+                    // Call the routine to evaluate the operating costs
+                    this->computeVarProfitICFixedFlow();
+
+                    // The penalty here refers to the end population being below
+                    // the required end population. We base the penalty on the
+                    // Xth percentile, where we wish the likelihood of the end
+                    // populations being above threshold to be X per cent.
+
+                    double penalty = 0.0;
+
+                    for (int ii = 0; ii < noSpecies; ii++) {
+                        double roadPopXconf = Utility::NormalCDFInverse((1 -
+                                this->optimiser.lock()->
+                                getConfidenceInterval()));
+                        double threshold = this->optimiser.lock()->
+                                getSpecies()[ii]->getThreshold();
+                        double perAnimalPenalty = (this->optimiser.lock())->
+                                getSpecies()[ii]->getCostPerAnimal();
+
+                        penalty += (double)(threshold > (roadPopXconf*
+                                endPopsSD(ii) + endPops(ii)))*(threshold -
+                                (roadPopXconf*endPopsSD(ii) + endPops(ii)))*
+                                perAnimalPenalty;
+                    }
+                    this->getCosts()->setPenalty(0.0);
+                }
+            }
+            break;
+
+        case Optimiser::CONTROLLED:
+            {
+                // Compute the road value in the ROV case. We progressively
+                // learn a surrogate function to limit the calls to the
+                // computationally-intensive animal simulation model. This
+                // surrogate is stored as a function pointer in the Optimiser
+                // class that is called here and updated during the
+                // optimisation process. By default, we compute the full model
+                // for the best three roads in the GA population to verify the
+                // model accuracy.
+                // Whether the full model is called now or not is based on
+                // whether the function is called from within the population
+                // evaluation routine or the surrogate model learning routine.
+
+                // First compute the initial AAR under the full traffic flow
+                // (this is an input to the surrogate)
                 TrafficProgramPtr program = (this->getOptimiser()
                         ->getPrograms())[this->getOptimiser()->getScenario()
                         ->getProgram()];
                 int controls = program->getFlowRates().size();
 
-                // First compute initial AAR (this is an input to the
-                // surrogate)
-                this->computeSimulationPatches();
                 int noSpecies = this->optimiser.lock()->getSpecies().size();
-
                 std::vector<Eigen::VectorXd> aar(noSpecies);
 
                 for (int ii = 0; ii < noSpecies; ii++) {
@@ -217,21 +286,15 @@ void Road::computeOperating(bool learning) {
                 // Call the surrogate model or full simulation.
                 if (learning) {
                     // Full simulation
-
-                    // Need to write the routine for full simulation in the
-                    // Simulation class
-                } else {
-                    // Surrogate model
-                    // Vector of end populations
-                    Eigen::VectorXd endPops(this->optimiser.lock()->
-                            getSpecies().size());
-                    this->optimiser.lock()->evaluateSurrogateModelMTE(
-                            this->me(),endPops);
+                    SimulatorPtr simulator(new Simulator(this->me()));
+                    this->simulator.reset();
+                    this->simulator = simulator;
+                    this->simulator->simulateROVCR();
                 }
+                // There is no penalty for this road as traffic is controlled
+                // to maintain the populations above critical thresholds.
+                this->getCosts()->setPenalty(0.0);
             }
-            break;            
-        case Optimiser::CONTROLLED:
-            {}
             break;
         default:
             {}
@@ -313,4 +376,51 @@ void Road::computeSimulationPatches() {
         this->srp[ii].reset();
         this->srp[ii] = speciesPatches;
     }
+}
+
+void Road::computeVarProfitICFixedFlow() {
+    // Call the simulation routine to vary the commodity prices
+    // using Monte Carlo simulation. N.B. These commodity
+    // prices could represent any sort of benefit or economic
+    // feature, so the principle used in this software is
+    // actually useful in many other scenarios.
+    //
+    // N.B. The routine must have been called prior so that the
+    // expected and standard deviations of the present value of
+    // the uncertainty are available.
+    OptimiserPtr optPtrShared = this->optimiser.lock();
+
+    const Eigen::VectorXd& Qs = optPtrShared
+            ->getTrafficProgram()->getFlowRates();
+    const std::vector<VehiclePtr>& vehicles = optPtrShared
+            ->getTraffic()->getVehicles();
+    double Q = Qs(Qs.size());
+
+    Eigen::VectorXd fuelExpPV1UnitTraffic;
+
+    for (int ii = 0; ii < vehicles.size(); ii++) {
+        fuelExpPV1UnitTraffic(ii) = vehicles[ii]->getFuel()->
+                getExpPV();
+    }
+
+    // Compute the price of a tonne of raw ore
+    double orePrice = 0.0;
+    double r = optPtrShared->getEconomic()->getRRR();
+    double t = optPtrShared->getEconomic()->getYears();
+    double g = optPtrShared->getTraffic()->getGR();
+    double factor = (1/(r-g) - (1/(r-g))*pow((1+g)/(1+r),t));
+
+    const std::vector<CommodityPtr>& commodities = optPtrShared
+            ->getEconomic()->getCommodities();
+
+    for (int ii = 0; ii < commodities.size(); ii++) {
+        orePrice += commodities[ii]->getOreContent()*
+                commodities[ii]->getExpPV();
+    }
+
+    this->getAttributes()->setVarProfitIC(Q*(this
+            ->getAttributes()->getUnitVarCosts()*factor
+            + (this->getCosts()->getUnitFuelCost()).transpose()
+            *fuelExpPV1UnitTraffic - this->getCosts()
+            ->getUnitRevenue()*orePrice));
 }

@@ -7,3 +7,7 @@ MonteCarloROV::MonteCarloROV() {
 
 MonteCarloROV::~MonteCarloROV() {
 }
+
+void MonteCarloROV::simulateROVCR() {
+
+}

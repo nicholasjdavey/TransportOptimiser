@@ -686,6 +686,8 @@ void RoadGA::computeSurrogate() {
     sampleRoads.segment(0,3) = sortedIdx.segment(0,3);
 
     // Now fill up the test road indices
+    // N.B. NEED TO PUT IN A ROUTINE HERE THAT SELECTS ROADS THAT HAVE DESIGN
+    // POINTS THAT ARE MOST DISSIMILAR FROM THE REST OF THE POPULATION.
     std::random_shuffle(sortedIdx.data()+3,sortedIdx.data() +
             this->populationSizeGA);
     sampleRoads.segment(3,newSamples-1) = sortedIdx.segment(3,
@@ -695,71 +697,48 @@ void RoadGA::computeSurrogate() {
     // models are different under each scenario (MTE vs CONTROLLED).
     if (this->type = Optimiser::MTE) {
 
-        std::vector< std::future< Eigen::MatrixXd > >
-                results(newSamples);
-
-
-    if (this->threader != nullptr) {
         for (unsigned long ii = 0; ii < newSamples; ii++) {
 
-            // Lambda function to be passed to threadpool
-            // This lambda function is MIMO. That is, we pass in the AAR of
-            // each species in the region at time t=0 and the respective
-            // resulting end populations to build f_i for each species,
-            // where
+            // As each full model requires its own parallel routine and this
+            // routine is quite intensive, we call the full model for each
+            // road serially. Furthermore, we do not want to add new roads to
+            // the threadpool
             //      endPop_i = f_i(aar_i)
-            results[ii] = this->threader->push([this](int id) {
-                RoadPtr road(new Road(this->me(),
-                        this->currentRoadPopulation.row(id)));
-                return this->surrogateResultsMTE(road);
-            });
-        }
+            RoadPtr road(new Road(this->me(),
+                    this->currentRoadPopulation.row(ii)));
+            Eigen::MatrixXd mteResult(3,this->species.size());
+            this->surrogateResultsMTE(road,mteResult);
 
-        for (unsigned long ii = 0; ii < newSamples; ii++) {
-            Eigen::MatrixXd result = results[ii].get();
-            this->iars.row(this->noSamples + ii) = result.row(0);
-            this->pops.row(this->noSamples + ii) = result.row(1);
-            this->popsSD.row(this->noSamples + ii) = result.row(2);
+            this->iars.row(this->noSamples + ii) = mteResult.row(0);
+            this->pops.row(this->noSamples + ii) = mteResult.row(1);
+            this->popsSD.row(this->noSamples + ii) = mteResult.row(2);
         }
-    }
 
         // Now that we have the results, let's build the surrogate model!!!
-
+        this->buildSurrogateModelMTE();
 
     } else if (this->type = Optimiser::CONTROLLED) {
 
-        std::vector< std::future< Eigen::MatrixXd > >
-                results(newSamples);
+        for (unsigned long ii = 0; ii < newSamples; ii++) {
 
-        if (this->threader != nullptr) {
-            for (unsigned long ii = 0; ii < newSamples; ii++) {
+            // As each full model requires its own parallel routine and this
+            // routine is quite intensive, we call the full model for each
+            // road serially. Furthermore, we do not want to add new roads to
+            // the threadpool
+            //      endPop_i = f_i(aar_i)
+            RoadPtr road(new Road(this->me(),
+                    this->currentRoadPopulation.row(ii)));
+            Eigen::MatrixXd rovResult(1,this->species.size()+2);
+            this->surrogateResultsROVCR(road,rovResult);
 
-                // Lambda function to be passed to threadpool
-                // This lambda function is MISO. That is, we pass in the AAR of
-                // each species in the region at time t=0 and the resulting
-                // overall road utilisation to build f,
-                // where
-                //      road_utilisation = f(aar_0,...,aar_n)
-                //
-                // where n is the number of animal species
-                results[ii] = this->threader->push([this](int id) {
-                    RoadPtr road(new Road(this->me(),
-                            this->currentRoadPopulation.row(id)));
-                    return this->surrogateResultsMTE(road);
-                });
-            }
-
-            for (unsigned long ii = 0; ii < newSamples; ii++) {
-                Eigen::MatrixXd result = results[ii].get();
-                this->iars.row(this->noSamples + ii) = result.block(0,2,1,
-                        result.cols()-2);
-                this->use(this->noSamples + ii) = result(0);
-                this->useSD(this->noSamples + ii) = result(1);
-            }
+            this->iars.row(this->noSamples + ii) = rovResult.block(0,2,
+                    1,this->species.size());
+            this->use(this->noSamples + ii) = rovResult(0,0);
+            this->useSD(this->noSamples + ii) = rovResult(0,1);
         }
 
         // Now that we have the results, let's build the surrogate model!!!
-
+        this->buildSurrogateModelROVCR();
     }
 
     this->noSamples += newSamples;
@@ -1082,8 +1061,8 @@ void RoadGA::surrogateResultsROVCR(RoadPtr road, Eigen::MatrixXd& rovResult) {
 
 void RoadGA::buildSurrogateModelMTE() {
     // This function takes in full model data and the generation and computes
-    // a surrogate model that is used in the Road Fitness function to determine
-    // the end populations based on species AARs.
+    // two surrogate models that are used in the Road Fitness function to determine
+    // the end populations (and standard deviations) based on species AARs.
 
     // Compute the window size
     int ww;
@@ -1129,15 +1108,21 @@ void RoadGA::buildSurrogateModelMTE() {
         // curve to the data. We will need to tweak this as we investigate the
         // method some more. Hopefully we can optimise the smoothing parameter.
         // If this is inadequate, we will revert to the locally-linear kernel
-        // technique, which will require more code or another library.
+        // technique, which will require more code or another library. We use
+        // the mean for each road as the input.
+        //
+        // Mean
         alglib::spline1dfitpenalized(inputX,inputY,m,rho,info,this->surrogate[
-                this->scenario->getCurrentScenario()][this->scenario->getRun()]
-                [ii],report);
-        /**
-        alglib::spline1dbuildcubic(inputX,inputY,5,natural_bound_type,0.0,
-                natural_bound_type, 0.0, this->surrogate[this->scenario->
-                getCurrentScenario()][this->scenario->getRun()][ii]);
-        */
+                2*this->scenario->getCurrentScenario()][this->scenario->
+                getRun()][ii],report);
+        // Standard deviation
+        ordinate = this->popsSD.col(ii);
+
+        inputX.setcontent(this->noSamples,abscissa.data());
+        inputY.setcontent(this->noSamples,ordinate.data());
+        alglib::spline1dfitpenalized(inputX,inputY,m,rho,info,this->surrogate[
+                2*this->scenario->getCurrentScenario()+1][this->scenario->
+                getRun()][ii],report);
     }
 }
 

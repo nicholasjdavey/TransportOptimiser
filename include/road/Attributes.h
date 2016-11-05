@@ -91,20 +91,20 @@ public:
     }
 
     /**
-     * Returns the end population under controlled flow
+     * Returns the end population standard deviation under controlled flow
      *
-     * @return End population as Eigen::VectorXd&
+     * @return End population SD as Eigen::VectorXd&
      */
-    Eigen::VectorXd& getEndPopROV() {
-        return this->endPopROV;
+    Eigen::VectorXd& getEndPopMTESD() {
+        return this->endPopMTESD;
     }
     /**
-     * Sets the end population under controlled flow
+     * Sets the end population standard deviation under controlled flow
      *
-     * @param endpop as Eigen::VectorXd&
+     * @param endpopsd as Eigen::VectorXd&
      */
-    void setEndPopROV(Eigen::VectorXd& endpop) {
-        this->endPopROV = endpop;
+    void setEndPopMTESD(Eigen::VectorXd& endpopsd) {
+        this->endPopMTESD = endpopsd;
     }
 
     /**
@@ -215,6 +215,8 @@ public:
      * Returns the total value standard deviation
      *
      * @return Total value standard deviation as double
+     * @note This standard deviation is simply the standard deviation of the
+     * operating profit as fixed costs are known
      */
     double getTotalValueSD() {
         return this->totalValueSD;
@@ -270,7 +272,7 @@ private:
     std::weak_ptr<Road> road;       /**< Road with these attributes */
     Eigen::VectorXd initAAR;        /**< Initial animals at risk */
     Eigen::VectorXd endPopMTE;      /**< End population if constant full flow */
-    Eigen::VectorXd endPopROV;      /**< Mean end population */
+    Eigen::VectorXd endPopMTESD;    /**< End population mean under full flow */
     double fixedCosts;              /**< Fixed road costs */
     double unitVarCosts;            /**< Variable costs per unit traffic per hour per year (excl. stochastic factors) */
     double unitVarRevenue;          /**< Variable revenue per unit traffic per hour per year (unused) */
