@@ -180,6 +180,7 @@ void Road::computeOperating(bool learning) {
                 if (learning) {
                     // Animal penalty component
                     // Full simulation
+                    this->computeSimulationPatches();
                     SimulatorPtr simulator(new Simulator(this->me()));
                     this->simulator.reset();
                     this->simulator = simulator;

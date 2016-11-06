@@ -128,6 +128,26 @@ private:
     Eigen::VectorXd endPops;    /**< End populations from all sims */
     double initAAR;             /**< Initial animals at risk */
     double penalty;             /**< Extinction penalty */
+
+    // PRIVATE ROUTINES ///////////////////////////////////////////////////////
+
+    /**
+     * This step is performed at every time step of the animal simulation model
+     * to account for competition between species. It is called after animal
+     * movement and mortality related to roads but before accounting for
+     * natural birth and death.
+     *
+     * @note This function is currently not in use
+     */
+    void animalCompetition();
+
+    /**
+     * This is the last step performed at each time step of the animal simulation
+     * model. It accounts for natural birth and death in each habitat patch after
+     * the effects of road movement and mortality and species competition have
+     * taken place.
+     */
+    void naturalBirthDeath();
 };
 
 #endif
