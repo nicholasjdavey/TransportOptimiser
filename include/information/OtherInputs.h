@@ -234,18 +234,18 @@ public:
 	// CALCULATION ROUTINES ///////////////////////////////////////////////////
 
 private:
-	std::string inputDataFile;	/**< Absolute location of input data file */
+    std::string inputDataFile;      /**< Absolute location of input data file */
 	std::string outputResultsFile;	/**< Absolute location of output results */
 	std::string inputTerrainFile;	/**< Absolute location of terrain file */
 	std::string existingRoadsFile;	/**< Absolute location of roads file */
-	double minLat;			/**< Minimum latitude for window */
-	double maxLat;			/**< Maximum latitude for window */
-	double minLon;			/**< Minimum longitude for window */
-	double maxLon;			/**< Maximum longitude for window */
-	unsigned long latPoints;	/**< Number of latitude points for grid */
-	unsigned long lonPoints;	/**< Number of longitude points for grid */
-	unsigned long habGridRes;	/**< Habitat grid resolution in longest dimension */
-    unsigned long noPaths;      /**< Number of simulation paths */
+    double minLat;                  /**< Minimum latitude for window */
+    double maxLat;                  /**< Maximum latitude for window */
+    double minLon;                  /**< Minimum longitude for window */
+    double maxLon;                  /**< Maximum longitude for window */
+    unsigned long latPoints;        /**< Number of latitude points for grid */
+    unsigned long lonPoints;        /**< Number of longitude points for grid */
+    unsigned long habGridRes;       /**< Habitat grid resolution in longest dimension */
+    unsigned long noPaths;          /**< Number of simulation paths */
 };
 
 #endif

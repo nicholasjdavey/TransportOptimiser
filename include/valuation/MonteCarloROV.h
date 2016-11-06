@@ -16,7 +16,7 @@ typedef std::shared_ptr<MonteCarloROV> MonteCarloROVPtr;
 /**
  * Class for managing ROV analysis with Monte Carlo simulation
  */
-class MonteCarloROV : public std::enable_shared_from_this<MonteCarloROV> {
+class MonteCarloROV {
 
 public:
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////

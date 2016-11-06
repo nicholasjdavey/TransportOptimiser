@@ -14,7 +14,7 @@ typedef std::shared_ptr<Simulator> SimulatorPtr;
  * Class for managing simulations
  */
 class Simulator : public MonteCarloROV, 
-		public std::enable_shared_from_this<Simulator> {
+        public std::enable_shared_from_this<Simulator> {
 
 public:
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
