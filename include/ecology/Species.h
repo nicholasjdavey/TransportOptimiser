@@ -386,8 +386,8 @@ private:
     double lambdaSD;                    /**< Movement propensity standard deviation */
     double rangingCoeffMean;            /**< Ranging coefficient mean */
     double rangingCoeffSD;              /**< Ranging coefficient standard deviation */
-    double growthRateMean;              /**< Mean growth rate parameters */
-    double growthRateSD;                /**< Growth rate standard devation */
+    double growthRateMean;              /**< Mean growth rate (%p.a.) */
+    double growthRateSD;                /**< Growth rate (%p.a.) standard devation */
     double lengthMean;                  /**< Mean species length */
     double lengthSD;                    /**< Species length standard deviation */
     double speedMean;                   /**< Mean species road crossing speed */
@@ -396,7 +396,7 @@ private:
     std::vector<HabitatTypePtr> habitat;/**< Habitat type */
     Eigen::MatrixXi habitatMap;         /**< Breakdown of region into the four base habitat types */
     Eigen::MatrixXd populationMap;      /**< Population of animals in each cell */
-    double threshold;                   /**< Target threshold as faction of initial population */
+    double threshold;                   /**< Target threshold as proportion of initial population */
     SpeciesPtr me();                    /**< Enables sharing from this */
 };
 

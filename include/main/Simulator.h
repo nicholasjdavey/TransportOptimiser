@@ -7,6 +7,9 @@ typedef std::shared_ptr<MonteCarloROV> MonteCarloROVPtr;
 class Road;
 typedef std::shared_ptr<Road> RoadPtr;
 
+class SpeciesRoadPatches;
+typedef std::shared_ptr<SpeciesRoadPatches> SpeciesRoadPatchesPtr;
+
 class Simulator;
 typedef std::shared_ptr<Simulator> SimulatorPtr;
 
@@ -120,8 +123,22 @@ public:
      *
      * This method computes the expected end populations and their standard
      * deviations that are then used to compute the road value.
+     *
+     * If the calling routine wishes to keep the population in each patch over
+     * time (i.e. so as to visualise the progression of a single population
+     * path) we pass in a reference to a matrix. If we do not enter a matrix,
+     * then we only produce the end metrics but not a realised simulation path
+     * that can be visualised via a post-processing routine.
      */
     void simulateMTE();
+
+    /**
+     * Overloaded version of the preceding function for storing an entire
+     * single path for visualisation
+     *
+     * @param (output) visualiseResults as std::vector<Eigen::MatrixXd>&
+     */
+    void simulateMTE(std::vector<Eigen::MatrixXd> &visualiseResults);
 
 private:
     std::weak_ptr<Road> road;   /**< Road owning simulator */
@@ -146,8 +163,45 @@ private:
      * model. It accounts for natural birth and death in each habitat patch after
      * the effects of road movement and mortality and species competition have
      * taken place.
+     *
+     * @param (input) species as const SpeciesRoadPatchesPtr
+     * @param (input) capacities as const Eigen::VectorXd&
+     * @param (input/output) pops as Eigen::VectorXd&
      */
-    void naturalBirthDeath();
+    void naturalBirthDeath(const SpeciesRoadPatchesPtr species, const
+            Eigen::VectorXd& capacities, Eigen::VectorXd& pops);
+
+    /**
+     * Simulates a single path up to the design horizon for one species
+     *
+     * This overloaded function returns an entire single path for all patches
+     *
+     * @param (input) species as const std::vector<SpeciesRoadPatchesPtr>&
+     * @param (input) initPops as const std::vector<Eigen::VectorXd>&
+     * @param (input) capacities as const std::vector<Eigen::VectorXd>&
+     * @param (output) finalPops as Eigen::MatrixXd&
+     */
+    void simulateMTEPath(const std::vector<SpeciesRoadPatchesPtr>& species,
+            const std::vector<Eigen::VectorXd>& initPops, const
+            std::vector<Eigen::VectorXd>& capacities,
+            std::vector<Eigen::VectorXd>& finalPops);
+
+    /**
+     * Simulates a single path up to the design horizon for all species
+     *
+     * This overloaded function returns an entire single path for all patches.
+     * This routine is used for visualising a single possible outcome for one
+     * species in the region.
+     *
+     * @param (input) species as const std::vector<SpeciesRoadPatchesPtr>&
+     * @param (input) initPops as const std::vector<Eigen::VectorXd>&
+     * @param (input) capacities as const std::vector<Eigen::VectorXd>&
+     * @param (output) visualiseResults as std::vector<Eigen::MatrixXd>&
+     */
+    void simulateMTEPath(const std::vector<SpeciesRoadPatchesPtr>& species,
+            const std::vector<Eigen::VectorXd>& initPops, const
+            std::vector<Eigen::VectorXd> &capacities,
+            std::vector<Eigen::MatrixXd> &visualiseResults);
 };
 
 #endif

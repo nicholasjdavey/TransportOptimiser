@@ -4,6 +4,7 @@ SpeciesRoadPatches::SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr
         species, RoadPtr road) : Uncertainty(optimiser) {
     this->species = species;
     this->road = road;
+    this->initPop = 0.0;
 }
 
 SpeciesRoadPatches::SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr
@@ -13,6 +14,7 @@ SpeciesRoadPatches::SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr
 
     this->species = species;
     this->road = road;
+    this->initPop = 0.0;
 }
 
 SpeciesRoadPatches::~SpeciesRoadPatches() {}
@@ -156,6 +158,7 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
                         // For now do not store the indices of the points
                         this->habPatch[patches] = hab;
                         patches++;
+                        this->initPop += thisPop;
                         // Find distance to road here?
                     }
                 }

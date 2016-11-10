@@ -344,7 +344,6 @@ void RoadGA::mutation(const Eigen::VectorXi &parentsIdx,
                  << std::endl;
     }
 
-
     unsigned long intersectPts = this->designParams->getIntersectionPoints();
 
     std::default_random_engine generator;
@@ -624,14 +623,6 @@ void RoadGA::output() {
     // best road
 }
 
-void RoadGA::defaultSurrogate() {
-
-    int scenario = this->getScenario()->getCurrentScenario();
-    int run = this->getScenario()->getRun();
-
-
-}
-
 void RoadGA::computeSurrogate() {
     // Select individuals for computing learning for the surrogate model
     // First select the proportion of individuals to compute for each
@@ -695,7 +686,7 @@ void RoadGA::computeSurrogate() {
 
     // Call the thread pool. The computed function and form of the surrogate
     // models are different under each scenario (MTE vs CONTROLLED).
-    if (this->type = Optimiser::MTE) {
+    if (this->type == Optimiser::MTE) {
 
         for (unsigned long ii = 0; ii < newSamples; ii++) {
 
@@ -717,7 +708,7 @@ void RoadGA::computeSurrogate() {
         // Now that we have the results, let's build the surrogate model!!!
         this->buildSurrogateModelMTE();
 
-    } else if (this->type = Optimiser::CONTROLLED) {
+    } else if (this->type == Optimiser::CONTROLLED) {
 
         for (unsigned long ii = 0; ii < newSamples; ii++) {
 
@@ -744,7 +735,12 @@ void RoadGA::computeSurrogate() {
     this->noSamples += newSamples;
 }
 
-void RoadGA::evaluateGeneration() {}
+void RoadGA::evaluateGeneration() {
+    // Computes the current population of roads using a surrogate function
+    // instead of the full model where necessary
+
+
+}
 
 void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
         Eigen::VectorXi& pe, RoadGA::Selection selector) {
@@ -1036,11 +1032,15 @@ void RoadGA::surrogateResultsMTE(RoadPtr road, Eigen::MatrixXd& mteResult) {
     std::vector<SpeciesRoadPatchesPtr> species =
             road->getSpeciesRoadPatches();
 
+    Eigen::VectorXd initPops(this->species.size());
+
     for (int ii = 0; ii < this->species.size(); ii++) {
+        // We normalise by the starting population
+        initPops(ii) = species->getInitPop();
         Eigen::VectorXd iars = species[ii]->getInitAAR();
         mteResult(0,ii) = iars(iars.size()-1);
-        mteResult(1,ii) = species[ii]->getEndPopMean();
-        mteResult(2,ii) = species[ii]->getEndPopSD();
+        mteResult(1,ii) = species[ii]->getEndPopMean()/initPops(ii);
+        mteResult(2,ii) = species[ii]->getEndPopSD()/initPops(ii);
     }
 }
 
@@ -1056,6 +1056,51 @@ void RoadGA::surrogateResultsROVCR(RoadPtr road, Eigen::MatrixXd& rovResult) {
     for (int ii = 0; ii < this->species.size(); ii++) {
         Eigen::VectorXd iars = species[ii]->getInitAAR();
         rovResult(0,ii+2) = iars(iars.size()-1);
+    }
+}
+
+void RoadGA::defaultSurrogate() {
+
+    if (this->type == Optimiser::MTE) {
+        // Default is to assume no animals die for any road
+
+        for (int ii = 0; ii < this->species.size(); ii++) {
+            // The default surrogate is a straight line at the initial
+            // population
+            alglib::ae_int_t m = 100;
+            // Amount to penalise non-linearity. We elect small penalisation.
+            double rho = 0;
+            // Exit status of spline fitting
+            alglib::ae_int_t info;
+
+            // Convert sample data to usable form for ALGLIB
+            alglib::real_1d_array inputX;
+            alglib::real_1d_array inputY;
+
+            Eigen::VectorXd abscissa = Eigen::VectorXd::LinSpaced(11,0,1);
+            Eigen::VectorXd ordinate = Eigen::VectorXd::Constant(11,1.0);
+
+            inputX.setcontent(this->noSamples,abscissa.data());
+            inputY.setcontent(this->noSamples,ordinate.data());
+
+            alglib::spline1dfitreport report;
+
+            // Mean
+            alglib::spline1dfitpenalized(inputX,inputY,m,rho,info,this->surrogate[
+                    2*this->scenario->getCurrentScenario()][this->scenario->
+                    getRun()][ii],report);
+            // Standard deviation
+            ordinate = Eigen::VectorXd::Zero(11);
+
+            inputX.setcontent(this->noSamples,abscissa.data());
+            inputY.setcontent(this->noSamples,ordinate.data());
+            alglib::spline1dfitpenalized(inputX,inputY,m,rho,info,this->surrogate[
+                    2*this->scenario->getCurrentScenario()+1][this->scenario->
+                    getRun()][ii],report);
+        }
+
+    } else if (this->type == Optimiser::CONTROLLED) {
+
     }
 }
 

@@ -84,6 +84,23 @@ public:
     }
 
     /**
+     * Returns the initial Species population in the region
+     *
+     * @return Initial overall population as double
+     */
+    double getInitPop() {
+        return this->initPop;
+    }
+    /**
+     * Sets the initial Species population in the region
+     *
+     * @param ip as double
+     */
+    void setInitPop(double ip) {
+        this->initPop = ip;
+    }
+
+    /**
      * Returns the habitat patches for simulations
      *
      * @return Habitat patches as const std::vector<HabitatPatchPtr>&
@@ -252,6 +269,7 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 private:
     SpeciesPtr species;                     /**< Speices used */
+    double initPop;                         /**< Initial species population */
     std::weak_ptr<Road> road;               /**< Corresponding road */
     std::vector<HabitatPatchPtr> habPatch;  /**< Corresponding habitat patches */
     Eigen::MatrixXd dists;                  /**< Distances between patches */
