@@ -92,6 +92,7 @@ public:
      * @param mr as double
      * @param cf as unsigned long
      * @param gens as unsigned long
+     * @param sg as unsigned long
      * @param popSize as unsigned long
      * @param stopTol as double
      * @param confInt as double
@@ -103,14 +104,15 @@ public:
      * @param threader as ThreadManagerPtr
      * @param elite as double
      */
-    Optimiser(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr oInputs,
-            DesignParametersPtr desParams, EarthworkCostsPtr earthworks,
-            UnitCostsPtr unitCosts, VariableParametersPtr varParams, const
-            std::vector<SpeciesPtr>& species, EconomicPtr economic, TrafficPtr
-            traffic, RegionPtr region, double mr, unsigned long cf, unsigned
-            long gens, unsigned long popSize, double stopTol, double confInt,
-            double confLvl, unsigned long habGridRes, std::string solScheme,
-            unsigned long noRuns, Optimiser::Type type, double elite);
+    Optimiser(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
+            oInputs, DesignParametersPtr desParams, EarthworkCostsPtr
+            earthworks, UnitCostsPtr unitCosts, VariableParametersPtr
+            varParams, const std::vector<SpeciesPtr>& species, EconomicPtr
+            economic, TrafficPtr traffic, RegionPtr region, double mr, unsigned
+            long cf, unsigned long gens, unsigned long popSize, double stopTol,
+            double confInt, double confLvl, unsigned long habGridRes,
+            std::string solScheme, unsigned long noRuns, Optimiser::Type type,
+            double elite, unsigned long sg);
     /**
      * Destructor
      */
@@ -479,6 +481,23 @@ public:
     }
 
     /**
+     * Returns the max number of generations to continue without improvement
+     *
+     * @return Number of stall generations permitted as unsigned long
+     */
+    unsigned long getStallGens() {
+        return this->stallGenerations;
+    }
+    /**
+     * Sets the max number of generations to continue without improvement
+     *
+     * @param sg as unsigned long
+     */
+    void setStallGens(unsigned long sg) {
+        this->stallGenerations = sg;
+    }
+
+    /**
      * Returns the GA population size
      *
      * @return Population size as unsigned long
@@ -730,9 +749,11 @@ protected:
     RegionPtr region;                                                               /**< Region of interest */
     UnitCostsPtr unitCosts;                                                         /**< Unit Costs */
     unsigned long generation;                                                       /**< Current generation in optimisation process */
+    unsigned long stallGen;                                                         /**< Number of sequential stall generations so far */
     double mutationRate;                                                            /**< Mutation rate */
     double crossoverFrac;                                                           /**< Crossover fraction */
     unsigned long generations;                                                      /**< Generations required */
+    unsigned long stallGenerations;                                                 /**< Maximum number of stall generations at which to stop the algorithm */
     unsigned long populationSizeGA;                                                 /**< Population size for GA */
     double stoppingTol;                                                             /**< Stopping tolerance */
     double confInt;                                                                 /**< Required confidence interval */

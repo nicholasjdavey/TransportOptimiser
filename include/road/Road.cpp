@@ -250,6 +250,7 @@ void Road::computeOperating(bool learning) {
                                 perAnimalPenalty;
                     }
                     this->getCosts()->setPenalty(0.0);
+                    this->getAttributes()->setTotalValueSD(0.0);
                 }
             }
             break;

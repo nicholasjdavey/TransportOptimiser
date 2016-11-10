@@ -21,8 +21,19 @@ class RoadGA : public Optimiser,
 public:
     // ENUMERATIONS ///////////////////////////////////////////////////////////
     typedef enum {
-        TOURNAMENT      /**< Tournament selection routine */
+        STOCHASTIC_UNIFORM,
+        REMAINDER,
+        UNIFORM,
+        ROULETTE,
+        TOURNAMENT
     } Selection;
+
+    typedef enum {
+        RANK,
+        PROPORTIONAL,
+        TOP,
+        SHIFT,
+    } Scaling;
 
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
@@ -47,9 +58,268 @@ public:
             double confInt, double confLvl, unsigned long habGridRes,
             std::string solScheme, unsigned long noRuns, Optimiser::Type type,
             double elite, double scale, unsigned long learnPeriod, double
-            surrThresh, unsigned long maxLearnNo, unsigned long minLearnNo);
+            surrThresh, unsigned long maxLearnNo, unsigned long minLearnNo,
+            unsigned long sg, RoadGA::Selection selector, RoadGA::Scaling
+            fitscale);
 
     // ACCESSORS //////////////////////////////////////////////////////////////
+
+    /**
+     * Returns the cooling rate for mutation
+     *
+     * @return Cooling rate for mutation as double
+     */
+    double getScale(){
+        return this->scale;
+    }
+    /**
+     * Sets the cooling rate for mutation
+     *
+     * @param scale as double
+     */
+    void setScale(double scale) {
+        this->scale = scale;
+    }
+
+    /**
+     * Returns the X coordinates of plane origins as Eigen::VectorXd&
+     *
+     * @return X coordinate of plane origins as Eigen::VectorXd&
+     */
+    Eigen::VectorXd& getXO() {
+        return this->xO;
+    }
+    /**
+     * @brief setXO
+     * @param xO
+     */
+    void setXO(Eigen::VectorXd& xO) {
+        this->xO = xO;
+    }
+
+    Eigen::VectorXd& getYO() {
+        return this->yO;
+    }
+
+    void setYO(Eigen::VectorXd& yO) {
+        this->yO = yO;
+    }
+
+    Eigen::VectorXd& getZO() {
+        return this->zO;
+    }
+
+    void setZO(Eigen::VectorXd& zO) {
+        this->zO;
+    }
+
+    Eigen::VectorXd& getdU() {
+        return this->dU;
+    }
+
+    void setDU(Eigen::VectorXd& dU) {
+        this->dU = dU;
+    }
+
+    Eigen::VectorXd& getDL() {
+        return this->dL;
+    }
+
+    void setDL(Eigen::VectorXd& dL) {
+        this->dL = dL;
+    }
+
+    double getTheta() {
+        return this->theta;
+    }
+
+    void setTheta(double theta) {
+        this->theta = theta;
+    }
+
+    unsigned long getLearningPeriod() {
+        return this->learnPeriod;
+    }
+
+    void setLearningPeriod(unsigned long lp) {
+        this->learnPeriod = lp;
+    }
+
+    double getSurrogateError() {
+        return this->surrErr;
+    }
+
+    void setSurrogateError(double se) {
+        this->surrErr = se;
+    }
+
+    double getSurrogateThreshold() {
+        return this->surrThresh;
+    }
+
+    void setSurrogateThreshold(double st) {
+        this->surrThresh = st;
+    }
+
+    unsigned long getMaxLearnNo() {
+        return this->maxLearnNo;
+    }
+
+    void setMaxLearnNo(unsigned long mln) {
+        this->maxLearnNo = mln;
+    }
+
+    unsigned long getMinLearnNo() {
+        return this->minLearnNo;
+    }
+
+    void setMinLearnNo(unsigned long mln) {
+        this->minLearnNo = mln;
+    }
+
+    Eigen::VectorXd& getCosts() {
+        return this->costs;
+    }
+
+    void setCosts(Eigen::VectorXd& costs) {
+        this->costs = costs;
+    }
+
+    Eigen::VectorXd& getProfits() {
+        return this->profits;
+    }
+
+    void setProfits(Eigen::VectorXd& profits) {
+        this->profits = profits;
+    }
+
+    Eigen::MatrixXd& getIARSCurr() {
+        return this->iarsCurr;
+    }
+
+    void setIARSCurr(Eigen::MatrixXd& iarsCurr) {
+        this->iarsCurr = iarsCurr;
+    }
+
+    Eigen::MatrixXd& getPopsCurr() {
+        return this->popsCurr;
+    }
+
+    void setPopsCurr(Eigen::MatrixXd& pc) {
+        this->popsCurr = pc;
+    }
+
+    Eigen::VectorXd& getUseCurr() {
+        return this->useCurr;
+    }
+
+    void setUseCurr(Eigen::VectorXd& uc) {
+        this->useCurr = uc;
+    }
+
+    Eigen::VectorXd& getBest() {
+        return this->best;
+    }
+
+    void setBest(Eigen::VectorXd& best) {
+        this->best = best;
+    }
+
+    Eigen::VectorXd& getAverage() {
+        return this->av;
+    }
+
+    void setAverage(Eigen::VectorXd& av) {
+        this->av = av;
+    }
+
+    Eigen::VectorXd& getSurrFit() {
+        return this->surrFit;
+    }
+
+    void setSurrFit(Eigen::VectorXd& sf) {
+        this->surrFit = sf;
+    }
+
+    Eigen::MatrixXd& getIARS() {
+        return this->iars;
+    }
+
+    void setIARS(Eigen::MatrixXd& iars) {
+        this->iars = iars;
+    }
+
+    Eigen::MatrixXd& getPops() {
+        return this->pops;
+    }
+
+    void setPops(Eigen::MatrixXd& pops) {
+        this->pops = pops;
+    }
+
+    Eigen::MatrixXd& getPopsSD() {
+        return this->popsSD;
+    }
+
+    void setPopsSD(Eigen::MatrixXd& psd) {
+        this->popsSD = psd;
+    }
+
+    Eigen::VectorXd& getUse() {
+        return this->use;
+    }
+
+    void setUse(Eigen::VectorXd& use) {
+        this->use = use;
+    }
+
+    Eigen::VectorXd& getUseSD() {
+        return this->useSD;
+    }
+
+    void setUseSD(Eigen::VectorXd& useSD) {
+        this->useSD = useSD;
+    }
+
+    unsigned long getNoSamples() {
+        return this->noSamples;
+    }
+
+    void setNoSamples(unsigned long ns) {
+        this->noSamples = ns;
+    }
+
+    RoadGA::Selection getSelector() {
+        return this->selector;
+    }
+
+    void setSelector(RoadGA::Selection selector) {
+        this->selector = selector;
+    }
+
+    RoadGA::Scaling getFitScaling() {
+        return this->fitScaling;
+    }
+
+    void setFitScaling(RoadGA::Scaling fs) {
+        this->fitScaling = fs;
+    }
+
+    unsigned long getTopProportion() {
+        return this->topProp;
+    }
+
+    void setTopProportion(unsigned long top) {
+        this->topProp = top;
+    }
+
+    double getMaxSurvivalRate() {
+        return this->maxSurvivalRate;
+    }
+
+    void setMaxSurvivalRate(double msr) {
+        this->maxSurvivalRate = msr;
+    }
 
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
@@ -188,7 +458,7 @@ public:
     virtual void buildSurrogateModelROVCR();
 
 private:
-    double scale;               /**< Cooling rate for mutation 3 */
+    double scale;               /**< Cooling rate for mutation */
     Eigen::VectorXd xO;         /**< X coordinate of plane origins */
     Eigen::VectorXd yO;         /**< Y coordinate of plane origins */
     Eigen::VectorXd zO;         /**< Z coordinate of plane origins */
@@ -217,6 +487,10 @@ private:
     Eigen::VectorXd use;        /**< Utilities (ROV) for surrogate models */
     Eigen::VectorXd useSD;      /**< Utilities standard deviations */
     unsigned long noSamples;    /**< Current number of samples available for building surrogates */
+    RoadGA::Selection selector; /**< Parents selection routine */
+    RoadGA::Scaling fitScaling; /**< Scaling method used for fitness scaling */
+    unsigned long topProp;      /**< Proportion to consider as top individuals */
+    double maxSurvivalRate;     /**< Maximum survival rate for shifLinearScaling */
 
 // PRIVATE ROUTINES ///////////////////////////////////////////////////////////
 
@@ -285,6 +559,23 @@ private:
      */
     void curveEliminationProcedure(int ii, int jj, int kk, int ll,
             Eigen::MatrixXd& children);
+
+    /**
+     * Determines if the function has stalled
+     *
+     * @return Test result as boolean
+     */
+    bool stallTest();
+
+    /**
+     * Orders and scales the parent roads
+     *
+     * @param scaleType as RoadGA::Scaling
+     * @param (output) parents as Eigen::VectorXi&
+     * @param (output) scaling as Eigen::VectorXd&
+     */
+    scaling(RoadGA::Scaling scaleType, Eigen::VectorXi& parents,
+            Eigen::VectorXd& scaling);
 };
 
 #endif

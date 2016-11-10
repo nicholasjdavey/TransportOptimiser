@@ -12,7 +12,7 @@ Optimiser::Optimiser(const std::vector<TrafficProgramPtr>& programs,
         double mr, unsigned long cf, unsigned long gens, unsigned long popSize,
         double stopTol, double confInt, double confLvl, unsigned long
         habGridRes, std::string solScheme, unsigned long noRuns,
-        Optimiser::Type type, double elite) {
+        Optimiser::Type type, double elite, unsigned long sg) {
 
 //	std::vector<RoadPtr>* crp(new std::vector<RoadPtr>());
     this->type = type;
@@ -61,6 +61,8 @@ Optimiser::Optimiser(const std::vector<TrafficProgramPtr>& programs,
     this->confLvl = confLvl;
     this->habGridRes = habGridRes;
     this->solutionScheme = solScheme;
+    this->stallGenerations = sg;
+    this->stallGen = 0;
 }
 
 Optimiser::~Optimiser() {

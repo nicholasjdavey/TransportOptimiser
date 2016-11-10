@@ -22,10 +22,11 @@ RoadGA::RoadGA(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
     habGridRes, std::string solScheme, unsigned long noRuns,
     Optimiser::Type type, double elite, double scale, unsigned long
     learnPeriod, double surrThresh, unsigned long maxLearnNo, unsigned long
-    minLearnNo) :
+    minLearnNo, unsigned long sg, RoadGA::Selection selector, RoadGA::Scaling
+    fitscale) :
     Optimiser(programs, oInputs, desParams, earthworks, unitCosts, varParams,
             species, economic, traffic, region, mr, cf, gens, popSize, stopTol,
-            confInt, confLvl, habGridRes, solScheme, noRuns, type, elite) {
+            confInt, confLvl, habGridRes, solScheme, noRuns, type, elite, sg) {
 
     this->theta = 0;
     this->generation = 0;
@@ -68,6 +69,8 @@ RoadGA::RoadGA(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
     this->surrThresh = surrThresh;
     this->surrErr = 1;
     this->noSamples = 0;
+    this->selector = selector;
+    this->fitScaling = fitscale;
 }
 
 void RoadGA::creation() {
@@ -736,26 +739,211 @@ void RoadGA::computeSurrogate() {
 }
 
 void RoadGA::evaluateGeneration() {
+    // Initialise the current vectors used to zero
+    this->costs = Eigen::VectorXd::Zero(this->populationSizeGA);
+    this->profits = Eigen::VectorXd::Zero(this->populationSizeGA);
+    this->iarsCurr = Eigen::MatrixXd::Zero(this->populationSizeGA,
+            this->species.size());
+    this->popsCurr = Eigen::MatrixXd::Zero(this->populationSizeGA,
+            this->species.size());
+
+    if (this->type == Optimiser::CONTROLLED) {
+        this->profits = Eigen::VectorXd::Zero(this->populationSizeGA);
+    }
+
     // Computes the current population of roads using a surrogate function
     // instead of the full model where necessary
+    OptimiserPtr optimiser = this->optimiser.lock();
+    ThreadManagerPtr threader = optimiser->getThreadManager();
+    unsigned int paths = optimiser->getOtherInputs()->getNoPaths();
 
+    std::vector<std::future<void>> results(paths);
 
+    if (threader != nullptr) {
+        // If multithreading is enabled
+        for (unsigned long ii = 0; ii < paths; ii++) {
+            // Push onto the pool with a lambda expression
+            results[ii] = threader->push([this](int id){
+                RoadPtr road(new Road(this->currentRoadPopulation.row(ii)));
+                road->designRoad();
+                road->evaluateRoad();
+
+                this->costs(ii) = road->getAttributes()->getTotalValueMean();
+                this->profits(ii) = road->getAttributes()->getVarProfitIC();
+
+                for (int jj = 0; jj < this->species.size(); jj++) {
+                    this->iarsCurr(ii,jj) = road->getAttributes()->getIAR()(jj);
+                    this->popsCurr(ii,jj) = road->getAttributes()->
+                            getEndPopMTE()(jj);
+                }
+            });
+        }
+
+        for (unsigned long ii = 0; ii < paths; ii++) {
+            results[ii]->get();
+        }
+
+    } else {
+        // Run serially
+        for (unsigned long ii = 0; ii < paths; ii++) {
+            RoadPtr road(new Road(this->currentRoadPopulation.row(ii)));
+            road->designRoad();
+            road->evaluateRoad();
+
+            this->costs(ii) = road->getAttributes()->getTotalValueMean();
+            this->profits(ii) = road->getAttributes()->getVarProfitIC();
+
+            for (int jj = 0; jj < this->species.size(); jj++) {
+                this->iarsCurr(ii,jj) = road->getAttributes()->getIAR()(jj);
+                this->popsCurr(ii,jj) = road->getAttributes()->
+                        getEndPopMTE()(jj);
+            }
+        }
+    }
+}
+
+void RoadGA::scaling(RoadGA::Scaling scaleType, Eigen::VectorXi& parents,
+        Eigen::VectorXd& scaling) {
+    // Select individuals for computing learning from the full model
+    // We first sort the roads by cost
+    igl::sort(this->costs,1,true,scaling,parents);
+
+    switch (scaleType) {
+    case RoadGA::RANK:
+    {
+        scaling = 1.0 / (parents.cast<double>().array() + 1);
+        break;
+    }
+    case RoadGA::PROPORTIONAL:
+    {
+        // This requires no changes
+        break;
+    }
+    case RoadGA::TOP:
+    {
+        // Only the top proportion of individuals remain
+        break;
+    }
+    case RoadGA::SHIFT:
+    {
+        double maxScore = this->costs.max();
+        double minScore = this->costs.min();
+        double meanScore = this->costs.mean();
+
+        if (maxScore == minScore) {
+            scaling = Eigen::VectorXd::Constant(scaling.size(),1);
+        } else {
+            double desiredMean = 1.0;
+
+            double scale = desiredMean*(this->maxSurvivalRate - 1)/(maxScore -
+                    meanScore);
+
+            double offset = desiredMean - (scale*meanScore);
+
+            if (offset + scale*minScore < 0) {
+                scale = desiredMean/(meanScore - minScore);
+                offset = desiredMean - (scale*meanScore);
+            }
+
+            scaling = offset + scale*scaling;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+
+    // Adjust the scaling vector so that its sum is equal to the number of elements
+    double factor = this->populationSizeGA*scaling.sum();
+    scaling = scaling*factor;
 }
 
 void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
         Eigen::VectorXi& pe, RoadGA::Selection selector) {
 
+    // Random number generator for random
+    std::default_random_engine generator;
+
+    // The fit scalings correspond the ordered list of parents
+    Eigen::VectorXi orderedParents(this->populationSizeGA);
+    Eigen::VectorXd fitScalings(this->populationSizeGA);
+    this->scaling(this->fitScaling, orderedParents, fitScalings);
+
+    unsigned long eliteParents = this->populationSizeGA*(1 - this->mutationRate
+            -this->crossoverFrac);
+
+    // Elite parents selection is easy
+    if (eliteParents > 0) {
+        pe = orderedParents.segment(0,eliteParents);
+    }
+
+    // Now select parents for crossover and mutation
     switch (selector) {
 
-    case TOURNAMENT:
+    case RoadGA::STOCHASTIC_UNIFORM:
+    {
+        Eigen::VectorXd wheelBase(this->populationSizeGA);
+
+        igl::cumsum(fitScalings,2,wheel);
+
+        // First, crossover
+        {
+            Eigen::VectorXd wheel = wheelBase/pc.size();
+            double stepSize = 1/pc.size();
+
+            std::uniform_real_distribution<double> start(0,stepSize);
+            double position = start(generator);
+
+            unsigned long lowest = 0;
+
+            for (unsigned long ii = 0; ii < pc.size(); ii++) {
+                for (unsigned long jj = lowest; jj < pc.size(); jj++) {
+                    if (position < wheel(jj)) {
+                        pc(ii) = orderedParents(jj);
+                        lowest = jj;
+                        break;
+                    }
+                }
+                position += stepSize;
+            }
+        }
+
+        // Next, mutation
+        {
+            Eigen::VectorXd wheel = wheelBase/pm.size();
+            double stepSize = 1/pm.size();
+
+            std::uniform_real_distribution<double> start(0,stepSize);
+            double position = start(generator);
+
+            unsigned long lowest = 0;
+
+            for (unsigned long ii = 0; ii < pc.size(); ii++) {
+                for (unsigned long jj = lowest; jj < pm.size(); jj++) {
+                    if (position < wheel(jj)) {
+                        pm(ii) = orderedParents(jj);
+                        lowest = jj;
+                        break;
+                    }
+                }
+                position += stepSize;
+            }
+        }
+        break;
+    }
+    case RoadGA::REMAINDER:
     {
         break;
     }
-    case 2:
+    case RoadGA::ROULETTE:
     {
         break;
     }
-    case 3:
+    case RoadGA::TOURNAMENT:
+    {
+        break;
+    }
+    case RoadGA::UNIFORM:
     {
         break;
     }
@@ -766,7 +954,67 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
     }
 }
 
-int RoadGA::stopCheck() {}
+int RoadGA::stopCheck() {
+    if (this->generation >= this->generations) {
+        // Adequate convergence not achieved. Generations exceeded
+        return -1;
+    }
+
+    if (this->stallTest()) {
+
+        this->stallGen++;
+
+        if (this->stallGen >= this->stallGenerations) {
+            // Number of stall generations exceeded
+            return -2;
+        }
+    } else {
+        this->stallGen = 0;
+    }
+
+    if (this->surrErr < this->surrThresh) {
+        if (this->generation > this->learnPeriod) {
+            if (abs((this->best(this->generation - 1) - this->best(
+                    this->generation - 2))/(this->best(
+                    this->generation - 2))) < this->stoppingTol) {
+                // Solution successfully found
+                return 1;
+
+            } else {
+                return 0;
+            }
+        } else {
+            // We should perform a minimum number of generations
+            return 0;
+        }
+    } else {
+        // Continue computing to reduce the surrogate error
+        return 0;
+    }
+}
+
+bool RoadGA::stallTest() {
+    // First, apply geometric weightings to all generations PRIOR to the
+    // current
+
+    double total = 1.0;
+    double totalWeight = 0.0;
+
+    for (int ii = this->generation - 1; ii < 0; ii--) {
+        double w = pow(0.5,this->generation - 1 - ii);
+        total = total*pow(this->av(ii),w);
+        totalWeight += w;
+    }
+
+    total = pow(total,1.0/totalWeight);
+
+    if (abs(this->av(this->generation - 1) - total)/(total) <
+            this->stoppingTol) {
+        return true;
+    } else {
+        return false;
+    }
+}
 
 void RoadGA::randomXYOnPlanes(const long &individuals, const long&
         intersectPts, const long& startRow) {

@@ -155,6 +155,8 @@ void Simulator::simulateMTE() {
 
         road->getAttributes()->setEndPopMTE(endPopMean);
         road->getAttributes()->setEndPopMTESD(endPopSD);
+        road->getCosts()->setPenalty(0.0);
+        road->getAttributes()->setTotalValueSD(0.0);
     }
 }
 

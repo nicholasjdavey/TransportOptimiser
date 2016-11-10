@@ -34,10 +34,11 @@ void Uncertainty::computeExpPV() {
     double total = 0;
 
     // Place to store simulation results
-    std::vector< std::future<double> > results(paths);
     Eigen::VectorXd finalResults(paths);
 
     if (threader != nullptr) {
+        std::vector< std::future<double> > results(paths);
+
         for (unsigned long ii = 0; ii < paths; ii++)  {
             // Push onto the pool with a lambda expression
             results[ii] = threader->push([this](int id){return
@@ -45,13 +46,14 @@ void Uncertainty::computeExpPV() {
         }
 
         for (unsigned long ii = 0; ii < paths; ii++) {
-            total += results[ii].get();
             finalResults(ii) = results[ii].get();
+            total += finalResults(ii);
         }
 
     } else {
         for (unsigned long ii = 0; ii < paths; ii++) {
-            total += this->singlePathValue();
+            finalResults(ii) = this->singlePathValue();
+            total += finalResults(ii);
         }
     }
 
