@@ -60,7 +60,7 @@ public:
             double elite, double scale, unsigned long learnPeriod, double
             surrThresh, unsigned long maxLearnNo, unsigned long minLearnNo,
             unsigned long sg, RoadGA::Selection selector, RoadGA::Scaling
-            fitscale);
+            fitscale, unsigned long topProp, double maxSurvivalRate);
 
     // ACCESSORS //////////////////////////////////////////////////////////////
 

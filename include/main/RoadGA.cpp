@@ -23,7 +23,7 @@ RoadGA::RoadGA(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
     Optimiser::Type type, double elite, double scale, unsigned long
     learnPeriod, double surrThresh, unsigned long maxLearnNo, unsigned long
     minLearnNo, unsigned long sg, RoadGA::Selection selector, RoadGA::Scaling
-    fitscale) :
+    fitscale, unsigned long topProp, double maxSurvivalRate) :
     Optimiser(programs, oInputs, desParams, earthworks, unitCosts, varParams,
             species, economic, traffic, region, mr, cf, gens, popSize, stopTol,
             confInt, confLvl, habGridRes, solScheme, noRuns, type, elite, sg) {
@@ -71,6 +71,8 @@ RoadGA::RoadGA(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
     this->noSamples = 0;
     this->selector = selector;
     this->fitScaling = fitscale;
+    this->topProp = topProp;
+    this->maxSurvivalRate = maxSurvivalRate;
 }
 
 void RoadGA::creation() {
@@ -822,6 +824,11 @@ void RoadGA::scaling(RoadGA::Scaling scaleType, Eigen::VectorXi& parents,
     case RoadGA::TOP:
     {
         // Only the top proportion of individuals remain
+        unsigned long noParents = this->maxSurvivalRate*this->populationSizeGA;
+
+        scaling.segment(0,noParents) = Eigen::VectorXd::Constant(noParents,1);
+        scaling.segment(noParents,scaling.size() - noParents) =
+                Eigen::VectorXd::Constant(scaling.size() - noParents, 0);
         break;
     }
     case RoadGA::SHIFT:
@@ -864,6 +871,9 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
 
     // Random number generator for random
     std::default_random_engine generator;
+    std::uniform_real_distribution<double> randomVal(0,1);
+    std::uniform_int_distribution<unsigned long> randomParent(0,
+            this->populationSizeGA-1);
 
     // The fit scalings correspond the ordered list of parents. We call the
     // scaling function to find the best parents (in order of increasing cost)
@@ -937,6 +947,9 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
     }
     case RoadGA::REMAINDER:
     {
+        // We need to keep the scalings vector for both crossover and mutation
+        Eigen::VectorXd fitScalingsTemp = fitScalings;
+
         // First, crossover
         {
             unsigned long next = 0;
@@ -945,10 +958,16 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
             // Load up the sure parents and leave the fractional
             // remainder in newScores.
             for (unsigned long ii = 0; ii < orderedParents.size(); ii++) {
-                while (fitScalings(ii) >= 1) {
+                if (next >= pc.size()) {
+                    break;
+                }
+                while (fitScalings(ii) >= 1.0) {
+                    if (next >= pc.size()) {
+                        break;
+                    }
                     pc(next) = orderedParents(ii);
                     next++;
-                    fitScalings(ii) = fitScalings(ii) - 1.0;
+                    fitScalings(ii) -= 1.0;
                 }
             }
 
@@ -961,23 +980,117 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
             Eigen::VectorXd intervals(this->populationSizeGA);
 
             igl::cumsum(fitScalings,2,intervals);
-
             intervals = intervals / intervals(intervals.size()-1);
 
             // Now use the remainders as probabilities
             for (unsigned long ii = next; ii < pc.size(); ii++) {
+                double r = randomVal(generator);
+                for (unsigned long jj = 0; jj < fitScalings.size(); jj++) {
+                    if (r <= intervals(ii)) {
+                        pc(ii) = orderedParents(jj);
 
+                        // Make sure this is not picked again
+                        fitScalings(jj) = 0;
+                        igl::cumsum(fitScalings,2,intervals);
+
+                        if (intervals(intervals.size()-1) != 0.0) {
+                            intervals = intervals / intervals(intervals.size()
+                                    - 1);
+                        }
+                        break;
+                    }
+                }
             }
         }
 
         // Next, mutation
         {
+            fitScalings = fitScalingsTemp;
+            unsigned long next = 0;
 
+            // First we assign the integral parts deterministically.
+            // Load up the sure parents and leave the fractional
+            // remainder in newScores.
+            for (unsigned long ii = 0; ii < orderedParents.size(); ii++) {
+                if (next >= pm.size()) {
+                    break;
+                }
+                while (fitScalings(ii) >= 1.0) {
+                    if (next >= pm.size()) {
+                        break;
+                    }
+                    pm(next) = orderedParents(ii);
+                    next++;
+                    fitScalings(ii) -= 1.0;
+                }
+            }
+
+            // If all new scores were integers, we are done
+            if (next >= pm.size()) {
+                break;
+            }
+
+            // Scale the remaining scores to be probabilities
+            Eigen::VectorXd intervals(this->populationSizeGA);
+
+            igl::cumsum(fitScalings,2,intervals);
+            intervals = intervals / intervals(intervals.size()-1);
+
+            // Now use the remainders as probabilities
+            for (unsigned long ii = next; ii < pc.size(); ii++) {
+                double r = randomVal(generator);
+                for (unsigned long jj = 0; jj < fitScalings.size(); jj++) {
+                    if (r <= intervals(ii)) {
+                        pm(ii) = orderedParents(jj);
+
+                        // Make sure this is not picked again
+                        fitScalings(jj) = 0;
+                        igl::cumsum(fitScalings,2,intervals);
+
+                        if (intervals(intervals.size()-1) != 0.0) {
+                            intervals = intervals / intervals(intervals.size()
+                                    - 1);
+                        }
+                        break;
+                    }
+                }
+            }
         }
         break;
     }
     case RoadGA::ROULETTE:
     {
+        Eigen::VectorXd wheelBase(this->populationSizeGA);
+
+        igl::cumsum(fitScalings,2,wheelBase);
+
+        // Crossover
+        {
+            for (unsigned long ii = 0; ii < pc.size(); ii++) {
+                double r = randomVal(generator);
+
+                for (unsigned long jj = 0; jj < wheelBase.size(); jj++) {
+                    if (r < wheelBase(jj)) {
+                        pc(ii) = orderedParents(jj);
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Mutation
+        {
+            for (unsigned long ii = 0; ii < pe.size(); ii++) {
+                double r = randomVal(generator);
+
+                for (unsigned long jj = 0; jj < wheelBase.size(); jj++) {
+                    if (r < wheelBase(jj)) {
+                        pe(ii) = orderedParents(jj);
+                        break;
+                    }
+                }
+            }
+        }
         break;
     }
     case RoadGA::TOURNAMENT:
@@ -986,6 +1099,20 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
     }
     case RoadGA::UNIFORM:
     {
+        // Do not use for actual convergence of the GA
+        // Crossover parents
+        {
+            for (unsigned long ii = 0; ii < pc.size(); ii++) {
+                pc(ii) = randomParent(generator);
+            }
+        }
+
+        // Mutation parents
+        {
+            for (unsigned long ii = 0; ii < pm.size(); ii++) {
+                pm(ii) = randomParent(generator);
+            }
+        }
         break;
     }
     default:
