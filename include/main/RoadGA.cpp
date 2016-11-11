@@ -853,7 +853,8 @@ void RoadGA::scaling(RoadGA::Scaling scaleType, Eigen::VectorXi& parents,
         break;
     }
 
-    // Adjust the scaling vector so that its sum is equal to the number of elements
+    // Adjust the scaling vector so that its sum is equal to the number of
+    // elements
     double factor = this->populationSizeGA*scaling.sum();
     scaling = scaling*factor;
 }
@@ -864,7 +865,10 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
     // Random number generator for random
     std::default_random_engine generator;
 
-    // The fit scalings correspond the ordered list of parents
+    // The fit scalings correspond the ordered list of parents. We call the
+    // scaling function to find the best parents (in order of increasing cost)
+    // and the corresponding scaling, as determined by the scaling routine we
+    // use.
     Eigen::VectorXi orderedParents(this->populationSizeGA);
     Eigen::VectorXd fitScalings(this->populationSizeGA);
     this->scaling(this->fitScaling, orderedParents, fitScalings);
@@ -884,7 +888,7 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
     {
         Eigen::VectorXd wheelBase(this->populationSizeGA);
 
-        igl::cumsum(fitScalings,2,wheel);
+        igl::cumsum(fitScalings,2,wheelBase);
 
         // First, crossover
         {
@@ -933,6 +937,43 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
     }
     case RoadGA::REMAINDER:
     {
+        // First, crossover
+        {
+            unsigned long next = 0;
+
+            // First we assign the integral parts deterministically.
+            // Load up the sure parents and leave the fractional
+            // remainder in newScores.
+            for (unsigned long ii = 0; ii < orderedParents.size(); ii++) {
+                while (fitScalings(ii) >= 1) {
+                    pc(next) = orderedParents(ii);
+                    next++;
+                    fitScalings(ii) = fitScalings(ii) - 1.0;
+                }
+            }
+
+            // If all new scores were integers, we are done
+            if (next >= pc.size()) {
+                break;
+            }
+
+            // Scale the remaining scores to be probabilities
+            Eigen::VectorXd intervals(this->populationSizeGA);
+
+            igl::cumsum(fitScalings,2,intervals);
+
+            intervals = intervals / intervals(intervals.size()-1);
+
+            // Now use the remainders as probabilities
+            for (unsigned long ii = next; ii < pc.size(); ii++) {
+
+            }
+        }
+
+        // Next, mutation
+        {
+
+        }
         break;
     }
     case RoadGA::ROULETTE:
