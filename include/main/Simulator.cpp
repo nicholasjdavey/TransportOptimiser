@@ -369,3 +369,11 @@ void Simulator::simulateMTEPath(const std::vector<SpeciesRoadPatchesPtr>&
         }
     }
 }
+
+// SIM ROVCR (we cannot use the base monte carlo routine)
+
+// Simulate forward paths
+// Save all paths:
+//  1. Values of all uncertainties
+//  2. Control taken
+//  3. Adjusted populations
