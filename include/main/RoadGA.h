@@ -60,7 +60,7 @@ public:
             double elite, double scale, unsigned long learnPeriod, double
             surrThresh, unsigned long maxLearnNo, unsigned long minLearnNo,
             unsigned long sg, RoadGA::Selection selector, RoadGA::Scaling
-            fitscale, unsigned long topProp, double maxSurvivalRate);
+            fitscale, unsigned long topProp, double maxSurvivalRate, int ts);
 
     // ACCESSORS //////////////////////////////////////////////////////////////
 
@@ -321,6 +321,14 @@ public:
         this->maxSurvivalRate = msr;
     }
 
+    int getTournamentSize() {
+        return this->tournamentSize;
+    }
+
+    void setTournamentSize(int ts) {
+        this->tournamentSize = ts;
+    }
+
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -491,6 +499,7 @@ private:
     RoadGA::Scaling fitScaling; /**< Scaling method used for fitness scaling */
     unsigned long topProp;      /**< Proportion to consider as top individuals */
     double maxSurvivalRate;     /**< Maximum survival rate for shifLinearScaling */
+    int tournamentSize;         /**< Number of competitors per tournament */
 
 // PRIVATE ROUTINES ///////////////////////////////////////////////////////////
 
@@ -574,7 +583,7 @@ private:
      * @param (output) parents as Eigen::VectorXi&
      * @param (output) scaling as Eigen::VectorXd&
      */
-    scaling(RoadGA::Scaling scaleType, Eigen::VectorXi& parents,
+    void scaling(RoadGA::Scaling scaleType, Eigen::VectorXi& parents,
             Eigen::VectorXd& scaling);
 };
 

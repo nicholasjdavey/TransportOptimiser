@@ -11,3 +11,7 @@ MonteCarloROV::~MonteCarloROV() {
 void MonteCarloROV::simulateROVCR() {
 
 }
+
+void MonteCarloROV::buildPolicyMap() {
+
+}

@@ -23,7 +23,7 @@ RoadGA::RoadGA(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
     Optimiser::Type type, double elite, double scale, unsigned long
     learnPeriod, double surrThresh, unsigned long maxLearnNo, unsigned long
     minLearnNo, unsigned long sg, RoadGA::Selection selector, RoadGA::Scaling
-    fitscale, unsigned long topProp, double maxSurvivalRate) :
+    fitscale, unsigned long topProp, double maxSurvivalRate, int ts) :
     Optimiser(programs, oInputs, desParams, earthworks, unitCosts, varParams,
             species, economic, traffic, region, mr, cf, gens, popSize, stopTol,
             confInt, confLvl, habGridRes, solScheme, noRuns, type, elite, sg) {
@@ -73,6 +73,7 @@ RoadGA::RoadGA(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
     this->fitScaling = fitscale;
     this->topProp = topProp;
     this->maxSurvivalRate = maxSurvivalRate;
+    this->tournamentSize = ts;
 }
 
 void RoadGA::creation() {
@@ -557,7 +558,7 @@ void RoadGA::optimise() {
     // AAR values (100% survival)
     this->defaultSurrogate();
 
-    while ((status <= 0) && (this->generation <= this->generations)) {
+    while ((status == 0) && (this->generation <= this->generations)) {
         // Evaluate current generation
         this->evaluateGeneration();
         this->output();
@@ -571,7 +572,7 @@ void RoadGA::optimise() {
         // Prepare for next generation
         this->computeSurrogate();
 
-        int pc = (floor(this->populationSizeGA * this->crossoverFrac))*2;
+        int pc = (floor(this->populationSizeGA * this->crossoverFrac));
         int pm = floor(this->populationSizeGA * this->mutationRate);
         int pe = this->populationSizeGA - pc - pm;
         int cols = this->currentRoadPopulation.cols();
@@ -585,7 +586,7 @@ void RoadGA::optimise() {
 
         // Select the parents for crossover, mutation and elite children
         this->selection(parentsCrossover, parentsMutation, parentsElite,
-                RoadGA::TOURNAMENT);
+                this->selector);
 
         // Perform crossover, mutation and elite subpopulation creation
         this->crossover(parentsCrossover,crossoverChildren);
@@ -593,9 +594,9 @@ void RoadGA::optimise() {
         this->elite(parentsElite,eliteChildren);
 
         // Assign the new population
-        this->currentRoadPopulation.block(0,0,pc/2,cols) = crossoverChildren;
-        this->currentRoadPopulation.block(pc/2,0,pm,cols) = mutationChildren;
-        this->currentRoadPopulation.block(pc/2+pm,0,pe,cols) = eliteChildren;
+        this->currentRoadPopulation.block(0,0,pc,cols) = crossoverChildren;
+        this->currentRoadPopulation.block(pc,0,pm,cols) = mutationChildren;
+        this->currentRoadPopulation.block(pc+pm,0,pe,cols) = eliteChildren;
 
         this->generation++;
     }
@@ -613,7 +614,7 @@ void RoadGA::assignBestRoad() {
 
     igl::mat_max(costs,1,Y,I);
 
-    RoadPtr road(new Road(this->me(),this->currentRoadPopulation.row(I(1))));
+    RoadPtr road(new Road(this->me(),this->currentRoadPopulation.row(I(0))));
 
     this->bestRoads[this->scenario->getCurrentScenario()][this->scenario->
             getRun()] = road;
@@ -755,9 +756,8 @@ void RoadGA::evaluateGeneration() {
 
     // Computes the current population of roads using a surrogate function
     // instead of the full model where necessary
-    OptimiserPtr optimiser = this->optimiser.lock();
-    ThreadManagerPtr threader = optimiser->getThreadManager();
-    unsigned int paths = optimiser->getOtherInputs()->getNoPaths();
+    ThreadManagerPtr threader = this->getThreadManager();
+    unsigned int paths = this->getOtherInputs()->getNoPaths();
 
     std::vector<std::future<void>> results(paths);
 
@@ -765,40 +765,58 @@ void RoadGA::evaluateGeneration() {
         // If multithreading is enabled
         for (unsigned long ii = 0; ii < paths; ii++) {
             // Push onto the pool with a lambda expression
-            results[ii] = threader->push([this](int id){
-                RoadPtr road(new Road(this->currentRoadPopulation.row(ii)));
+            results[ii] = threader->push([this,ii](int id){
+                RoadPtr road(new Road(this->me(),
+                        this->currentRoadPopulation.row(ii)));
                 road->designRoad();
                 road->evaluateRoad();
 
                 this->costs(ii) = road->getAttributes()->getTotalValueMean();
                 this->profits(ii) = road->getAttributes()->getVarProfitIC();
 
-                for (int jj = 0; jj < this->species.size(); jj++) {
-                    this->iarsCurr(ii,jj) = road->getAttributes()->getIAR()(jj);
-                    this->popsCurr(ii,jj) = road->getAttributes()->
-                            getEndPopMTE()(jj);
+                if (this->type != Optimiser::SIMPLEPENALTY) {
+                    for (int jj = 0; jj < this->species.size(); jj++) {
+                        this->iarsCurr(ii,jj) = road->getAttributes()->
+                                getIAR()(jj);
+
+                        if (this->type == Optimiser::MTE) {
+                            this->popsCurr(ii,jj) = road->getAttributes()->
+                                    getEndPopMTE()(jj);
+                        } else if (this->type == Optimiser::CONTROLLED) {
+
+                        }
+                    }
                 }
             });
         }
 
         for (unsigned long ii = 0; ii < paths; ii++) {
-            results[ii]->get();
+            results[ii].get();
         }
 
     } else {
         // Run serially
         for (unsigned long ii = 0; ii < paths; ii++) {
-            RoadPtr road(new Road(this->currentRoadPopulation.row(ii)));
+            RoadPtr road(new Road(this->me(),
+                    this->currentRoadPopulation.row(ii)));
             road->designRoad();
             road->evaluateRoad();
 
             this->costs(ii) = road->getAttributes()->getTotalValueMean();
             this->profits(ii) = road->getAttributes()->getVarProfitIC();
 
-            for (int jj = 0; jj < this->species.size(); jj++) {
-                this->iarsCurr(ii,jj) = road->getAttributes()->getIAR()(jj);
-                this->popsCurr(ii,jj) = road->getAttributes()->
-                        getEndPopMTE()(jj);
+            if (this->type != Optimiser::SIMPLEPENALTY) {
+                for (int jj = 0; jj < this->species.size(); jj++) {
+                    this->iarsCurr(ii,jj) = road->getAttributes()->
+                            getIAR()(jj);
+
+                    if (this->type == Optimiser::MTE) {
+                        this->popsCurr(ii,jj) = road->getAttributes()->
+                                getEndPopMTE()(jj);
+                    } else if (this->type == Optimiser::CONTROLLED) {
+
+                    }
+                }
             }
         }
     }
@@ -833,8 +851,8 @@ void RoadGA::scaling(RoadGA::Scaling scaleType, Eigen::VectorXi& parents,
     }
     case RoadGA::SHIFT:
     {
-        double maxScore = this->costs.max();
-        double minScore = this->costs.min();
+        double maxScore = this->costs.maxCoeff();
+        double minScore = this->costs.minCoeff();
         double meanScore = this->costs.mean();
 
         if (maxScore == minScore) {
@@ -852,7 +870,7 @@ void RoadGA::scaling(RoadGA::Scaling scaleType, Eigen::VectorXi& parents,
                 offset = desiredMean - (scale*meanScore);
             }
 
-            scaling = offset + scale*scaling;
+            scaling = offset + scale*scaling.array();
         }
         break;
     }
@@ -1095,6 +1113,52 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
     }
     case RoadGA::TOURNAMENT:
     {
+        Eigen::MatrixXi playerList(pc.size()+pm.size(), this->tournamentSize);
+
+        // The player list refers to the index in 'orderedParents' and not to
+        // the original parent number. I.e. a player value of 20 indicates the
+        // 20th lowest cost parent as stored in 'orderedParents' and not the
+        // 20th parent in the current population list.
+        //
+        // This is fine as the tournament pools of parents are random anyway.
+        for (unsigned long ii = 0; ii < this->populationSizeGA; ii++) {
+            playerList(ii) = this->populationSizeGA*randomVal(generator);
+        }
+
+        Eigen::MatrixXi players(1,this->tournamentSize);
+        // Crossover parents
+        for (unsigned long ii = 0; ii < pc.size(); ii++) {
+            players = playerList.row(ii);
+            // For each tournament
+            unsigned long winner = players(0);
+            for (int jj = 1; jj < players.size(); jj++) {
+                double score1 = fitScalings(winner);
+                double score2 = fitScalings(jj);
+                if (score2 > score1) {
+                    // The problem is single-objective so we only have one
+                    // score per road
+                    winner = orderedParents(jj);
+                }
+            }
+            pc(ii) = winner;
+        }
+
+        // Mutation parents
+        for (unsigned long ii = 0; ii < pm.size(); ii++) {
+            players = playerList.row(ii);
+            // For each tournament
+            unsigned long winner = players(0);
+            for (int jj = 1; jj < players.size(); jj++) {
+                double score1 = fitScalings(winner);
+                double score2 = fitScalings(jj);
+                if (score2 > score1) {
+                    // The problem is single-objective so we only have one
+                    // score per road
+                    winner = orderedParents(jj);
+                }
+            }
+            pm(ii) = winner;
+        }
         break;
     }
     case RoadGA::UNIFORM:
@@ -1452,7 +1516,7 @@ void RoadGA::surrogateResultsMTE(RoadPtr road, Eigen::MatrixXd& mteResult) {
 
     for (int ii = 0; ii < this->species.size(); ii++) {
         // We normalise by the starting population
-        initPops(ii) = species->getInitPop();
+        initPops(ii) = species[ii]->getInitPop();
         Eigen::VectorXd iars = species[ii]->getInitAAR();
         mteResult(0,ii) = iars(iars.size()-1);
         mteResult(1,ii) = species[ii]->getEndPopMean()/initPops(ii);

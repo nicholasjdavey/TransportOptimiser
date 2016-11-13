@@ -140,6 +140,23 @@ public:
      */
     void simulateMTE(std::vector<Eigen::MatrixXd> &visualiseResults);
 
+    /**
+     * Runs the optimally controlled traffic scenario over the entire design
+     * horizon for all species encountered by the road.
+     */
+    virtual void simulateROVCR();
+
+    /**
+     * Overloaded version of the preceding function for storing an entire
+     * single realisation for visualisation. This keeps the populations in
+     * each patch over time as well as the traffic control choice.
+     *
+     * @param (output) visualisePops as std::vector<Eigen::MatrixXd>&
+     * @param (output) visualiseFlows as std::vector<int>&
+     */
+    void simulateROVCR(std::vector<Eigen::MatrixXd>& visualisePops,
+            std::vector<int>& visualiseFlows);
+
 private:
     std::weak_ptr<Road> road;   /**< Road owning simulator */
     Eigen::VectorXd endPops;    /**< End populations from all sims */
@@ -172,7 +189,7 @@ private:
             Eigen::VectorXd& capacities, Eigen::VectorXd& pops);
 
     /**
-     * Simulates a single path up to the design horizon for one species
+     * Simulates a single path up to the design horizon for one species for MTE
      *
      * This overloaded function returns an entire single path for all patches
      *
@@ -202,6 +219,11 @@ private:
             const std::vector<Eigen::VectorXd>& initPops, const
             std::vector<Eigen::VectorXd> &capacities,
             std::vector<Eigen::MatrixXd> &visualiseResults);
+
+
+    virtual void simulateROVCRPath();
+
+    virtual void simulateROVCRPath();
 };
 
 #endif

@@ -37,6 +37,23 @@ typedef std::shared_ptr<SpeciesRoadPatches> SpeciesRoadPatchesPtr;
 
 /**
  * Class for managing %Road objects
+ *
+ * This class can also refer to road networks but for convenience and to tie
+ * it in with the original PhD code, it is called %Road.
+ *
+ * In the case of a Network, it is a derived type of %Road. The key differences
+ * are that Network contains references to all of the contained roads and it
+ * itself does not contain any of the following elements:
+ * - RoadSegments
+ * - Costs (this is replaced by the costs of contained roads and Program)
+ * - HorizontalAlignment
+ * - VerticalAlignment
+ * - Attributes
+ *
+ * To perform ROVCR on a network, the different survival probabilities matrices
+ * all relate to a different flow configuration through the network. A routine
+ * of Network actually finds a suitable set of flow configurations and this is
+ * then saved as a type of TrafficProgram (but the flow rates have no meaning)+
  */
 class Road : public std::enable_shared_from_this<Road> {
 
@@ -64,7 +81,7 @@ public:
      *
      * Constructs a %Road object using the encoded genome
      */
-    Road(OptimiserPtr op, Eigen::RowVectorXd genome);
+    Road(OptimiserPtr op, const Eigen::RowVectorXd& genome);
 
     /**
      * Destructor

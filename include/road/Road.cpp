@@ -22,7 +22,7 @@ Road::Road(OptimiserPtr op,const Eigen::VectorXd &xCoords, const
     this->attributes = att;
 }
 
-Road::Road(OptimiserPtr op, Eigen::RowVectorXd genome) {
+Road::Road(OptimiserPtr op, const Eigen::RowVectorXd& genome) {
     // First, ensure that the genome length is a multiple of three
     int intersectPts = op->getDesignParameters()->getIntersectionPoints() + 2;
 

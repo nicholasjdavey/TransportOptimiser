@@ -178,9 +178,35 @@ public:
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
 
     /**
-     * Runs the optimal control simulation
+     * Runs the optimal control simulation to determine road value
+     *
+     * This routine computes the Real Options Value of a road over the
+     * projected life with the ability to select different options based on the
+     * prevailing state. This method uses control randomisation with forward
+     * path recomputation (Henry-Labordere and Guyon 2011; Kharroubi, Langrene
+     * and Pham 2014) to simulate a number of Monte Carlo paths using a
+     * random selection of the available controls at each time step for each
+     * path. These are then used in a backward stochastic differential equation
+     * to compute conditional expectations for each control at each time step
+     * and expected state. The state here consists of the overall population as
+     * well as the AAR for each control. This dimension is a measure of the
+     * proportion of animals killed by the road from time t to t+1 under each
+     * control. It is deterministic because we treate the transition and
+     * survival matricies as fixed for a run (they are hidden parameters as
+     * opposed to uncertain). Furthermore, using AAR allows us to create an
+     * 'adjusted' population for each control, which represents the number of
+     * animals left at the end of the run for breeding at the start of the next
+     * time step. This means that we can reduce the entire problem down from np
+     * states (number of patches) to just one without losing the effect of the
+     * animal positions within the grid as would happend if we just considered
+     * population alone.
      */
-    void simulateROVCR();
+    virtual void simulateROVCR();
+
+    /**
+     * Builds the policy map for a given road
+     */
+    void buildPolicyMap();
 
 private:
         StatePtr state;                         /**< State object used in simulation */
