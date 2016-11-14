@@ -571,6 +571,8 @@ void RoadGA::optimise() {
 
         // Prepare for next generation
         this->computeSurrogate();
+        // Re-evaluate the current generation using the new surrogate
+        this->evaluateGeneration();
 
         int pc = (floor(this->populationSizeGA * this->crossoverFrac));
         int pm = floor(this->populationSizeGA * this->mutationRate);
@@ -691,7 +693,8 @@ void RoadGA::computeSurrogate() {
             newSamples-1);
 
     // Call the thread pool. The computed function and form of the surrogate
-    // models are different under each scenario (MTE vs CONTROLLED).
+    // models are different under each scenario (MTE vs CONTROLLED). The thread
+    // pool is called WITHIN the functions to compute the surrogate data.
     if (this->type == Optimiser::MTE) {
 
         for (unsigned long ii = 0; ii < newSamples; ii++) {

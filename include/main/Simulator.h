@@ -220,10 +220,78 @@ private:
             std::vector<Eigen::VectorXd> &capacities,
             std::vector<Eigen::MatrixXd> &visualiseResults);
 
+    /**
+     * Simulates a single forward path for Real Options, returning the values
+     * for each uncertainty at each time for the time steps.
+     *
+     * This method is used for finding the optimal policy for a road and is
+     * called many times as part of a Monte Carlo simulation. It does not save
+     * the population in each patch for each species, hence it is not used for
+     * visualisation of the optimal policy.
+     *
+     * @note Time steps refers to the number of time steps up to and including
+     * the end time step, T. Therefore, the algorithm starts at time step
+     * t = T -  timeSteps. I.e. if we want to compute the full path to the very
+     * beginning, t = T. In addition, we must always pass in the full vector,
+     * even if we are only changing a portion of the time steps.
+     *
+     * @param (input) species as const std::vector<SpeciesRoadPatchesPtr>&
+     * @param (input) initPops as const std::vector<Eigen::VectorXd>&
+     * @param (input) capacities as const std::vector<Eigen::VectorXd>&
+     * @param (output) exogenousPaths as std::vector<Eigen::VectorXd>&
+     * @param (output) endogenousPaths as std::vector<Eigen::VectorXd>&
+     */
+    virtual void simulateROVCRPath(const std::vector<SpeciesRoadPatchesPtr>&
+            species, const std::vector<Eigen::VectorXd>& initPops, const
+            std::vector<Eigen::VectorXd>& capacities,
+            std::vector<Eigen::VectorXd>& exogenousPaths,
+            std::vector<Eigen::VectorXd>& endogenousPaths);
 
-    virtual void simulateROVCRPath();
+    /**
+     * Simulates a single full forward path for Real Options, returning the
+     * values for each uncertainty (including individual patch populations)
+     * for the entire time horizon.
+     *
+     * @note This method is used for visualisation purposes ONLY
+     *
+     * @param (input) species as const std::vector<SpeciesRoadPatchesPtr>&
+     * @param (input) initPops as const std::vector<Eigen::VectorXd>&
+     * @param (input) capacities as const std::vector<Eigen::VectorXd>&
+     * @param (input) exogenousPaths const as std::vector<Eigen::VectorXd>&
+     * @param (output) endogenousPaths as std::vector<Eigen::VectorXd>&
+     * @param (output) visualiseResults as std::vector<Eigen::MatrixXd>&
+     */
+    virtual void simulateROVCRPath(const std::vector<SpeciesRoadPatchesPtr>&
+            species, const std::vector<Eigen::VectorXd>& initPops, const
+            std::vector<Eigen::VectorXd>& capacities,
+            const std::vector<Eigen::VectorXd>& exogenousPaths,
+            std::vector<Eigen::VectorXd>& endogenousPaths,
+            std::vector<Eigen::MatrixXd> &visualiseResults);
 
-    virtual void simulateROVCRPath();
+    /**
+     * Recomputes a single path from a specific time to the end time, T
+     *
+     * This function uses the stored optimal profits to go for each control
+     * at each time step to recompute the forward paths from a specific time.
+     *
+     * @note We pass in the full vectors (i.e. from time t = 0 to t = T) and
+     * only update the last 'T - timeStep' entries.
+     *
+     * @param (input) species as const std::vector<SpeciesRoadPatchesPtr>&
+     * @param (input) initPops as const std::vector<Eigen::VectorXd>&
+     * @param (input) capacities as const std::vector<Eigen::VectorXd>&
+     * @param (input) exogenousPaths const as std::vector<Eigen::VectorXd>&
+     * @param (input) timeStep as const unsigned long
+     * @param (input) optPtG as std::vector<std::vector<alglib::spline1dinterpolant>>
+     * @param (output) endogenousPaths as std::vector<Eigen::VectorXd>&
+     */
+    virtual void recomputeForwardPath(const std::vector<SpeciesRoadPatchesPtr>&
+            species, const std::vector<Eigen::VectorXd>& initPops, const
+            std::vector<Eigen::VectorXd>& capacities,
+            const std::vector<Eigen::VectorXd>& exogenousPaths,
+            const unsigned long timeStep, const std::vector<std::vector<
+            alglib::spline1dinterpolant>> optPtG,
+            std::vector<Eigen::VectorXd>& endogenousPaths);
 };
 
 #endif

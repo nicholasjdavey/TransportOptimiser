@@ -26,8 +26,7 @@ void Simulator::simulateMTE() {
     int controls = program->getFlowRates().size();
     unsigned long noPaths = optimiser->getOtherInputs()->getNoPaths();
 
-    std::vector<SpeciesRoadPatchesPtr> srp = road->
-            getSpeciesRoadPatches();
+    std::vector<SpeciesRoadPatchesPtr> srp = road->getSpeciesRoadPatches();
     Eigen::VectorXd iar(srp.size());
 
     // First, compute the IARs for the road
@@ -228,7 +227,74 @@ void Simulator::simulateMTE(std::vector<Eigen::MatrixXd>& visualiseResults) {
 }
 
 void Simulator::simulateROVCR() {
+    // SIM ROVCR (we cannot use the base monte carlo routine for this method)
 
+    // Simulate forward paths
+    // Save all paths:
+    //  1. Values of all uncertainties
+    //  2. Control taken
+    //  3. Adjusted populations
+
+    RoadPtr road = this->road.lock();
+    OptimiserPtr optimiser = road->getOptimiser();
+    ThreadManagerPtr threader = optimiser->getThreadManager();
+    ExperimentalScenarioPtr scenario = optimiser->getScenario();
+    VariableParametersPtr varParams = optimiser->getVariableParams();
+
+    TrafficProgramPtr program = optimiser->getPrograms()
+            [scenario->getProgram()];
+    int controls = program->getFlowRates().size();
+    unsigned long noPaths = optimiser-getOtherInputs()->getNoPaths();
+
+    std::vector<SpeciesRoadPatchesPtr> srp = road->getSpeciesRoadPatches();
+    Eigen::Vector iar(srp.size());
+
+    // First, compute the IAR for each species for this road
+    if (threader != nullptr) {
+        // If we have access to multi-threading, use it for computing the
+        // iars
+        std::vector<std::future<double>> results(srp.size());
+
+        for (int ii = 0; ii < srp.size(); ii++) {
+            // Push onto the pool with a lambda expression
+            results[ii] = threader->push([ii,controls,srp](int id){
+                Eigen::VectorXd iarsCont(controls);
+                srp[ii]->createSpeciesModel();
+                srp[ii]->computeInitialAAR(iarsCont);
+                return iarsCont(controls-1);
+            });
+        }
+
+        for (int ii = 0; ii < srp.size(); ii++) {
+            // Retrieve results
+            iar(ii) = results[ii].get();
+        }
+
+    } else {
+
+        for (int ii = 0; ii < srp.size(); ii++) {
+            Eigen::VectorXd iarsCont(controls);
+            srp[ii]->createSpeciesModel();
+            srp[ii]->computeInitialAAR(iarsCont);
+            iar(ii) = iarsCont(controls-1);
+        }
+    }
+
+    road->getAttributes()->setIAR(iar);
+
+    // Initialise the populations and capacities vectors
+    std::vector<Eigen::VectorXd> initPops(srp.size());
+    std::vector<Eigen::VectorXd> capacities(srp.size());
+
+    for (int ii = 0; ii < srp.size(); ii++) {
+        initPops[ii].resize(srp[ii]->getHabPatches().size());
+        capacities[ii].resize(srp[ii]->getHabPatches().size());
+
+        for (int jj = 0; jj < srp.size(); jj++) {
+            initPops[ii](jj) = srp[ii]->getHabPatches()[jj]->getPopulation();
+            capacities[ii](jj) = srp[ii]->getHabPatches()[jj]->getCapacity();
+        }
+    }
 }
 
 void Simulator::simulateROVCR(std::vector<Eigen::MatrixXd>& visualisePops,
@@ -370,10 +436,30 @@ void Simulator::simulateMTEPath(const std::vector<SpeciesRoadPatchesPtr>&
     }
 }
 
-// SIM ROVCR (we cannot use the base monte carlo routine)
+void Simulator::simulateROVCRPath(const std::vector<SpeciesRoadPatchesPtr>&
+            species, const std::vector<Eigen::VectorXd>& initPops, const
+            std::vector<Eigen::VectorXd>& capacities,
+            std::vector<Eigen::VectorXd>& exogenousPaths,
+            std::vector<Eigen::VectorXd>& endogenousPaths) {
 
-// Simulate forward paths
-// Save all paths:
-//  1. Values of all uncertainties
-//  2. Control taken
-//  3. Adjusted populations
+}
+
+void Simulator::simulateROVCRPath(const std::vector<SpeciesRoadPatchesPtr>&
+            species, const std::vector<Eigen::VectorXd>& initPops, const
+            std::vector<Eigen::VectorXd>& capacities,
+            const std::vector<Eigen::VectorXd>& exogenousPaths,
+            std::vector<Eigen::VectorXd>& endogenousPaths,
+            std::vector<Eigen::MatrixXd> &visualiseResults) {
+
+}
+
+void Simulator::recomputeForwardPath(const std::vector<SpeciesRoadPatchesPtr>&
+            species, const std::vector<Eigen::VectorXd>& initPops, const
+            std::vector<Eigen::VectorXd>& capacities,
+            const std::vector<Eigen::VectorXd>& exogenousPaths,
+            const unsigned long timeStep, const std::vector<std::vector<
+            alglib::spline1dinterpolant>> optPtG,
+            std::vector<Eigen::VectorXd>& endogenousPaths) {
+
+}
+
