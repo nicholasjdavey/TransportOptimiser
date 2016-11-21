@@ -40,3 +40,7 @@ DesignParameters::DesignParameters(double desVel, double sx, double sy,
     this->landUse = land;
     this->solidChemWaste = chem;
 }
+
+DesignParameters::~DesignParameters(){
+
+}

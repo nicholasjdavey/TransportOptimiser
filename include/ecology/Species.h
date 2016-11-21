@@ -38,7 +38,7 @@ public:
      *
      * Constructs a %Species object with default parent values.
      */
-    Species(std::string* nm, bool sex, double lm, double lsd, double rcm,
+    Species(std::string nm, bool sex, double lm, double lsd, double rcm,
             double rcsd, double grm, double grsd, double lenm, double lensd,
             double spm, double spsd, double cpa, bool active,
             std::vector<HabitatTypePtr>& habitat);
@@ -48,7 +48,7 @@ public:
      *
      * Constructs a %Species object with assigned values.
      */
-    Species(std::string* nm, bool sex, double lm, double lsd, double rcm,
+    Species(std::string nm, bool sex, double lm, double lsd, double rcm,
             double rcsd, double grm, double grsd, double lenm, double lensd,
             double spm, double spsd, double cpa, bool active,
             std::vector<HabitatTypePtr> &habitat, double current);

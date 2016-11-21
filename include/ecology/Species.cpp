@@ -1,12 +1,12 @@
 #include "../transportbase.h"
 
-Species::Species(std::string* nm, bool sex, double lm, double lsd, double rcm,
+Species::Species(std::string nm, bool sex, double lm, double lsd, double rcm,
         double rcsd, double grm, double grsd, double lenm, double lensd,
         double spm, double spsd, double cpa, bool active,
         std::vector<HabitatTypePtr> &habitat) {
 
 	// Initialise object values
-	this->setName(*nm);
+    this->setName(nm);
     this->sex = sex;
 	this->lambdaMean = lm;
 	this->lambdaSD = lsd;
@@ -23,13 +23,13 @@ Species::Species(std::string* nm, bool sex, double lm, double lsd, double rcm,
     this->habitat = habitat;
 }
 
-Species::Species(std::string* nm, bool sex, double lm, double lsd, double rcm,
+Species::Species(std::string nm, bool sex, double lm, double lsd, double rcm,
         double rcsd, double grm, double grsd, double lenm, double lensd,
         double spm, double spsd, double cpa, bool active,
         std::vector<HabitatTypePtr>& habitat, double current) {
 
 	// Initialise object values
-	this->setName(*nm);
+    this->setName(nm);
     this->sex = sex;
 	this->lambdaMean = lm;
 	this->lambdaSD = lsd;
@@ -44,6 +44,10 @@ Species::Species(std::string* nm, bool sex, double lm, double lsd, double rcm,
     this->costPerAnimal = cpa;
     this->setActive(active);
     this->habitat = habitat;
+}
+
+Species::~Species() {
+
 }
 
 SpeciesPtr Species::me() {

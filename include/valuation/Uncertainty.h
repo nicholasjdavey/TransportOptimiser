@@ -265,7 +265,7 @@ public:
     void computeExpPV();
 
 private:
-    std::weak_ptr<Optimiser> optimiser; /**< */
+    std::weak_ptr<Optimiser> optimiser; /**< Weak pointer to Optimiser object*/
     std::string name;                   /**< Name of the product */
     double current;                     /**< Current level of uncertainty */
     double meanP;                       /**< Long-run mean */

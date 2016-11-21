@@ -4,14 +4,9 @@ Optimiser::Optimiser() {
     // Initialise nothing. All parameters must be assigned manually.
 }
 
-Optimiser::Optimiser(const std::vector<TrafficProgramPtr>& programs,
-        OtherInputsPtr oInputs, DesignParametersPtr desParams,
-        EarthworkCostsPtr earthworks, UnitCostsPtr unitCosts,
-        VariableParametersPtr varParams, const std::vector<SpeciesPtr>&
-        species, EconomicPtr economic, TrafficPtr traffic, RegionPtr region,
-        double mr, unsigned long cf, unsigned long gens, unsigned long popSize,
-        double stopTol, double confInt, double confLvl, unsigned long
-        habGridRes, std::string solScheme, unsigned long noRuns,
+Optimiser::Optimiser(double mr, unsigned long cf, unsigned long gens, unsigned
+        long popSize, double stopTol, double confInt, double confLvl, unsigned
+        long habGridRes, std::string solScheme, unsigned long noRuns,
         Optimiser::Type type, double elite, unsigned long sg) {
 
 //	std::vector<RoadPtr>* crp(new std::vector<RoadPtr>());
@@ -40,16 +35,6 @@ Optimiser::Optimiser(const std::vector<TrafficProgramPtr>& programs,
     unsigned long const hardware_threads = std::thread::hardware_concurrency();
     ThreadManagerPtr threader(new ThreadManager(hardware_threads));
     this->threader = threader;
-    this->programs = programs;
-    this->otherInputs = oInputs;
-    this->designParams = desParams;
-    this->earthworks = earthworks;
-    this->economic = economic;
-    this->traffic = traffic;
-    this->region = region;
-    this->earthworks = earthworks;
-    this->unitCosts = unitCosts;
-    this->species = species;
     this->mutationRate = mr;
     this->crossoverFrac = cf;
     this->variableParams = varParams;

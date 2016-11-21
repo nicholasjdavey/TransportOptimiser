@@ -5,6 +5,7 @@ To build and run the road optimiser software, the following libraries need to be
 - Eigen http://eigen.tuxfamily.org/
 - LibIGL http://libigl.github.io/libigl/
 - CTPL https://github.com/vit-vit/CTPL.git
+- GDAL http://www.gdal.org/index.html/
 - CSIRO Workspace https://research.csiro.au/workspace/
 - QuantLib http://quantlib.org/index.shtml
 - Marxan http://marxan.net

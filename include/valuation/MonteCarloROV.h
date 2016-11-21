@@ -208,6 +208,18 @@ public:
      */
     void buildPolicyMap();
 
+    /**
+     * Updates the state
+     *
+     * @param state as StatePtr
+     */
+    void randomState(StatePtr state);
+
+    /**
+     * Simulates all the forward paths
+     */
+    void simulateForwardPaths();
+
 private:
         StatePtr state;                         /**< State object used in simulation */
         PolicyMapPtr policyMap;                 /**< Generated policy map */

@@ -35,8 +35,7 @@ public:
 	 * Constructs a %Commodity object with assigned values
 	 */
     Commodity(OptimiserPtr optimiser, std::string nm, double mp, double sd,
-            double rev, const std::vector<CommodityCovariancePtr>& covs, bool
-            active);
+            double rev, bool active);
 
 	/**
 	 * Destructor

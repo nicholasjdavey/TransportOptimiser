@@ -289,34 +289,34 @@ public:
     /**
      * Returns X coordinates of the intersection points
      *
-     * @return X coordinates as const Eigen::VectorXd&
+     * @return X coordinates as const Eigen::RowVectorXd&
      */
-    const Eigen::VectorXd& getXCoords() {
+    const Eigen::RowVectorXd& getXCoords() {
         return this->xCoords;
     }
     /**
      * Sets the X coordinates of the intersection points
      *
-     * @param xc as const Eigen::VectorXd&
+     * @param xc as const Eigen::RowVectorXd&
      */
-    void setXCoords(const Eigen::VectorXd& xc) {
+    void setXCoords(const Eigen::RowVectorXd& xc) {
         this->xCoords = xc;
     }
 
     /**
      * Returns the Y coordinates of the intersection points
      *
-     * @return Y coordinates as const Eigen::VectorXd&
+     * @return Y coordinates as const Eigen::RowVectorXd&
      */
-    const Eigen::VectorXd& getYCoords() {
+    const Eigen::RowVectorXd& getYCoords() {
         return this->yCoords;
     }
     /**
      * Sets the Y coordinates of the intersection points
      *
-     * @param yc as const Eigen::VectorXd&
+     * @param yc as const Eigen::RowVectorXd&
      */
-    void setYCoordinates(const Eigen::VectorXd& yc) {
+    void setYCoordinates(const Eigen::RowVectorXd& yc) {
         this->yCoords = yc;
     }
 
@@ -325,15 +325,15 @@ public:
      *
      * @return Z coordinates of the the intersection points
      */
-    const Eigen::VectorXd& getZCoords() {
+    const Eigen::RowVectorXd& getZCoords() {
         return this->zCoords;
     }
     /**
      * Sets the Z coordinates of the intersection points
      *
-     * @param zc as const Eigen::VectorXd&
+     * @param zc as const Eigen::RowVectorXd&
      */
-    void setZCoords(const Eigen::VectorXd& zc) {
+    void setZCoords(const Eigen::RowVectorXd& zc) {
         this->zCoords = zc;
     }
 
@@ -406,9 +406,9 @@ private:
     CostsPtr costs;                             /**< Costs */
     std::vector<SpeciesRoadPatchesPtr> srp;     /**< Patches corresponding to each species */
     std::string testName;                       /**< Name of test */
-    Eigen::VectorXd xCoords;                    /**< X coordinates of intersection points */
-    Eigen::VectorXd yCoords;                    /**< Y coordinates of intersection points */
-    Eigen::VectorXd zCoords;                    /**< Z coordinates of intersection points */
+    Eigen::RowVectorXd xCoords;                 /**< X coordinates of intersection points */
+    Eigen::RowVectorXd yCoords;                 /**< Y coordinates of intersection points */
+    Eigen::RowVectorXd zCoords;                 /**< Z coordinates of intersection points */
     RoadPtr me();                               /**< Enables sharing from within Road class */
 
     // PRIVATE ROUTINES ///////////////////////////////////////////////////////

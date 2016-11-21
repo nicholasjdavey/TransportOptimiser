@@ -2,25 +2,33 @@ include Makefile.inc
 
 # The dependency tree is only to two subdirectory levels. We have opted for a
 # non-recursive make as we do not intend to build libraries
-SOURCES = $(wildcard */*.cpp wildcard */*/*.cpp)
-OBJECTS = $(SOURCES:.cpp=.o)
+TESTFILES := $(wildcard tests/*.cpp)
+TESTOBJS := $(TESTFILES:.cpp=.o)
+SOURCES := $(wildcard */*.cpp wildcard */*/*.cpp)
+SOURCES := $(foreach f, $(SOURCES),$(if $(filter tests,$(subst /, ,$f)),,$f))
+#SOURCES := $(filter-out $(TESTFILES), $(wildcard */*.cpp wildcard */*/*.cpp))
+OBJECTS := $(SOURCES:.cpp=.o)
 
 # If we are doing a library build (libraries to only two levels of dependency)
-DIRS = $(wildcard */)
-CURRSOURCES = $(wildcard *.cpp)
-CURROBJS = $(CURRSOURCES:.cpp=.o)
-OBJLIBSTEM = $(DIRS:%/=%.a)
-OBJLIBS = $(DIRS:%/=lib%.a)
-LIBS = -L. $(wildcard *.a)
+DIRS := $(wildcard */)
+CURRSOURCES := $(wildcard *.cpp)
+CURROBJS := $(CURRSOURCES:.cpp=.o)
+OBJLIBSTEM := $(DIRS:%/=%.a)
+OBJLIBS := $(DIRS:%/=lib%.a)
+LIBS := -L. $(wildcard *.a)
 
 # Main executable
-MAINFILE = TransOpt.cpp
-EXE = $(MAINFILE:.cpp=.exe)
+MAINFILE := TransOpt.cpp
+EXE := $(MAINFILE:.cpp=.exe)
+TESTEXES := $(TESTFILES:.cpp=.exe)
 
 # Default is an incremental linking of dependencies
 $(EXE): $(OBJECTS) $(CURROBJS) force_look
-	$(ECHO) $(CXX) $(CXXFLAGS) $(OBJECTS) $(CURROBJS) -o $(EXE)
+	$(ECHO) $(LD) $(OBJECTS) $(CURROBJS) $(LXXFLAGS) -o $(EXE)
 	$(LD) $(OBJECTS) $(CURROBJS) $(LXXFLAGS) -o $(EXE)
+
+# Build tests files
+tests: $(OBJECTS) $(TESTEXES) force_look
 
 # Build for creating and linking libraries
 withlibs: $(LIBS) $(CURROBJS) force_look
@@ -40,8 +48,16 @@ makelibs: $(OBJLIBSTEM) force_look
 	$(ECHO) $(CXX) $(CXXFLAGS) $< -o $@
 	$(CXX) $(CXXFLAGS) $< -o $@
 
+# Suffix rule to make test executables
+%.exe: %.cpp
+	$(ECHO) $(LD) $(OBJECTS) $< $(LXXFLAGS) -o $@
+	$(LD) $(OBJECTS) $< $(LXXFLAGS) -o $@
+
 clean:
 	-rm $(OBJECTS) $(CURROBJS) $(EXE)
+
+cleantests:
+	-rm $(TESTEXES)
 
 cleanlibs:
 	-rm $(CURROBJS) $(EXE)

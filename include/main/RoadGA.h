@@ -1,6 +1,36 @@
 #ifndef ROADGA_H
 #define ROADGA_H
 
+class OtherInputs;
+typedef std::shared_ptr<OtherInputs> OtherInputsPtr;
+
+class TrafficProgram;
+typedef std::shared_ptr<TrafficProgram> TrafficProgramPtr;
+
+class DesignParameters;
+typedef std::shared_ptr<DesignParameters> DesignParametersPtr;
+
+class EarthworkCosts;
+typedef std::shared_ptr<EarthworkCosts> EarthworkCostsPtr;
+
+class UnitCosts;
+typedef std::shared_ptr<UnitCosts> UnitCostsPtr;
+
+class VariableParameters;
+typedef std::shared_ptr<VariableParameters> VariableParametersPtr;
+
+class Species;
+typedef std::shared_ptr<Species> SpeciesPtr;
+
+class Economic;
+typedef std::shared_ptr<Economic> EconomicPtr;
+
+class Traffic;
+typedef std::shared_ptr<Traffic> TrafficPtr;
+
+class Region;
+typedef std::shared_ptr<Region> RegionPtr;
+
 class Optimiser;
 typedef std::shared_ptr<Optimiser> OptimiserPtr;
 
@@ -41,6 +71,8 @@ public:
      * Constructor I
      *
      * Constructs a RoadGA object with default values.
+     *
+     * @note This is the constructor that will typically be used.
      */
     RoadGA();
 
@@ -49,18 +81,14 @@ public:
      *
      * Constructs a RoadGA object with assigned values
      */
-    RoadGA(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
-            oInputs, DesignParametersPtr desParams, EarthworkCostsPtr
-            earthworks, UnitCostsPtr unitCosts, VariableParametersPtr
-            varParams, const std::vector<SpeciesPtr>& species, EconomicPtr
-            economic, TrafficPtr traffic, RegionPtr region, double mr, unsigned
-            long cf, unsigned long gens, unsigned long popSize, double stopTol,
-            double confInt, double confLvl, unsigned long habGridRes,
-            std::string solScheme, unsigned long noRuns, Optimiser::Type type,
-            double elite, double scale, unsigned long learnPeriod, double
-            surrThresh, unsigned long maxLearnNo, unsigned long minLearnNo,
-            unsigned long sg, RoadGA::Selection selector, RoadGA::Scaling
-            fitscale, unsigned long topProp, double maxSurvivalRate, int ts);
+    RoadGA(double mr, unsigned long cf, unsigned long gens, unsigned long
+            popSize, double stopTol, double confInt, double confLvl, unsigned
+            long habGridRes, std::string solScheme, unsigned long noRuns,
+            Optimiser::Type type, double elite, double scale, unsigned long
+            learnPeriod, double surrThresh, unsigned long maxLearnNo, unsigned
+            long minLearnNo, unsigned long sg, RoadGA::Selection selector,
+            RoadGA::Scaling fitscale, unsigned long topProp, double
+            maxSurvivalRate, int ts);
 
     // ACCESSORS //////////////////////////////////////////////////////////////
 

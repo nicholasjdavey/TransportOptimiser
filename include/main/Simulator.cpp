@@ -244,10 +244,10 @@ void Simulator::simulateROVCR() {
     TrafficProgramPtr program = optimiser->getPrograms()
             [scenario->getProgram()];
     int controls = program->getFlowRates().size();
-    unsigned long noPaths = optimiser-getOtherInputs()->getNoPaths();
+    unsigned long noPaths = optimiser->getOtherInputs()->getNoPaths();
 
     std::vector<SpeciesRoadPatchesPtr> srp = road->getSpeciesRoadPatches();
-    Eigen::Vector iar(srp.size());
+    Eigen::VectorXd iar(srp.size());
 
     // First, compute the IAR for each species for this road
     if (threader != nullptr) {

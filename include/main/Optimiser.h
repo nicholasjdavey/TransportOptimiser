@@ -104,15 +104,10 @@ public:
      * @param threader as ThreadManagerPtr
      * @param elite as double
      */
-    Optimiser(const std::vector<TrafficProgramPtr>& programs, OtherInputsPtr
-            oInputs, DesignParametersPtr desParams, EarthworkCostsPtr
-            earthworks, UnitCostsPtr unitCosts, VariableParametersPtr
-            varParams, const std::vector<SpeciesPtr>& species, EconomicPtr
-            economic, TrafficPtr traffic, RegionPtr region, double mr, unsigned
-            long cf, unsigned long gens, unsigned long popSize, double stopTol,
-            double confInt, double confLvl, unsigned long habGridRes,
-            std::string solScheme, unsigned long noRuns, Optimiser::Type type,
-            double elite, unsigned long sg);
+    Optimiser(double mr, unsigned long cf, unsigned long gens, unsigned long
+            popSize, double stopTol, double confInt, double confLvl, unsigned
+            long habGridRes, std::string solScheme, unsigned long noRuns,
+            Optimiser::Type type, double elite, unsigned long sg);
     /**
      * Destructor
      */

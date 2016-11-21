@@ -23,32 +23,33 @@ Road::Road(OptimiserPtr op,const Eigen::VectorXd &xCoords, const
 }
 
 Road::Road(OptimiserPtr op, const Eigen::RowVectorXd& genome) {
-    // First, ensure that the genome length is a multiple of three
+    // First, ensure that the genome length is a multiple of three and that it
+    // is equal to the number of design points (intersection points + start and
+    // end points)
     int intersectPts = op->getDesignParameters()->getIntersectionPoints() + 2;
 
     if (genome.size() != 3*(intersectPts)) {
-        throw std::invalid_argument("Genome must be a multiple of three.");
+        throw std::invalid_argument("Genome must be 3x the number of design points.");
     }
 
     this->xCoords.resize(intersectPts);
     this->yCoords.resize(intersectPts);
     this->zCoords.resize(intersectPts);
 
+    Eigen::VectorXi rowIdx(1);
+    rowIdx(0) = 0;
     Eigen::VectorXi colIdx = Eigen::VectorXi::LinSpaced(intersectPts,0,
             intersectPts-1);
 
-    igl::slice(genome,colIdx,this->xCoords);
+    igl::slice(genome,rowIdx,colIdx,this->xCoords);
     colIdx = (colIdx.array() + 1).matrix();
-    igl::slice(genome,colIdx,this->yCoords);
+    igl::slice(genome,rowIdx,colIdx,this->yCoords);
     colIdx = (colIdx.array() + 1).matrix();
-    igl::slice(genome,colIdx,this->zCoords);
+    igl::slice(genome,rowIdx,colIdx,this->zCoords);
 
     // Assign optimiser
+    this->optimiser.reset();
     this->optimiser = op;
-
-    // Assign an empty Attributes object (always has the same size)
-    AttributesPtr att(new Attributes(this->me()));
-    this->attributes = att;
 }
 
 Road::~Road() {
@@ -59,6 +60,8 @@ RoadPtr Road::me() {
 }
 
 void Road::designRoad() {
+    AttributesPtr att(new Attributes(this->me()));
+    this->attributes = att;
     this->computeAlignment();
     this->plotRoadPath();    
     const Eigen::VectorXd& s = this->segments->getDists();
