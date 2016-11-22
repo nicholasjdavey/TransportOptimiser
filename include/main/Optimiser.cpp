@@ -7,29 +7,7 @@ Optimiser::Optimiser() {
 Optimiser::Optimiser(double mr, unsigned long cf, unsigned long gens, unsigned
         long popSize, double stopTol, double confInt, double confLvl, unsigned
         long habGridRes, std::string solScheme, unsigned long noRuns,
-        Optimiser::Type type, double elite, unsigned long sg) {
-
-//	std::vector<RoadPtr>* crp(new std::vector<RoadPtr>());
-    this->type = type;
-    Eigen::MatrixXd currPop(popSize,3*(desParams->getIntersectionPoints()+2));
-    this->currentRoadPopulation = currPop;
-
-    unsigned long noTests = (varParams->getPopulationLevels().size())*
-            (varParams->getHabPref().size())*(varParams->getLambda().
-            size())*(varParams->getBeta().size())*
-            (varParams->getGrowthRatesMultipliers().size())*
-            (varParams->getGrowthRateSDMultipliers().size())*
-            (varParams->getCommodityMultipliers().size())*
-            (varParams->getCommoditySDMultipliers().size())*
-            (varParams->getAnimalBridge().size());
-
-    std::vector< std::vector<RoadPtr> > br(noTests);
-
-    for(unsigned int ii=0; ii<noTests;ii++) {
-            std::vector<RoadPtr> brr(noRuns);
-            br.push_back(brr);
-    }
-    this->bestRoads = br;
+        Optimiser::Type type, unsigned long sg) {
 
 //	std::vector<ProgramPtr>* programs(new std::vector<ProgramPtr>());
     unsigned long const hardware_threads = std::thread::hardware_concurrency();
@@ -37,7 +15,6 @@ Optimiser::Optimiser(double mr, unsigned long cf, unsigned long gens, unsigned
     this->threader = threader;
     this->mutationRate = mr;
     this->crossoverFrac = cf;
-    this->variableParams = varParams;
     this->generations = gens;
     this->noRuns = noRuns;
     this->populationSizeGA = popSize;
@@ -48,6 +25,7 @@ Optimiser::Optimiser(double mr, unsigned long cf, unsigned long gens, unsigned
     this->solutionScheme = solScheme;
     this->stallGenerations = sg;
     this->stallGen = 0;
+    this->type = type;
 }
 
 Optimiser::~Optimiser() {
@@ -55,6 +33,31 @@ Optimiser::~Optimiser() {
 
 OptimiserPtr Optimiser::me() {
     return shared_from_this();
+}
+
+void Optimiser::initialiseStorage() {
+    //	std::vector<RoadPtr>* crp(new std::vector<RoadPtr>());
+    Eigen::MatrixXd currPop(this->populationSizeGA,3*(this->designParams->
+            getIntersectionPoints()+2));
+    this->currentRoadPopulation = currPop;
+
+    unsigned long noTests = (this->variableParams->getPopulationLevels().
+            size())*(this->variableParams->getHabPref().size())*(this->
+            variableParams->getLambda().size())*(this->variableParams->
+            getBeta().size())*(this->variableParams->
+            getGrowthRatesMultipliers().size())*
+            (this->variableParams->getGrowthRateSDMultipliers().size())*
+            (this->variableParams->getCommodityMultipliers().size())*
+            (this->variableParams->getCommoditySDMultipliers().size())*
+            (this->variableParams->getAnimalBridge().size());
+
+    std::vector< std::vector<RoadPtr> > br(this->noRuns);
+
+    for(unsigned int ii=0; ii<this->noRuns;ii++) {
+            std::vector<RoadPtr> brr(this->noRuns);
+            br.push_back(brr);
+    }
+    this->bestRoads = br;
 }
 
 void Optimiser::computeHabitatMaps() {

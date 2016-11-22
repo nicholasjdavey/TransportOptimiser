@@ -84,7 +84,7 @@ public:
     RoadGA(double mr, unsigned long cf, unsigned long gens, unsigned long
             popSize, double stopTol, double confInt, double confLvl, unsigned
             long habGridRes, std::string solScheme, unsigned long noRuns,
-            Optimiser::Type type, double elite, double scale, unsigned long
+            Optimiser::Type type, double scale, unsigned long
             learnPeriod, double surrThresh, unsigned long maxLearnNo, unsigned
             long minLearnNo, unsigned long sg, RoadGA::Selection selector,
             RoadGA::Scaling fitscale, unsigned long topProp, double

@@ -107,7 +107,7 @@ public:
     Optimiser(double mr, unsigned long cf, unsigned long gens, unsigned long
             popSize, double stopTol, double confInt, double confLvl, unsigned
             long habGridRes, std::string solScheme, unsigned long noRuns,
-            Optimiser::Type type, double elite, unsigned long sg);
+            Optimiser::Type type, unsigned long sg);
     /**
      * Destructor
      */
@@ -663,6 +663,14 @@ public:
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
+
+    /**
+     * Initialises the storage containers in the object (bestRoads etc.)
+     *
+     * @note This function must be called once all object attributes such as
+     * VarParams have been assigned non-null pointers
+     */
+    void initialiseStorage();
 
     /**
      * Runs the algorithm to optimise the road with the possibility to enter

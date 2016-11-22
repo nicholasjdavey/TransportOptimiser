@@ -16,13 +16,12 @@ RoadGA::RoadGA() : Optimiser() {
 RoadGA::RoadGA(double mr, unsigned long cf, unsigned long gens, unsigned
     long popSize, double stopTol, double confInt, double confLvl, unsigned long
     habGridRes, std::string solScheme, unsigned long noRuns,
-    Optimiser::Type type, double elite, double scale, unsigned long
-    learnPeriod, double surrThresh, unsigned long maxLearnNo, unsigned long
-    minLearnNo, unsigned long sg, RoadGA::Selection selector, RoadGA::Scaling
-    fitscale, unsigned long topProp, double maxSurvivalRate, int ts) :
-    Optimiser(programs, oInputs, desParams, earthworks, unitCosts, varParams,
-            species, economic, traffic, region, mr, cf, gens, popSize, stopTol,
-            confInt, confLvl, habGridRes, solScheme, noRuns, type, elite, sg) {
+    Optimiser::Type type, double scale, unsigned long learnPeriod, double
+    surrThresh, unsigned long maxLearnNo, unsigned long minLearnNo, unsigned
+    long sg, RoadGA::Selection selector, RoadGA::Scaling fitscale, unsigned
+    long topProp, double maxSurvivalRate, int ts) :
+    Optimiser(mr, cf, gens, popSize, stopTol, confInt, confLvl, habGridRes,
+            solScheme, noRuns, type, sg) {
 
     this->theta = 0;
     this->generation = 0;
