@@ -17,49 +17,49 @@ typedef std::shared_ptr<CommodityCovariance> CommodityCovariancePtr;
  * Class for managing %Commodity objects (including fuels)
  */
 class Commodity : public Uncertainty, 
-		public std::enable_shared_from_this<Commodity> {
+        public std::enable_shared_from_this<Commodity> {
 
 public:
-	// CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
+    // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
-	/**
-	 * Constructor I
-	 *
-	 * Constructs a %Commodity object with default values
-	 */
+    /**
+     * Constructor I
+     *
+     * Constructs a %Commodity object with default values
+     */
     Commodity(OptimiserPtr optimiser);
 
-	/**
-	 * Constructor II
-	 *
-	 * Constructs a %Commodity object with assigned values
-	 */
+    /**
+     * Constructor II
+     *
+     * Constructs a %Commodity object with assigned values
+     */
     Commodity(OptimiserPtr optimiser, std::string nm, double mp, double sd,
             double rev, bool active);
 
-	/**
-	 * Destructor
-	 */
-	~Commodity();
+    /**
+     * Destructor
+     */
+    ~Commodity();
 
-	// ACCESSORS //////////////////////////////////////////////////////////////
+    // ACCESSORS //////////////////////////////////////////////////////////////
 
-	/**
-	 * Returns the commodity's covariance with other commodities
-	 *
+    /**
+     * Returns the commodity's covariance with other commodities
+     *
      * @return Covariances as std::vector<CommodityCovariancePtr>&
-	 */
+     */
     const std::vector<CommodityCovariancePtr>& getCovariances() {
         return this->covariances;
-	}
-	/**
-	 * Sets the commodity's covariance with other commodities
-	 *
+    }
+    /**
+     * Sets the commodity's covariance with other commodities
+     *
      * @param covs as std::vector<CommodityCovariancePtr>&
-	 */
+     */
     void setCovariances(const std::vector<CommodityCovariancePtr>& covs) {
         this->covariances = covs;
-	}
+    }
 
     /**
      * Returns the ore content.
@@ -107,9 +107,9 @@ public:
         this->oreContentSD = ocsd;
     }
 
-	// STATIC ROUTINES ////////////////////////////////////////////////////////
+    // STATIC ROUTINES ////////////////////////////////////////////////////////
 
-	// CALCULATION ROUTINES ///////////////////////////////////////////////////
+    // CALCULATION ROUTINES ///////////////////////////////////////////////////
 
 private:
     std::vector<CommodityCovariancePtr> covariances;/**< Covariances with other commodities */

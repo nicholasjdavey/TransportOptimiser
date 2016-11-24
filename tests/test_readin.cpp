@@ -6,12 +6,9 @@ int main(int argc, char **argv) {
     // We will later add the attributes to the Optimiser Object
     std::string solScheme = "GA";
 
-    RoadGAPtr roadGA(new RoadGA());
-
-    RoadGAPtr roadGA(new RoadGA(programs,otherInputs,desParams,earthwork,
-            unitCosts,varParams,species,economic,traffic,region,0.4,0.55,500,
-            400,0.1,0.95,0.95,10,solScheme,5,Optimiser::MTE,0.5,1,50,0.05,50,
-            3,10,RoadGA::TOURNAMENT,RoadGA::RANK,0.4,0.8,5));
+    RoadGAPtr roadGA(new RoadGA(0.4,0.55,500,400,0.1,0.95,0.95,10,solScheme,5,
+            Optimiser::MTE,1,50,0.05,50,3,10,RoadGA::TOURNAMENT,
+            RoadGA::RANK,0.4,0.8,5));
 
     // Initialise the input classes
     // SPECIES
@@ -40,8 +37,12 @@ int main(int argc, char **argv) {
     std::string petrolName = "petrol";
     std::string commodityName = "ore";
 
-    CommodityPtr diesel(roadGA,dieselName,1.2,0.01,0.01,true);
-    CommodityPtr petrol(roadGA,dieselName,1.05,0.01,0.01,true);
+    CommodityPtr diesel(new Commodity(roadGA,dieselName,1.2,0.01,0.01,true));
+    diesel->setCurrent(1.2);
+    CommodityPtr petrol(new Commodity(roadGA,petrolName,1.05,0.01,0.01,true));
+    petrol->setCurrent(1.05);
+    CommodityPtr ore(new Commodity(roadGA,commodityName,100,0.1,0.01,true));
+    ore->setCurrent(120);
 
     // VEHICLES
     std::string smallCarName = "small";
@@ -66,18 +67,28 @@ int main(int argc, char **argv) {
     Eigen::MatrixXd switching(flows.size(),flows.size());
     switching << 0, 0, 0, 0, 0, 0, 0, 0, 0;
 
-    TrafficProgramPtr prog1(new TraficProgram(false, flows,switching));
+    TrafficProgramPtr prog1(new TrafficProgram(false,traffic,flows,switching));
     std::vector<TrafficProgramPtr> programs(1);
     programs[1] = prog1;
 
     // OTHER INPUTS
-    OtherInputsPtr otherInputs(new OtherInputs());
+    std::string idf = "Input Data/input_data_file.csv";
+    std::string orf = "Output Data/output_data_file.csv";
+    std::string itf = "Input Data/input_terrain_file.csv";
+    std::string erf = "Input Data/existing_roads_file.csv";
+    OtherInputsPtr otherInputs(new OtherInputs(idf,orf,itf,erf,0,1,0,1,1000,
+            20));
 
     // EARTHWORK COSTS
-    EarthworkCostsPtr earthwork(new EarthworkCosts());
+    Eigen::VectorXd cd(6);
+    cd << 0,1.5,3.0,4.5,6.0,7.5;
+    Eigen::VectorXd cc(6);
+    cc << 0,40.0,57.6,72.8,100.0,120.0,200.0;
+    EarthworkCostsPtr earthwork(new EarthworkCosts(cd,cc,40/1.623));
 
     // UNIT COSTS
-    UnitCostsPtr unitCosts(new UnitCosts());
+    UnitCostsPtr unitCosts(new UnitCosts(4852,1.42*2.55,1.42*0.125,1.42*0.11,
+            1.42*1.71,1.42*3.05,1.42*0.12));
 
     // VARIABLE PARAMETERS
     VariableParametersPtr varParams(new VariableParameters());

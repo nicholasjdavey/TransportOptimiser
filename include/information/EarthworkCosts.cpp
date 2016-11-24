@@ -5,5 +5,5 @@ EarthworkCosts::EarthworkCosts(const Eigen::VectorXd& cd, const
 
     this->cDepths = cd;
     this->cCosts = cc;
-	this->fCost = fc;
+    this->fCost = fc;
 }

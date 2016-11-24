@@ -3,26 +3,26 @@
 double Costs::unitRevenueVar = 0.0;
 
 Costs::Costs(RoadPtr road) {
-	this->road = road;
-	this->accidentFixed = 0.0;
-	this->accidentVar = 0.0;
-	this->earthwork = 0.0;
-	this->lengthFixed = 0.0;
-	this->lengthVar = 0.0;
+    this->road = road;
+    this->accidentFixed = 0.0;
+    this->accidentVar = 0.0;
+    this->earthwork = 0.0;
+    this->lengthFixed = 0.0;
+    this->lengthVar = 0.0;
     this->location = 0.0;
-	this->penaltyCost = 0.0;
+    this->penaltyCost = 0.0;
 }
 
 Costs::Costs(RoadPtr road, double af, double av, double e, double lf, double
         lv, double loc, double pc) {
     this->road = road;
-	this->accidentFixed = af;
-	this->accidentVar = av;
-	this->earthwork = e;
-	this->lengthFixed = lf;
-	this->lengthVar = lv;
+    this->accidentFixed = af;
+    this->accidentVar = av;
+    this->earthwork = e;
+    this->lengthFixed = lf;
+    this->lengthVar = lv;
     this->location = loc;
-	this->penaltyCost = pc;
+    this->penaltyCost = pc;
 }
 
 Costs::~Costs() {
@@ -39,9 +39,9 @@ void Costs::computeUnitRevenue(OptimiserPtr optimiser) {
 }
 
 void Costs::computeEarthworkCosts() {
-	// Get segment lengths and segment average depths.
-	// Negative values represent fill, positive values
-	// represent cuts.
+    // Get segment lengths and segment average depths.
+    // Negative values represent fill, positive values
+    // represent cuts.
     RoadPtr roadPtrShared = this->road.lock();
 
     long int segs = roadPtrShared->getRoadSegments()->getDists().size() - 1;
@@ -56,13 +56,13 @@ void Costs::computeEarthworkCosts() {
     double repF = roadPtrShared->getOptimiser()->getDesignParameters()
 			->getFillRep();
 
-	Eigen::VectorXd avDepth = 0.5*(depth.segment(1,segs+1)
-			+ depth.segment(0,segs));
+    Eigen::VectorXd avDepth = 0.5*(depth.segment(1,segs+1)
+                    + depth.segment(0,segs));
     Eigen::VectorXi type = Eigen::VectorXi::Constant(segs,
             (int)(RoadSegments::ROAD));
     roadPtrShared->getRoadSegments()->setType(type);
 
-	// Costs are USD per m^3 in 2015 based on Chew, Goh & Fwa 1988 indexed.
+    // Costs are USD per m^3 in 2015 based on Chew, Goh & Fwa 1988 indexed.
     // When different soil types are used, they shall be included as well.
     // The first zero in each of the followin two vectors corresponds the to
     // the case where the segment is actually filled. This allows us to use
@@ -74,36 +74,36 @@ void Costs::computeEarthworkCosts() {
     double fCost = roadPtrShared->getOptimiser()->getEarthworkCosts()
 			->getFillCost();
 
-	Eigen::VectorXd cut = (avDepth.array() > 0).cast<double>();
-	Eigen::VectorXd fill = 1 - avDepth.array();
+    Eigen::VectorXd cut = (avDepth.array() > 0).cast<double>();
+    Eigen::VectorXd fill = 1 - avDepth.array();
 
-	// CutLevel entry of 0 indicates that it is actually a fill. This is used
-	// for indexing in the matrices that follow.
+    // CutLevel entry of 0 indicates that it is actually a fill. This is used
+    // for indexing in the matrices that follow.
     Eigen::MatrixXd dWidth = Eigen::MatrixXd::Zero(cDepths.size(),
-			avDepth.size());
-	Eigen::VectorXd cutCosts = Eigen::VectorXd::Zero(avDepth.size());
-	Eigen::VectorXd fillCosts = Eigen::VectorXd::Zero(avDepth.size());
-	Eigen::VectorXd finalLayerCost = Eigen::VectorXd::Zero(avDepth.size());
-	Eigen::VectorXd finalLayerDepth = Eigen::VectorXd::Zero(avDepth.size());
-	Eigen::VectorXd finalLayerWidth = Eigen::VectorXd::Zero(avDepth.size());
-	Eigen::VectorXd segCosts = Eigen::VectorXd::Zero(avDepth.size());
+            avDepth.size());
+    Eigen::VectorXd cutCosts = Eigen::VectorXd::Zero(avDepth.size());
+    Eigen::VectorXd fillCosts = Eigen::VectorXd::Zero(avDepth.size());
+    Eigen::VectorXd finalLayerCost = Eigen::VectorXd::Zero(avDepth.size());
+    Eigen::VectorXd finalLayerDepth = Eigen::VectorXd::Zero(avDepth.size());
+    Eigen::VectorXd finalLayerWidth = Eigen::VectorXd::Zero(avDepth.size());
+    Eigen::VectorXd segCosts = Eigen::VectorXd::Zero(avDepth.size());
 
-	// Compute the cross section width at the start of this cost level for each
-	// road segment.
+    // Compute the cross section width at the start of this cost level for each
+    // road segment.
     for (int ii = 2; ii< cDepths.size(); ii++) {
-		Eigen::VectorXi lessDepth =
-                (avDepth.array() >= cDepths(ii-1)).cast<int>();
+        Eigen::VectorXi lessDepth =
+        (avDepth.array() >= cDepths(ii-1)).cast<int>();
 
-		dWidth.block(ii-1,0,1,avDepth.size()) =
-				((lessDepth.cast<double>().array()*(2*avDepth.array()
-                -cDepths(ii-1)))/((tan(repC)+rw.array()))).matrix();
-		
-		finalLayerCost += (lessDepth.cast<double>().array()*
-                (cCosts(ii)-cCosts(ii-1))).matrix();
-		finalLayerDepth += (lessDepth.cast<double>().array()*
-                (cDepths(ii)-cDepths(ii-1))).matrix();
+        dWidth.block(ii-1,0,1,avDepth.size()) =
+                        ((lessDepth.cast<double>().array()*(2*avDepth.array()
+        -cDepths(ii-1)))/((tan(repC)+rw.array()))).matrix();
 
-		// If we are in the first depth band, the following will add
+        finalLayerCost += (lessDepth.cast<double>().array()*
+        (cCosts(ii)-cCosts(ii-1))).matrix();
+        finalLayerDepth += (lessDepth.cast<double>().array()*
+        (cDepths(ii)-cDepths(ii-1))).matrix();
+
+        // If we are in the first depth band, the following will add
         // nothing. The value for this will be added after the loop for
         // segments where the overall depth falls within this band.
         // Otherwise, we add the whole depth.
@@ -111,39 +111,39 @@ void Costs::computeEarthworkCosts() {
             -cDepths(ii-2))*0.5*cCosts(ii-1)*
 			(dWidth.block(ii-1,0,1,avDepth.size()).array()
 			+dWidth.block(ii-2,0,1,avDepth.size()).array())).matrix();
-	}
+    }
 
-	// Compute the costs associated with the deepest excavated cost level
+    // Compute the costs associated with the deepest excavated cost level
     // and add to the cut costs. The width of the bottom is simply the road
     // width.
-	finalLayerWidth = (2*(avDepth.array() - finalLayerDepth.array())/
-			((tan(repC)+rw.array()))).matrix();
-	cutCosts += ((cut.array())*finalLayerCost.array()*
-			(avDepth.array()-finalLayerDepth.array())*(finalLayerWidth.array()
-			+rw.array()*0.5)).matrix();
+    finalLayerWidth = (2*(avDepth.array() - finalLayerDepth.array())/
+                    ((tan(repC)+rw.array()))).matrix();
+    cutCosts += ((cut.array())*finalLayerCost.array()*
+                    (avDepth.array()-finalLayerDepth.array())*(finalLayerWidth.array()
+                    +rw.array()*0.5)).matrix();
 
-	// If the cut cost for a segment is too great, build a tunnel instead.
+    // If the cut cost for a segment is too great, build a tunnel instead.
     // If the fill cost for a segment is too great, build a bridge instead.
     // Ignore tunnel and bridge costs for now.
 
-	// Compute the final costs for each segment
-	cutCosts = (cut.array()*segLen.array()*cutCosts.array()).matrix();
-	fillCosts = (fill.array()*segLen.array()*fCost*(2*rw.array()+2*
-			avDepth.array().abs()/tan(repF))*avDepth.array().abs())
-			.matrix();
-	
-	// bridgeCosts = fill.*segLen.*cBridge;
-	// tunnelCosts = cut.*segLen.*cTunnel;
-	// typ = typ + 2*cut.*(cutCosts > tunnelCosts) + fill.*(fillCosts > ...
-	//     bridgeCosts);
+    // Compute the final costs for each segment
+    cutCosts = (cut.array()*segLen.array()*cutCosts.array()).matrix();
+    fillCosts = (fill.array()*segLen.array()*fCost*(2*rw.array()+2*
+                    avDepth.array().abs()/tan(repF))*avDepth.array().abs())
+                    .matrix();
 
-	// segCosts = cut.*(min(cutCosts,tunnelCosts))+fill.*(min(fillCosts,...
-	//     bridgeCosts));
+    // bridgeCosts = fill.*segLen.*cBridge;
+    // tunnelCosts = cut.*segLen.*cTunnel;
+    // typ = typ + 2*cut.*(cutCosts > tunnelCosts) + fill.*(fillCosts > ...
+    //     bridgeCosts);
 
-	// Ignore bridges and tunnels for now
-	segCosts = (cut.array()*cutCosts.array() + fill.array()*fillCosts.array())
-			.matrix();
-	this->setEarthwork(segCosts.sum());
+    // segCosts = cut.*(min(cutCosts,tunnelCosts))+fill.*(min(fillCosts,...
+    //     bridgeCosts));
+
+    // Ignore bridges and tunnels for now
+    segCosts = (cut.array()*cutCosts.array() + fill.array()*fillCosts.array())
+                    .matrix();
+    this->setEarthwork(segCosts.sum());
 }
 
 void Costs::computeLocationCosts() {
