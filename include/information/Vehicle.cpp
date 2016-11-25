@@ -16,3 +16,7 @@ Vehicle::Vehicle(CommodityPtr fuel, std::string nm, double width, double length,
 	this->avsq = avsq;
 	this->travelPerHrCost = travel;
 }
+
+Vehicle::~Vehicle() {
+
+}

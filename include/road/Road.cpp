@@ -26,8 +26,8 @@ Road::Road(OptimiserPtr op, const Eigen::RowVectorXd& genome) {
     // First, ensure that the genome length is a multiple of three and that it
     // is equal to the number of design points (intersection points + start and
     // end points)
-    int intersectPts = op->getDesignParameters()->getIntersectionPoints() + 2;
 
+    int intersectPts = op->getDesignParameters()->getIntersectionPoints() + 2;
     if (genome.size() != 3*(intersectPts)) {
         throw std::invalid_argument("Genome must be 3x the number of design points.");
     }

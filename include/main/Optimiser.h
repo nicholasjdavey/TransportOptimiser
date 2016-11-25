@@ -104,7 +104,7 @@ public:
      * @param threader as ThreadManagerPtr
      * @param elite as double
      */
-    Optimiser(double mr, unsigned long cf, unsigned long gens, unsigned long
+    Optimiser(double mr, double cf, unsigned long gens, unsigned long
             popSize, double stopTol, double confInt, double confLvl, unsigned
             long habGridRes, std::string solScheme, unsigned long noRuns,
             Optimiser::Type type, unsigned long sg);
@@ -670,7 +670,7 @@ public:
      * @note This function must be called once all object attributes such as
      * VarParams have been assigned non-null pointers
      */
-    void initialiseStorage();
+    virtual void initialiseStorage();
 
     /**
      * Runs the algorithm to optimise the road with the possibility to enter

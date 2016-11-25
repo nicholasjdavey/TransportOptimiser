@@ -13,19 +13,36 @@ RoadGA::RoadGA() : Optimiser() {
     this->surrThresh = 0.05;
 }
 
-RoadGA::RoadGA(double mr, unsigned long cf, unsigned long gens, unsigned
-    long popSize, double stopTol, double confInt, double confLvl, unsigned long
-    habGridRes, std::string solScheme, unsigned long noRuns,
-    Optimiser::Type type, double scale, unsigned long learnPeriod, double
-    surrThresh, unsigned long maxLearnNo, unsigned long minLearnNo, unsigned
-    long sg, RoadGA::Selection selector, RoadGA::Scaling fitscale, unsigned
-    long topProp, double maxSurvivalRate, int ts) :
+RoadGA::RoadGA(double mr, double cf, unsigned long gens, unsigned long popSize,
+    double stopTol, double confInt, double confLvl, unsigned long habGridRes,
+    std::string solScheme, unsigned long noRuns, Optimiser::Type type, double
+    scale, unsigned long learnPeriod, double surrThresh, unsigned long
+    maxLearnNo, unsigned long minLearnNo, unsigned long sg, RoadGA::Selection
+    selector, RoadGA::Scaling fitscale, double topProp, double
+    maxSurvivalRate, int ts) :
     Optimiser(mr, cf, gens, popSize, stopTol, confInt, confLvl, habGridRes,
             solScheme, noRuns, type, sg) {
 
     this->theta = 0;
     this->generation = 0;
     this->scale = scale;
+
+    this->maxLearnNo = maxLearnNo;
+    this->minLearnNo = minLearnNo;
+    this->learnPeriod = learnPeriod;
+    this->surrThresh = surrThresh;
+    this->surrErr = 1;
+    this->noSamples = 0;
+    this->selector = selector;
+    this->fitScaling = fitscale;
+    this->topProp = topProp;
+    this->maxSurvivalRate = maxSurvivalRate;
+    this->tournamentSize = ts;
+}
+
+void RoadGA::initialiseStorage() {
+    Optimiser::initialiseStorage();
+
     this->xO = Eigen::VectorXd::Zero(this->designParams->
             getIntersectionPoints());
     this->yO = Eigen::VectorXd::Zero(this->designParams->
@@ -57,18 +74,6 @@ RoadGA::RoadGA(double mr, unsigned long cf, unsigned long gens, unsigned
             populationSizeGA*this->maxSampleRate,noSpecies);
     this->useSD = Eigen::VectorXd::Zero(this->generations*this->
             populationSizeGA*this->maxSampleRate);
-
-    this->maxLearnNo = maxLearnNo;
-    this->minLearnNo = minLearnNo;
-    this->learnPeriod = learnPeriod;
-    this->surrThresh = surrThresh;
-    this->surrErr = 1;
-    this->noSamples = 0;
-    this->selector = selector;
-    this->fitScaling = fitscale;
-    this->topProp = topProp;
-    this->maxSurvivalRate = maxSurvivalRate;
-    this->tournamentSize = ts;
 }
 
 void RoadGA::creation() {

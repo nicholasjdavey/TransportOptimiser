@@ -17,3 +17,7 @@ OtherInputs::OtherInputs(std::string& idf, std::string& orf, std::string& itf,
     this->lonPoints = lonPoints;
     this->habGridRes = habGridRes;
 }
+
+OtherInputs::~OtherInputs() {
+
+}

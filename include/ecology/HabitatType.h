@@ -174,15 +174,15 @@ public:
 	// CALCULATION ROUTINES ///////////////////////////////////////////////////
 
 private:
-        HabitatType::habType type;	/**< Habitat type */
-        double maxPop;              /**< Maximum population per m^2 */
-        double cost;                /**< Cost per m^2 */
-        Eigen::VectorXi vegetations;/**< Vegetations in this habitat type */
-        double habPrefMean;         /**< Species mean preference for this habitat */
-        double habPrefSD;           /**< Habitat preference standard deviation */
+    HabitatType::habType type;	/**< Habitat type */
+    double maxPop;              /**< Maximum population per m^2 */
+    double cost;                /**< Cost per m^2 */
+    Eigen::VectorXi vegetations;/**< Vegetations in this habitat type */
+    double habPrefMean;         /**< Species mean preference for this habitat */
+    double habPrefSD;           /**< Habitat preference standard deviation */
 
 public:
-        static Eigen::VectorXi allVegetations;  /**< All vegetations in the region */
+    static Eigen::VectorXi allVegetations;  /**< All vegetations in the region */
 };
 
 #endif

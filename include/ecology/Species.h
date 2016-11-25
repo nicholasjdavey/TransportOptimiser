@@ -393,7 +393,7 @@ private:
     double speedMean;                   /**< Mean species road crossing speed */
     double speedSD;                     /**< Species road crossing speed standard deviation */
     double costPerAnimal;               /**< Cost per animal below threshold ($) */
-    std::vector<HabitatTypePtr> habitat;/**< Habitat type */
+    std::vector<HabitatTypePtr> habitat;/**< Habitat types */
     Eigen::MatrixXi habitatMap;         /**< Breakdown of region into the four base habitat types */
     Eigen::MatrixXd populationMap;      /**< Population of animals in each cell */
     double threshold;                   /**< Target threshold as proportion of initial population */

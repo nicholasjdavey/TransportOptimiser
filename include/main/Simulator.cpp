@@ -311,18 +311,18 @@ void Simulator::simulateROVCR(std::vector<Eigen::MatrixXd>& visualisePops,
 void Simulator::naturalBirthDeath(const SpeciesRoadPatchesPtr species, const
         Eigen::VectorXd& capacities, Eigen::VectorXd& pops) {
 
-    RoadPtr road = this->road.lock();
-    OptimiserPtr optimiser = road->getOptimiser();
-    ThreadManagerPtr threader = optimiser->getThreadManager();
-    ExperimentalScenarioPtr scenario = optimiser->getScenario();
+//    RoadPtr road = this->road.lock();
+//    OptimiserPtr optimiser = road->getOptimiser();
+//    ThreadManagerPtr threader = optimiser->getThreadManager();
+//    ExperimentalScenarioPtr scenario = optimiser->getScenario();
     SpeciesPtr spec = species->getSpecies();
 
-    TrafficProgramPtr program = (road->getOptimiser()
-            ->getPrograms())[scenario->getProgram()];
-    int controls = program->getFlowRates().size();
+//    TrafficProgramPtr program = (road->getOptimiser()
+//            ->getPrograms())[scenario->getProgram()];
+//    int controls = program->getFlowRates().size();
 
-    int timeSteps = road->getOptimiser()->getEconomic()->getYears();
-    double stepSize = road->getOptimiser()->getEconomic()->getTimeStep();
+//    int timeSteps = road->getOptimiser()->getEconomic()->getYears();
+//    double stepSize = road->getOptimiser()->getEconomic()->getTimeStep();
 
     // Initialise random number generator
     std::mt19937_64 generator;
@@ -421,7 +421,7 @@ void Simulator::simulateMTEPath(const std::vector<SpeciesRoadPatchesPtr>&
 
         // Next, compute animal movement and road mortality
         for (int kk = 0; kk < species.size(); kk++) {
-            pops[kk] =reArrMat[jj]*initPops[kk];
+            pops[kk] = reArrMat[jj]*initPops[kk];
         }
 
         // Finally, account for natural birth and death

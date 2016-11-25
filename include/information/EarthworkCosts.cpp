@@ -7,3 +7,7 @@ EarthworkCosts::EarthworkCosts(const Eigen::VectorXd& cd, const
     this->cCosts = cc;
     this->fCost = fc;
 }
+
+EarthworkCosts::~EarthworkCosts() {
+
+}

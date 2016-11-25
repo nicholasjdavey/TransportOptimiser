@@ -17,9 +17,11 @@ public:
      *
      * Constructs a %VariableParameters object with default values.
 	 */
-    VariableParameters(const Eigen::VectorXd& popLevels, const Eigen::VectorXi &bridge, const Eigen::VectorXd& hp, const Eigen::VectorXd& l, const
-        Eigen::VectorXd& b, const Eigen::VectorXd& pgr,
-        const Eigen::VectorXd& c, const Eigen::VectorXd& csd);
+    VariableParameters(const Eigen::VectorXd& popLevels, const Eigen::VectorXi
+            &bridge, const Eigen::VectorXd& hp, const Eigen::VectorXd& l, const
+            Eigen::VectorXd& b, const Eigen::VectorXd& pgr, const
+            Eigen::VectorXd& pgrsd, const Eigen::VectorXd& c, const
+            Eigen::VectorXd& csd);
     /**
      * Destructor
      */
@@ -210,11 +212,13 @@ public:
     // CALCULATION ROUTINES //////////////////////////////////////////////////////
 
     private:
+    // Sensitivity variables
     Eigen::VectorXd populationLevels;   /**< Percentage required survival levels to test */
     Eigen::VectorXd habPref;            /**< Standard deviations away from mean habitat preferences to use */
     Eigen::VectorXd lambda;             /**< Standard deviations away from mean lambdas to use */
     Eigen::VectorXd beta;               /**< Standard deviations away from mean betas to use */
     Eigen::VectorXi animalBridge;       /**< Maximum number of animal bridges to use */
+    // Stochastic variables:
     Eigen::VectorXd popGR;              /**< Percentage of base population growth rates to use */
     Eigen::VectorXd popGRSD;            /**< Population growth rate standard deviation scalings to use */
     Eigen::VectorXd commodity;          /**< Percentage of base commodity mean price to use */

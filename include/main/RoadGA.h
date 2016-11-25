@@ -81,13 +81,13 @@ public:
      *
      * Constructs a RoadGA object with assigned values
      */
-    RoadGA(double mr, unsigned long cf, unsigned long gens, unsigned long
+    RoadGA(double mr, double cf, unsigned long gens, unsigned long
             popSize, double stopTol, double confInt, double confLvl, unsigned
             long habGridRes, std::string solScheme, unsigned long noRuns,
             Optimiser::Type type, double scale, unsigned long
             learnPeriod, double surrThresh, unsigned long maxLearnNo, unsigned
             long minLearnNo, unsigned long sg, RoadGA::Selection selector,
-            RoadGA::Scaling fitscale, unsigned long topProp, double
+            RoadGA::Scaling fitscale, double topProp, double
             maxSurvivalRate, int ts);
 
     // ACCESSORS //////////////////////////////////////////////////////////////
@@ -364,6 +364,11 @@ public:
     /** Virtual Routines *****************************************************/
 
     /**
+     * Extends the 'initialiseStorage' routine of Optimiser to include RoadGA
+     * specific initialisations.
+     */
+    virtual void initialiseStorage();
+    /**
      * Creates the initial population used in the optimisation process
      *
      * Creates the initial population for the genetic algorithm that will
@@ -525,7 +530,7 @@ private:
     unsigned long noSamples;    /**< Current number of samples available for building surrogates */
     RoadGA::Selection selector; /**< Parents selection routine */
     RoadGA::Scaling fitScaling; /**< Scaling method used for fitness scaling */
-    unsigned long topProp;      /**< Proportion to consider as top individuals */
+    double topProp;             /**< Proportion to consider as top individuals */
     double maxSurvivalRate;     /**< Maximum survival rate for shifLinearScaling */
     int tournamentSize;         /**< Number of competitors per tournament */
 

@@ -21,6 +21,10 @@ Region::Region(std::string input) {
 Region::Region(std::string rawData, bool rd) {
 }
 
+Region::~Region() {
+
+}
+
 void Region::placeNetwork(const Eigen::VectorXd x, const Eigen::VectorXd y,
         Eigen::VectorXd z) {
 

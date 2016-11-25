@@ -4,7 +4,7 @@ Optimiser::Optimiser() {
     // Initialise nothing. All parameters must be assigned manually.
 }
 
-Optimiser::Optimiser(double mr, unsigned long cf, unsigned long gens, unsigned
+Optimiser::Optimiser(double mr, double cf, unsigned long gens, unsigned
         long popSize, double stopTol, double confInt, double confLvl, unsigned
         long habGridRes, std::string solScheme, unsigned long noRuns,
         Optimiser::Type type, unsigned long sg) {
@@ -37,6 +37,7 @@ OptimiserPtr Optimiser::me() {
 
 void Optimiser::initialiseStorage() {
     //	std::vector<RoadPtr>* crp(new std::vector<RoadPtr>());
+
     Eigen::MatrixXd currPop(this->populationSizeGA,3*(this->designParams->
             getIntersectionPoints()+2));
     this->currentRoadPopulation = currPop;

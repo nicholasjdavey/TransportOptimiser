@@ -20,7 +20,7 @@ endif
 
 LDLIBS = -lpthread
 CXXFLAGS = -std=gnu++11 -pthread -c $(CFLAGS) $(DEBUG)
-LXXFLAGS = -std=gnu++11 -pthread $(CFLAGS) $(LFLAGS) $(LDLIBS) $(DEBUG)
+LXXFLAGS = -std=gnu++11 -pthread $(LFLAGS) $(LDLIBS) $(DEBUG)
 
 SHELL = /bin/sh
 

@@ -236,7 +236,8 @@ void SpeciesRoadPatches::roadCrossings() {
     double lda = (roadPtrShared->getOptimiser()->getVariableParams()
             ->getLambda())(roadPtrShared->getOptimiser()->getScenario()
             ->getLambda());
-    double maxDist = log(0.05)/(-lda);
+    double maxDist = log(0.05)/(-(this->species->getLambdaMean() + this->
+            species->getLambdaSD()*lda));
 
     // No need to remove road segments that are not finite or for which the
     // start and end points are coincident as this is already taken care of by
@@ -292,7 +293,11 @@ void SpeciesRoadPatches::computeTransitionProbabilities() {
     double lda = (roadPtrShared->getOptimiser()->getVariableParams()
             ->getLambda())(roadPtrShared->getOptimiser()->getScenario()
             ->getLambda());
-    double maxDist = log(0.05)/(-lda);
+    double hp = (roadPtrShared->getOptimiser()->getVariableParams()
+            ->getHabPref()(roadPtrShared->getOptimiser()->getScenario()
+            ->getHabPref()));
+    double maxDist = log(0.05)/(-(this->species->getLambdaMean() + this->
+            species->getLambdaSD()*lda));
 
     this->transProbs = Eigen::MatrixXd::Zero(this->habPatch.size(),
             this->habPatch.size());
@@ -305,11 +310,13 @@ void SpeciesRoadPatches::computeTransitionProbabilities() {
                 if (ii == jj) {
                     this->transProbs(ii,jj) = this->habPatch[jj]->getArea()
                             *lda*exp(this->habPatch[jj]->getType()
-                            ->getHabPrefMean());
+                            ->getHabPrefMean() + this->habPatch[jj]->getType()
+                            ->getHabPrefSD()*hp);
                 } else {
                     this->transProbs(ii,jj) = (this->habPatch[jj]->getArea()
                             *lda*exp(this->habPatch[jj]->getType()
-                            ->getHabPrefMean())) / exp(-lda*dists(ii,jj));
+                            ->getHabPrefMean() + this->habPatch[jj]->getType()
+                            ->getHabPrefSD()*hp)) / exp(-lda*dists(ii,jj));
                 }
                 summ += this->transProbs(ii,jj);
             }

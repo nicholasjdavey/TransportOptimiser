@@ -11,3 +11,7 @@ UnitCosts::UnitCosts(double acc, double air, double noise, double water, double 
 	this->landUse = land;
 	this->solidChemWaste = chem;
 }
+
+UnitCosts::~UnitCosts() {
+
+}
