@@ -132,10 +132,9 @@ int main(int argc, char **argv) {
     roadGA->setRegion(region);
     // Now that we have all of the contained objects within the roadGA object,
     // we can initialise the storage elements
-    std::cout << ":( " << desParams.get() << std::endl;
-    std::cout << "what... " << roadGA->getDesignParameters().get() << std::endl;
+    std::cout << ":( " << varParams->getPopulationLevels() << std::endl;
+    std::cout << "what... " << roadGA->getVariableParams()->getPopulationLevels() << std::endl;
     roadGA->initialiseStorage();
-    std::cout << "the fuck? " << roadGA->getDesignParameters().get() << std::endl;
 
     // ADD A TEST ROAD
     Eigen::RowVectorXd genome(30);
