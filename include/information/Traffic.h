@@ -13,125 +13,125 @@ typedef std::shared_ptr<Traffic> TrafficPtr;
 class Traffic : public std::enable_shared_from_this<Traffic> {
 
 public:
-	// CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
+    // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
-	/**
-	 * Constructor I
-	 *
-	 * Constructs a blank %Traffic object
-	 */
-	Traffic();
+    /**
+     * Constructor I
+     *
+     * Constructs a blank %Traffic object
+     */
+    Traffic();
 
-	/**
-	 * Constructor II
-	 *
-	 * Constructs a %Traffic object with assigned values.
-	 */
+    /**
+     * Constructor II
+     *
+     * Constructs a %Traffic object with assigned values.
+     */
     Traffic(const std::vector<VehiclePtr>& vehicles, double peakProp, double d,
-			double peak, double gr);
+            double peak, double gr);
 
-	/** 
+    /**
      * Destructor
-	 */
-	~Traffic();
+     */
+    ~Traffic();
 
-	// ACCESSORS //////////////////////////////////////////////////////////////
+    // ACCESSORS //////////////////////////////////////////////////////////////
 
-	/**
-	 * Returns the vehicles
-	 *
-	 * @return Vehicles as std::vector<VehiclePtr>*
-	 */
+    /**
+     * Returns the vehicles
+     *
+     * @return Vehicles as std::vector<VehiclePtr>*
+     */
     const std::vector<VehiclePtr>& getVehicles() {
         return this->vehicles;
-	}
-	/**
-	 * Sets the vehicles used
-	 *
+    }
+    /**
+     * Sets the vehicles used
+     *
      * @param vehicles as const std::vector<VehiclePtr>&
-	 */
+     */
     void setVehicles(const std::vector<VehiclePtr>& vehicles) {
         this->vehicles = vehicles;
-	}
-	
-	/**
-	 * Returns the proportion of daily traffic during peak time
-	 *
-	 * @return Peak proportion as double
-	 */
-	double getPeakProportion() {
-		return this->peakProportion;
-	}
-	/**
-	 * Sets the proportion of daily traffic during peak time
-	 *
-	 * @param pp as double
-	 */
-	void setPeakProportion(double pp) {
-		this->peakProportion = pp;
-	}
+    }
 
-	/**
-	 * Returns the directionality of traffic during peak time toward A
-	 *
-	 * @return Peak directionality as double
-	 */
-	double getDirectionality() {
-		return this->directionality;
-	}
-	/**
-	 * Sets the directionality of traffic during peak time toward A
-	 *
-	 * @param dir as double
-	 */
-	void setDirectionality(double dir) {
-		this->directionality = dir;
-	}
+    /**
+     * Returns the proportion of daily traffic during peak time
+     *
+     * @return Peak proportion as double
+     */
+    double getPeakProportion() {
+        return this->peakProportion;
+    }
+    /**
+     * Sets the proportion of daily traffic during peak time
+     *
+     * @param pp as double
+     */
+    void setPeakProportion(double pp) {
+        this->peakProportion = pp;
+    }
 
-	/**
-	 * Returns the number of peak hours per day
-	 *
-	 * @return Peak hours as double
-	 */
-	double getPeakHours() {
-		return this->peakHours;
-	}
-	/**
-	 * Sets the number of peak hours per day
-	 *
-	 * @param hours as double
-	 */
-	void setPeakHours(double hours) {
-		this->peakHours = hours;
-	}
+    /**
+     * Returns the directionality of traffic during peak time toward A
+     *
+     * @return Peak directionality as double
+     */
+    double getDirectionality() {
+        return this->directionality;
+    }
+    /**
+     * Sets the directionality of traffic during peak time toward A
+     *
+     * @param dir as double
+     */
+    void setDirectionality(double dir) {
+        this->directionality = dir;
+    }
 
-	/**
-	 * Returns the annual traffic growth rate (\% p.a.)
-	 *
-	 * @return Growth rate as double
-	 */
-	double getGR() {
-		return this->growthRate;
-	}
-	/**
-	 * Sets the annual traffic growth rate
-	 *
-	 * @param gr as double
-	 */
-	void setGR(double gr) {
-		this->growthRate = gr;
-	}
+    /**
+     * Returns the number of peak hours per day
+     *
+     * @return Peak hours as double
+     */
+    double getPeakHours() {
+        return this->peakHours;
+    }
+    /**
+     * Sets the number of peak hours per day
+     *
+     * @param hours as double
+     */
+    void setPeakHours(double hours) {
+        this->peakHours = hours;
+    }
 
-	// STATIC ROUTINES ////////////////////////////////////////////////////////
+    /**
+     * Returns the annual traffic growth rate (\% p.a.)
+     *
+     * @return Growth rate as double
+     */
+    double getGR() {
+        return this->growthRate;
+    }
+    /**
+     * Sets the annual traffic growth rate
+     *
+     * @param gr as double
+     */
+    void setGR(double gr) {
+        this->growthRate = gr;
+    }
 
-	// CALCULATION ROUTINES ///////////////////////////////////////////////////
+    // STATIC ROUTINES ////////////////////////////////////////////////////////
+
+    // CALCULATION ROUTINES ///////////////////////////////////////////////////
 
 private:
     std::vector<VehiclePtr> vehicles;	/**< Vehicles in traffic */
-	double peakProportion;				/**< Proportion of daily traffic during peak times */
-	double directionality;				/**< Peak time directionality toward A */
-	double peakHours;					/**< Peak hours in a day */
-	double growthRate;					/**< Annual traffic growth rate */
+    double peakProportion;              /**< Proportion of daily traffic during peak times */
+    double directionality;              /**< Peak time directionality toward A */
+    double peakHours;                   /**< Peak hours in a day */
+    double growthRate;                  /**< Annual traffic growth rate */
 };
 
 #endif

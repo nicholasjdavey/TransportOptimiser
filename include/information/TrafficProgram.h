@@ -22,7 +22,7 @@ public:
      * Constructs an empty %TrafficProgram object
      */
     TrafficProgram(const Eigen::VectorXd& flowRates, const Eigen::MatrixXd&
-            switching);
+        switching);
 
     /**
      * Constructor II
