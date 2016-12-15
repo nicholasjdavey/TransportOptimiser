@@ -34,6 +34,7 @@
 #include <Eigen/Sparse>
 // LIBIGL
 #include <igl/ceil.h>
+#include <igl/colon.h>
 #include <igl/cumsum.h>
 #include <igl/floor.h>
 #include <igl/repmat.h>

@@ -269,6 +269,7 @@ void RoadCells::computeRoadCells() {
 
 	// Finally, remove any extra rows
     Eigen::MatrixXd interMat = Eigen::MatrixXd::Zero(nnew,5);
+    Eigen::MatrixXd tempMat;
     Eigen::MatrixXd uniqueMat;
     Eigen::VectorXi uniqueRows;
     Eigen::VectorXi fullRows;
@@ -277,7 +278,17 @@ void RoadCells::computeRoadCells() {
     interMat.block(0,2,nnew,1) = this->z.transpose();
     interMat.block(0,3,nnew,1) = this->w.transpose();
     interMat.block(0,4,nnew,1) = (this->type.cast<double>()).transpose();
-    igl::unique_rows(interMat,uniqueMat,uniqueRows,fullRows);
+    igl::unique_rows(interMat,tempMat,uniqueRows,fullRows);
+    Eigen::VectorXi originalOrder;
+    Eigen::VectorXi originalOrderIDX;
+    igl::sort(uniqueRows,2,true,originalOrder,originalOrderIDX);
+    Eigen::MatrixXi sliceRows;
+    Eigen::MatrixXi sliceCols;
+    igl::repmat(originalOrder,1,tempMat.cols(),sliceRows);
+    Eigen::RowVectorXi colIdx = Eigen::VectorXi::LinSpaced(tempMat.cols(),0,
+            tempMat.cols()-1);
+    igl::repmat(colIdx,tempMat.rows(),1,sliceCols);
+    igl::slice(tempMat,sliceRows,sliceCols,uniqueMat);
     nnew = uniqueMat.rows();
     this->x = uniqueMat.block(0,0,nnew,1);
     this->y = uniqueMat.block(0,1,nnew,1);
