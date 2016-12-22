@@ -141,4 +141,7 @@ int main(int argc, char **argv) {
 
     RoadPtr trialRoad(new Road(roadGA,genome));
     std::cout << "Read in test success" << std::endl;
+
+    trialRoad->designRoad();
+    //trialRoad->evaluateRoad();
 }

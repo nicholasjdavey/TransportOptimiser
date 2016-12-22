@@ -39,7 +39,7 @@ Road::Road(OptimiserPtr op, const Eigen::RowVectorXd& genome) {
     Eigen::VectorXi rowIdx(1);
     rowIdx(0) = 0;
     Eigen::VectorXi colIdx = Eigen::VectorXi::LinSpaced(intersectPts,0,
-            intersectPts-1);
+            (3*(intersectPts-1)));
 
     igl::slice(genome,rowIdx,colIdx,this->xCoords);
     colIdx = (colIdx.array() + 1).matrix();
@@ -323,11 +323,11 @@ void Road::computeAlignment() {
 	// First ensure that no two or more successive points have the same x and
 	// y values without having the same z value
 	for (int ii = 1; ii < this->xCoords.size(); ii++) {
-		if ((this->xCoords(ii) == this->xCoords(ii-1)) &&
-				(this->yCoords(ii) == this->yCoords(ii-1)) &&
-				(this->zCoords(ii) != this->zCoords(ii-1))) {
-			throw std::invalid_argument("Impossible road alignment");
-		}
+            if ((this->xCoords(ii) == this->xCoords(ii-1)) &&
+                    (this->yCoords(ii) == this->yCoords(ii-1)) &&
+                    (this->zCoords(ii) != this->zCoords(ii-1))) {
+                throw std::invalid_argument("Impossible road alignment");
+            }
 	}
 
     // The code below must be run in order for a valid road
