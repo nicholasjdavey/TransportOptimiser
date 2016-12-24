@@ -45,8 +45,7 @@ typedef std::shared_ptr<Road> RoadPtr;
  *
  * @note Based on the road design procedure of Jong and Schonfeld (2003)
  */
-class RoadGA : public Optimiser,
-        public std::enable_shared_from_this<RoadGA> {
+class RoadGA : public Optimiser {
 
 public:
     // ENUMERATIONS ///////////////////////////////////////////////////////////
