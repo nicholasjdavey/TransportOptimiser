@@ -10,8 +10,7 @@ typedef std::shared_ptr<TrafficProgram> TrafficProgramPtr;
 /**
  * Class for managing %TrafficProgram objects
  */
-class TrafficProgram : public Program,
-    public std::enable_shared_from_this<TrafficProgram> {
+class TrafficProgram : public Program {
 
 public:
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
