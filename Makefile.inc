@@ -18,7 +18,7 @@ else
 	LFLAGS = -I/usr/local/lib
 endif
 
-LDLIBS = -lpthread
+LDLIBS = -lpthread -lboost_iostreams -lboost_system -lboost_filesystem
 CXXFLAGS = -std=gnu++11 -pthread -c $(CFLAGS) $(DEBUG)
 LXXFLAGS = -std=gnu++11 -pthread $(CFLAGS) $(LFLAGS) $(LDLIBS) $(DEBUG)
 

@@ -1,4 +1,5 @@
 #include "../transportbase.h"
+#include <gnuplot-iostream-master/gnuplot-iostream.h>
 
 RoadSegments::RoadSegments(RoadPtr road) {
 	this->road = road;
@@ -8,7 +9,7 @@ RoadSegments::~RoadSegments() {
 }
 
 void RoadSegments::computeSegments() {
-    unsigned int noPoints = 2;
+    unsigned int noPoints = 1;
     RoadPtr roadPtrShared = this->road.lock();
 
 	// Set up short names
@@ -31,11 +32,11 @@ void RoadSegments::computeSegments() {
     double width = roadPtrShared->getOptimiser()->getDesignParameters()
             ->getRoadWidth();
     const Eigen::VectorXd& pocx = (roadPtrShared->getHorizontalAlignment()->getPOCX());
-    const Eigen::VectorXd& pocy = (roadPtrShared->getHorizontalAlignment()->getPOCX());
-    const Eigen::VectorXd& potx = (roadPtrShared->getHorizontalAlignment()->getPOCX());
-    const Eigen::VectorXd& poty = (roadPtrShared->getHorizontalAlignment()->getPOCX());
-    const Eigen::VectorXd& radii = (roadPtrShared->getHorizontalAlignment()->getPOCX());
-    const Eigen::VectorXd& delta = (roadPtrShared->getHorizontalAlignment()->getPOCX());
+    const Eigen::VectorXd& pocy = (roadPtrShared->getHorizontalAlignment()->getPOCY());
+    const Eigen::VectorXd& potx = (roadPtrShared->getHorizontalAlignment()->getPOTX());
+    const Eigen::VectorXd& poty = (roadPtrShared->getHorizontalAlignment()->getPOTY());
+    const Eigen::VectorXd& radii = (roadPtrShared->getHorizontalAlignment()->getRadii());
+    const Eigen::VectorXd& delta = (roadPtrShared->getHorizontalAlignment()->getDeltas());
     const Eigen::VectorXd& delx = (roadPtrShared->getHorizontalAlignment()->getDelX());
     const Eigen::VectorXd& dely = (roadPtrShared->getHorizontalAlignment()->getDelY());
     const Eigen::VectorXd& pvc = (roadPtrShared->getVerticalAlignment()->getPVCs());
@@ -50,46 +51,46 @@ void RoadSegments::computeSegments() {
     std::vector<unsigned int> straightN(ip+1);
 
     straightN[0] = (unsigned int)std::ceil(sqrt(pow(pocx(0)-startX,2)
-        + pow(pocy(0)-startY,2))/segLen);
+            + pow(pocy(0)-startY,2))/segLen);
     noPoints += straightN[0];
 
     // Compute the number of segments
     for (unsigned int ii = 0; ii < ip; ii++) {
-    thetaS(ii) = atan((pocy(ii) - dely(ii))/(pocx(ii)
-            - delx(ii)));
+        thetaS(ii) = atan((pocy(ii) - dely(ii))/(pocx(ii)
+                - delx(ii)));
 
-    if ((((pocy(ii) - dely(ii)) >= 0) && (thetaS(ii) < 0)) ||
-            (((pocy(ii) - dely(ii)) <= 0) && (thetaS(ii) > 0))) {
-                    thetaS(ii) += M_PI;
-            } else if (thetaS(ii) < 0) {
-                    thetaS(ii) += 2*M_PI;
-            }
+        if ((((pocy(ii) - dely(ii)) >= 0) && (thetaS(ii) < 0)) ||
+                (((pocy(ii) - dely(ii)) <= 0) && (thetaS(ii) > 0))) {
+            thetaS(ii) += M_PI;
+        } else if (thetaS(ii) < 0) {
+            thetaS(ii) += 2*M_PI;
+        }
 
-    thetaE(ii) = atan((poty(ii) - dely(ii))/(potx(ii)
-            - delx(ii)));
-    if ((((poty(ii) - dely(ii)) >= 0) && (thetaE(ii) < 0)) ||
-            (((poty(ii) - dely(ii)) <= 0) && (thetaE(ii) > 0))) {
-        thetaE(ii) += M_PI;
-            } else if (thetaE(ii) < 0) {
-        thetaE(ii) += 2*M_PI;
-            }
+        thetaE(ii) = atan((poty(ii) - dely(ii))/(potx(ii)
+                - delx(ii)));
+        if ((((poty(ii) - dely(ii)) >= 0) && (thetaE(ii) < 0)) ||
+                (((poty(ii) - dely(ii)) <= 0) && (thetaE(ii) > 0))) {
+            thetaE(ii) += M_PI;
+        } else if (thetaE(ii) < 0) {
+            thetaE(ii) += 2*M_PI;
+        }
 
-    curveN[ii] = (unsigned int)std::max(ceil(delta(ii)*360/M_PI),
-            ceil(delta(ii)*radii(ii)/segLen));
+        curveN[ii] = (unsigned int)std::max(ceil(delta(ii)*180/M_PI),
+                ceil(delta(ii)*radii(ii)/segLen));
 
-            if (ii > 0) {
-        straightN[ii] = (unsigned int)ceil(sqrt(pow(pocx(ii)
-            -potx(ii-1),2) + pow(pocy(ii)-poty(ii-1),2)));
-                    noPoints += (curveN[ii] + straightN[ii]);
-            } else {
-                    noPoints += curveN[ii];
-            }
+        if (ii > 0) {
+            straightN[ii] = (unsigned int)ceil(sqrt(pow(pocx(ii)
+                -potx(ii-1),2) + pow(pocy(ii)-poty(ii-1),2))/segLen);
+            noPoints += (curveN[ii] + straightN[ii]);
+        } else {
+            noPoints += curveN[ii];
+        }
     }
 
-    // Now compute the segment coordinates
-    straightN[ip+1] = (unsigned int)floor(sqrt(pow(endX - potx(ip-1),2)
+    // Now add the final straight segment
+    straightN[ip] = (unsigned int)floor(sqrt(pow(endX - potx(ip-1),2)
             + pow(endY - poty(ip-1),2))/segLen);
-    noPoints += straightN[ip+1];
+    noPoints += straightN[ip];
 
     // Resize parametrised vectors
     this->x.resize(noPoints);
@@ -99,7 +100,7 @@ void RoadSegments::computeSegments() {
     this->w.resize(noPoints-1);
     this->spc.resize(2*(ip+1));
     this->v.resize(noPoints);
-    this->v = this->v * vMax;
+    this->v = Eigen::VectorXd::Constant(noPoints,vMax);
     this->typ = Eigen::VectorXi::Constant(noPoints-1,(int)(RoadSegments::ROAD));
 
     this->x(0) = startX;
@@ -108,15 +109,15 @@ void RoadSegments::computeSegments() {
     this->spc(0) = 0;
 
     Eigen::VectorXd span = Eigen::VectorXd::LinSpaced(straightN[0],
-                    1,straightN[0]);
+            1,straightN[0]);
 
     this->x.segment(1,straightN[0]) = this->x(0)
-        + (pocx(0)-this->x(0))*span.array()/straightN[0];
+            + (pocx(0)-this->x(0))*span.array()/straightN[0];
     this->y.segment(1,straightN[0]) = this->y(0)
-        + (pocy(0)-this->y(0))*span.array()/straightN[0];
+            + (pocy(0)-this->y(0))*span.array()/straightN[0];
     this->s.segment(1,straightN[0]) = this->s(0)
-        + sqrt(pow(pocx(0)-this->x(0),2)
-        + pow(pocy(0)-this->y(0),2))*span.array()/straightN[0];
+            + sqrt(pow(pocx(0)-this->x(0),2)
+            + pow(pocy(0)-this->y(0),2))*span.array()/straightN[0];
 
     unsigned int counter = straightN[0] + 1;
     this->spc(1) = s(counter-1);
@@ -124,44 +125,44 @@ void RoadSegments::computeSegments() {
     for (unsigned int ii = 0; ii < ip; ii++) {
         // Straight segments first
         if (ii > 0) {
-                span = Eigen::VectorXd::LinSpaced(straightN[ii],1,straightN[ii]);
-    this->x.segment(counter,straightN[ii]) = potx(ii-1)
-            + span.array() * (pocx(ii)-potx(ii-1))/straightN[ii];
-    this->y.segment(counter,straightN[ii]) = poty(ii-1)
-            + span.array() * (pocy(ii)-poty(ii-1))/straightN[ii];
-                this->s.segment(counter,straightN[ii]) = this->s(counter-1)
-            + span.array() * sqrt(pow(pocx(ii)-potx(ii-1),2)
-            + pow(pocy(ii)-poty(ii-1),2))/straightN[ii];
+            span = Eigen::VectorXd::LinSpaced(straightN[ii],1,straightN[ii]);
+            this->x.segment(counter,straightN[ii]) = potx(ii-1)
+                    + span.array() * (pocx(ii)-potx(ii-1))/((double)straightN[ii]);
+            this->y.segment(counter,straightN[ii]) = poty(ii-1)
+                    + span.array() * (pocy(ii)-poty(ii-1))/((double)straightN[ii]);
+            this->s.segment(counter,straightN[ii]) = this->s(counter-1)
+                    + span.array() * sqrt(pow(pocx(ii)-potx(ii-1),2)
+                    + pow(pocy(ii)-poty(ii-1),2))/((double)straightN[ii]);
 
-                counter += straightN[ii];
-                this->spc((ii+1)*2-1) = s(counter-1);
+            counter += straightN[ii];
+            this->spc((ii+1)*2-1) = s(counter-1);
         }
 
-    // Next do the curved segments
-    // If the angle between tangents is not zero
-    if (delta(ii) != 0.0) {
-        if ((thetaE(ii) - thetaS(ii)) > M_PI) {
+        // Next do the curved segments
+        // If the angle between tangents is not zero
+        if (delta(ii) != 0.0) {
+            if ((thetaE(ii) - thetaS(ii)) > M_PI) {
                 thetaE(ii) = thetaE(ii) - 2*M_PI;
-        } else if (thetaS(ii) - thetaE(ii) > M_PI) {
+            } else if (thetaS(ii) - thetaE(ii) > M_PI) {
                 thetaS(ii) = thetaS(ii) - 2*M_PI;
-        }
+            }
 
-        span = Eigen::VectorXd::LinSpaced(curveN[ii],1,curveN[ii]);
-        double thetaDiff = (thetaE(ii) - thetaS(ii))/curveN[ii];
-        Eigen::VectorXd theta = span.array() * thetaDiff + thetaS(ii);
+            span = Eigen::VectorXd::LinSpaced(curveN[ii],1,curveN[ii]);
+            double thetaDiff = (thetaE(ii) - thetaS(ii))/((double)curveN[ii]);
+            Eigen::VectorXd theta = span.array() * thetaDiff + thetaS(ii);
 
-        this->x.segment(counter,curveN[ii]) = delx(ii) + radii(ii) *
-                theta.array().cos();
-        this->y.segment(counter,curveN[ii]) = dely(ii) + radii(ii) *
-                theta.array().sin();
-        this->s.segment(counter,curveN[ii]) = this->s(counter-1)
-                + radii(ii)*(theta.array()-thetaS(ii)).abs();
+            this->x.segment(counter,curveN[ii]) = delx(ii) + radii(ii) *
+                    theta.array().cos();
+            this->y.segment(counter,curveN[ii]) = dely(ii) + radii(ii) *
+                    theta.array().sin();
+            this->s.segment(counter,curveN[ii]) = this->s(counter-1)
+                    + radii(ii)*(theta.array()-thetaS(ii)).abs();
         } else {
             this->x(counter) = pocx(ii);
             this->y(counter) = pocy(ii);
             this->s(counter) = this->s(counter-1) + sqrt(pow(pocx(ii)
-                    -this->x(counter-1),2) + pow(pocy(ii)
-                    -this->y(counter-1),2));
+                -this->x(counter-1),2) + pow(pocy(ii)
+                -this->y(counter-1),2));
         }
 
         counter += curveN[ii];
@@ -169,20 +170,29 @@ void RoadSegments::computeSegments() {
     }
 	
     // Add final straight as well as the final point
-    span = Eigen::VectorXd::LinSpaced(straightN[ip+1],1,straightN[ip+1]);
+    // Final segment
+    span = Eigen::VectorXd::LinSpaced(straightN[ip],1,straightN[ip]);
 
-    this->x.segment(counter,straightN[ip+1]) = potx(ip-1)
-            + span.array() * (endX-potx(ip-1))/(straightN[ip+1]+1);
-    this->y.segment(counter,straightN[ip+1]) = poty(ip-1)
-            + span.array() * (endY-poty(ip-1))/(straightN[ip+1]+1);
-    this->s.segment(counter,straightN[ip+1]) = this->s(counter-1)
+    this->x.segment(counter,straightN[ip]) = potx(ip-1)
+            + span.array() * (endX-potx(ip-1))/((double)straightN[ip]);
+    this->y.segment(counter,straightN[ip]) = poty(ip-1)
+            + span.array() * (endY-poty(ip-1))/((double)straightN[ip]);
+    this->s.segment(counter,straightN[ip]) = this->s(counter-1)
             + span.array() * sqrt(pow(endX - potx(ip-1),2)
-            + pow(endY - poty(ip-1),2))/(straightN[ip+1]+1);
+            + pow(endY - poty(ip-1),2))/((double)straightN[ip]);
+    counter += straightN[ip];
     this->spc(ip*2+1) = s(counter-1);
 
+    // Final point
+    this->x(this->x.size()-1) = endX;
+    this->y(this->y.size()-1) = endY;
+    this->s(this->s.size()-1) = (roadPtrShared->getVerticalAlignment()->
+            getSDistances()(roadPtrShared->getVerticalAlignment()->
+            getSDistances().size()-1));
     // Compute the velocities of each of the segments based on the horizontal
     // alignment maximum speeds
-    const Eigen::VectorXd& velv = roadPtrShared->getVerticalAlignment()->getVelocities();
+    const Eigen::VectorXd& velv = roadPtrShared->getVerticalAlignment()->
+            getVelocities();
 
     // Ranges counter
     unsigned int r1 = 0;
@@ -200,71 +210,74 @@ void RoadSegments::computeSegments() {
 
                 // If r1 is 0 or even, we are in a tangent segment. Otherwise
                 // we need to adjust the velocity
-                if (!(r1 % 2)) {
+                if ((r1 % 2) != 0) {
                     this->v(ii) = velv((r1-1)/2);
                 }
 
-                } else {
-                    r1++;
-                    r2++;
-                }
+            } else {
+                r1++;
+                r2++;
             }
         }
+    }
 
-	// Now compute the elevations of each of the x and y values based on their
-	// corresponding s values and adjust for the velocity during these
-	// transitions if required
+    // Now compute the elevations of each of the x and y values based on their
+    // corresponding s values and adjust for the velocity during these
+    // transitions if required
 
-        Eigen::VectorXd ranges = Eigen::VectorXd::Zero(2*(pvc.size())+2);
-	ranges(0) = 0;
+    Eigen::VectorXd ranges = Eigen::VectorXd::Zero(2*(pvc.size())+2);
+    ranges(0) = 0;
 
-	for (int ii = 0; ii < ranges.size(); ii++) {
-            ranges(2*(ii+1)-1) = pvc(ii);
-            ranges(2*(ii+1)) = pvt(ii);
-	}
-	ranges(ranges.size()-1) = this->s(ip+1);
+    for (int ii = 0; ii < pvc.size(); ii++) {
+        ranges(2*(ii+1)-1) = pvc(ii);
+        ranges(2*(ii+1)) = pvt(ii);
+    }
 
-	// Ranges counter
-	r1 = 0;
-	r2 = 1;
+    ranges(ranges.size()-1) = this->s(noPoints-1);
 
-	for (unsigned int ii = 0; ii < noPoints; ii++) {
-            bool inSegment = false;
+    // Ranges counter
+    r1 = 0;
+    r2 = 1;
 
-            // We initially set a uniform road width for the entire length
+    for (unsigned int ii = 0; ii < noPoints; ii++) {
+        bool inSegment = false;
+
+        // We initially set a uniform road width for the entire length
+        if (ii < (noPoints-1)) {
             this->w(ii) = width;
+        }
 
-            // Find the curve segment to which this value belongs. We do not
-            // consider prior segments as s is monotonically increasing.
-            while(!inSegment && (r2 <= ip*2+1)) {
-                if (this->s(ii) >= ranges(r1) &&
-                        (this->s(ii) <= ranges(r2))) {
-                    inSegment = true;
+        // Find the curve segment to which this value belongs. We do not
+        // consider prior segments as s is monotonically increasing.
+        while(!inSegment && (r2 <= ip*2+1)) {
+            if (this->s(ii) >= ranges(r1) &&
+                    (this->s(ii) <= ranges(r2))) {
+                inSegment = true;
 
-                    // If r1 is 0 or even, we are in a tangent segment
-                    if (!(r1 % 2)) {
-                        if (r1 == 0) {
-                            this->z(ii) = z(0) + (this->s(ii) - this->s(0))
-                                    * gr(0) / 100;
-                        } else {
-                            this->z(ii) = epvt(r1/2-1) + (this->s(ii)
-                                    - pvt(r1/2-1))*gr(r1/2)/100;
-                        }
-
+                // If r1 is 0 or even, we are in a tangent segment
+                if ((r1 % 2) == 0) {
+                    if (r1 == 0) {
+                        this->z(ii) = z(0) + (this->s(ii) - this->s(0))
+                                * gr(0) / 100.0;
                     } else {
-                        this->z(ii) = a(r2/2-1) + a(r2/2-1,2)*(
-                                this->s(ii) - pvc(r2/2-1)) + a(r2/2,3) *
-                        pow(this->s(ii)-pvc(r2/2),2);
+                        this->z(ii) = epvt(r1/2-1) + (this->s(ii)
+                                - pvt(r1/2-1))*gr(r1/2)/100.0;
                     }
 
                 } else {
-                    r1++;
-                    r2++;
+                    this->z(ii) = a(r2/2-1,0) + a(r2/2-1,1)*(
+                            this->s(ii) - pvc(r2/2-1)) + a(r2/2-1,2) *
+                            pow(this->s(ii)-pvc(r2/2-1),2);
                 }
-            }
-	}
 
-	this->z(noPoints) = endZ;
+            } else {
+                r1++;
+                r2++;
+            }
+        }
+    }
+
+    this->z(noPoints-1) = endZ;
     this->computeRoadLength();
 }
 

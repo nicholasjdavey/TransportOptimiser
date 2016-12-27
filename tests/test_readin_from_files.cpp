@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
     species[0] = animal;
 
     // DESIGN PARAMETERS
-    DesignParametersPtr desParams(new DesignParameters(100,100,100,4900,4900,
+    DesignParametersPtr desParams(new DesignParameters(100,0,0,8500,3000,
             5,8,15,2.5,3.4,8,20,M_PI/4,M_PI/6,0,0,0,0,0,0,100,3.621,
             0.355,0.1562,2.4282,4.331,0.1704,false));
 
@@ -118,6 +118,17 @@ int main(int argc, char **argv) {
     // REGION
     std::string regionData = "Input Data/region.csv";
     RegionPtr region(new Region(regionData,true));
+
+    // Read in region Z coordinates
+    ifstream regionFile("/Input Data/Regions/Region_1/zcoordsMatrix.csv");
+
+    while (regionFile.good()) {
+        std::string line;
+        getline(regionFile,line, "\n");
+        std::stringstream ss(line);
+
+
+    }
 
     // ADD THE COMPONENTS TO THE OPTIMISER OBJECT
     roadGA->setPrograms(programs);

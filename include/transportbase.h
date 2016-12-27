@@ -50,6 +50,11 @@
 // CTPL
 #include <CTPL-master/ctpl.h>
 
+// GNUPLOTIOSTREAM
+// Only include in the specific CPP source files where required. The wrapper
+// was written with bad practices including initialising static members in the
+// header instead of the source file.
+
 // EXTERNAL PROJECTS INCLUDED IN SOURCE CODE (AS PER USAGE INSTRUCTIONS) //////
 #include "utilities/labelmethod.h"
 #include "utilities/r8lib.hpp"
