@@ -65,7 +65,7 @@ void Road::designRoad() {
     this->computeAlignment();
     this->plotRoadPath();    
     const Eigen::VectorXd& s = this->segments->getDists();
-    this->attributes->setLength(s(s.size()));
+    this->attributes->setLength(s(s.size()-1));
     this->computeRoadCells();
     this->computeCostElements();
 }
@@ -362,6 +362,8 @@ void Road::computeRoadCells() {
 }
 
 void Road::computeCostElements() {
+    CostsPtr costs(new Costs(this->me()));
+    this->setCosts(costs);
     this->costs->computeEarthworkCosts();
     this->costs->computeLocationCosts();
     this->costs->computeLengthCosts();

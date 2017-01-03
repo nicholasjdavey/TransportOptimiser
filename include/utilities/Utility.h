@@ -74,6 +74,28 @@ namespace Utility {
     }
 
     /**
+     * Retrieves the corresponding entries at each index in I of matrix X and
+     * returns the result to a corresponding vector.
+     *
+     * @param X as m by n matrix (Eigen)
+     * @param I list of indices (Eigen)
+     * @return Y list of corresponding values (Eigen)
+     */
+    template <typename T>
+    static void sliceIdx(
+            const Eigen::Matrix<T,Eigen::Dynamic,Eigen::Dynamic>& X,
+            const Eigen::Matrix<int,Eigen::Dynamic,1>& I,
+            Eigen::Matrix<T,Eigen::Dynamic,1>& Y) {
+
+        const T* data = X.data();
+
+        // Loop over indices. The data input matrix is in COLUMN-MAJOR form
+        for (int ii = 0; ii < I.size(); ii++) {
+            Y(ii) = data[I(ii)];
+        }
+    }
+
+    /**
      * Allows determining where values in a matrix are finite
      */
     template<typename Derived>

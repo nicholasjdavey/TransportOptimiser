@@ -155,6 +155,7 @@ public:
      * Sets the matrix of soil stabilisation costs
      *
      * @param ssc as const Eigen::MatrixXd&
+     */
 
     void setSoilStabilisationCost(const Eigen::MatrixXd& ssc) {
         this->soilStabCost = ssc;
@@ -202,8 +203,8 @@ public:
      * @param y as const Eigen::VectorXd&
      * @param z as Eigen::VectorXd&
      */
-    void placeNetwork(const Eigen::VectorXd x, const Eigen::VectorXd y,
-            Eigen::VectorXd z);
+    void placeNetwork(const Eigen::VectorXd& x, const Eigen::VectorXd& y,
+            Eigen::VectorXd& z);
 
     /**
      * Places a single X and Y coordinate onto the region to get the

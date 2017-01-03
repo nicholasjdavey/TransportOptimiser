@@ -48,15 +48,15 @@ void Costs::computeEarthworkCosts() {
     Eigen::VectorXd depth = roadPtrShared->getRoadSegments()->getE() -
             roadPtrShared->getRoadSegments()->getZ();
     Eigen::VectorXd segLen = roadPtrShared->getRoadSegments()->getDists().
-            segment(1,segs+1) - roadPtrShared->getRoadSegments()->getDists().
-			segment(0,segs);
+            segment(1,segs) - roadPtrShared->getRoadSegments()->getDists().
+            segment(0,segs);
     const Eigen::VectorXd& rw = roadPtrShared->getRoadSegments()->getWidths();
     double repC = roadPtrShared->getOptimiser()->getDesignParameters()
-			->getCutRep();
+            ->getCutRep();
     double repF = roadPtrShared->getOptimiser()->getDesignParameters()
-			->getFillRep();
+            ->getFillRep();
 
-    Eigen::VectorXd avDepth = 0.5*(depth.segment(1,segs+1)
+    Eigen::VectorXd avDepth = 0.5*(depth.segment(1,segs)
                     + depth.segment(0,segs));
     Eigen::VectorXi type = Eigen::VectorXi::Constant(segs,
             (int)(RoadSegments::ROAD));
@@ -72,10 +72,10 @@ void Costs::computeEarthworkCosts() {
     const Eigen::VectorXd& cCosts = roadPtrShared->getOptimiser()->
             getEarthworkCosts()->getCutCosts();
     double fCost = roadPtrShared->getOptimiser()->getEarthworkCosts()
-			->getFillCost();
+            ->getFillCost();
 
     Eigen::VectorXd cut = (avDepth.array() > 0).cast<double>();
-    Eigen::VectorXd fill = 1 - avDepth.array();
+    Eigen::VectorXd fill = 1 - cut.array();
 
     // CutLevel entry of 0 indicates that it is actually a fill. This is used
     // for indexing in the matrices that follow.
@@ -87,40 +87,45 @@ void Costs::computeEarthworkCosts() {
     Eigen::VectorXd finalLayerDepth = Eigen::VectorXd::Zero(avDepth.size());
     Eigen::VectorXd finalLayerWidth = Eigen::VectorXd::Zero(avDepth.size());
     Eigen::VectorXd segCosts = Eigen::VectorXd::Zero(avDepth.size());
+    finalLayerCost = cut.array()*cCosts(0);
+    dWidth.block(0,0,1,avDepth.size()) =
+            (cut.array()*(2*avDepth.array())/(tan(repC))
+            + rw.array()).transpose();
 
     // Compute the cross section width at the start of this cost level for each
     // road segment.
-    for (int ii = 2; ii< cDepths.size(); ii++) {
+    for (int ii = 1; ii < cDepths.size(); ii++) {
         Eigen::VectorXi lessDepth =
-        (avDepth.array() >= cDepths(ii-1)).cast<int>();
+                (avDepth.array() >= cDepths(ii-1)).cast<int>();
 
-        dWidth.block(ii-1,0,1,avDepth.size()) =
-                        ((lessDepth.cast<double>().array()*(2*avDepth.array()
-        -cDepths(ii-1)))/((tan(repC)+rw.array()))).matrix();
+        dWidth.block(ii,0,1,avDepth.size()) =
+                (lessDepth.cast<double>().array()*(2*(avDepth.array()
+                -cDepths(ii)))/(tan(repC))+rw.array()).transpose();
 
         finalLayerCost += (lessDepth.cast<double>().array()*
-        (cCosts(ii)-cCosts(ii-1))).matrix();
+                (cCosts(ii)-finalLayerCost.array())).matrix();
         finalLayerDepth += (lessDepth.cast<double>().array()*
-        (cDepths(ii)-cDepths(ii-1))).matrix();
+                (cDepths(ii)-finalLayerDepth.array())).matrix();
 
         // If we are in the first depth band, the following will add
         // nothing. The value for this will be added after the loop for
         // segments where the overall depth falls within this band.
         // Otherwise, we add the whole depth.
-        cutCosts += (lessDepth.cast<double>().array()*(cDepths(ii-1)
-            -cDepths(ii-2))*0.5*cCosts(ii-1)*
-			(dWidth.block(ii-1,0,1,avDepth.size()).array()
-			+dWidth.block(ii-2,0,1,avDepth.size()).array())).matrix();
+        cutCosts += (lessDepth.cast<double>().array()*(cDepths(ii)
+                -cDepths(ii-1))*0.5*cCosts(ii-1)*
+                (dWidth.block(ii,0,1,avDepth.size()).transpose().array()
+                +dWidth.block(ii-1,0,1,avDepth.size()).transpose().array()))
+                .matrix();
     }
 
     // Compute the costs associated with the deepest excavated cost level
     // and add to the cut costs. The width of the bottom is simply the road
     // width.
-    finalLayerWidth = (2*(avDepth.array() - finalLayerDepth.array())/
-                    ((tan(repC)+rw.array()))).matrix();
-    cutCosts += ((cut.array())*finalLayerCost.array()*
-                    (avDepth.array()-finalLayerDepth.array())*(finalLayerWidth.array()
-                    +rw.array()*0.5)).matrix();
+    finalLayerWidth = (2*(avDepth.array() - finalLayerDepth.array())/tan(repC)
+            + rw.array()).matrix();
+    cutCosts += ((cut.array()*finalLayerCost.array())*0.5*
+            ((avDepth.array()-finalLayerDepth.array())*(finalLayerWidth.array()
+            +rw.array()))).matrix();
 
     // If the cut cost for a segment is too great, build a tunnel instead.
     // If the fill cost for a segment is too great, build a bridge instead.
@@ -128,9 +133,9 @@ void Costs::computeEarthworkCosts() {
 
     // Compute the final costs for each segment
     cutCosts = (cut.array()*segLen.array()*cutCosts.array()).matrix();
-    fillCosts = (fill.array()*segLen.array()*fCost*(2*rw.array()+2*
-                    avDepth.array().abs()/tan(repF))*avDepth.array().abs())
-                    .matrix();
+    fillCosts = (fill.array()*segLen.array()*fCost*(rw.array()+
+            avDepth.array().abs()/tan(repF))*(avDepth.array().abs()))
+            .matrix();
 
     // bridgeCosts = fill.*segLen.*cBridge;
     // tunnelCosts = cut.*segLen.*cTunnel;
@@ -142,7 +147,7 @@ void Costs::computeEarthworkCosts() {
 
     // Ignore bridges and tunnels for now
     segCosts = (cut.array()*cutCosts.array() + fill.array()*fillCosts.array())
-                    .matrix();
+            .matrix();
     this->setEarthwork(segCosts.sum());
 }
 
@@ -154,25 +159,27 @@ void Costs::computeLocationCosts() {
 
     Eigen::VectorXi purch(segments->getTypes().size());
     purch = (segments->getTypes().array() !=
-             (int)RoadSegments::TUNNEL).cast<int>();
+            (int)RoadSegments::TUNNEL).cast<int>();
 
     Eigen::VectorXi interact(segments->getTypes().size());
     interact = (segments->getTypes().array() ==
-             (int)RoadSegments::ROAD).cast<int>();
+            (int)RoadSegments::ROAD).cast<int>();
 
     // Acquisition costs
     Eigen::VectorXd ac(segments->getTypes().size());
     const Eigen::MatrixXd& acCostsPtr = region->getAcquisitionCost();
-    igl::slice(acCostsPtr,segments->getCellRefs(),ac);
+    Utility::sliceIdx(acCostsPtr,segments->getCellRefs(),ac);
 
-    double acqCost = (purch.cast<double>().array()*ac.cast<double>().array()*
+    double acqCost = (purch.segment(0,purch.size()-1).cast<double>().array()*
+            ac.segment(0,ac.size()-1).cast<double>().array()*
             (segments->getAreas().array())).sum();
 
     // Soil stabilisation costs
     Eigen::VectorXd stab(segments->getTypes().size());
     const Eigen::MatrixXd& stabCostsPtr = region->getSoilStabilisationCost();
-    igl::slice(stabCostsPtr,segments->getCellRefs(),stab);
-    double stabCost = (purch.cast<double>().array()*stab.cast<double>().
+    Utility::sliceIdx(stabCostsPtr,segments->getCellRefs(),stab);
+    double stabCost = (purch.segment(0,purch.size()-1).cast<double>().array()*
+            stab.segment(0,stab.size()-1).cast<double>().
             array()*(segments->getAreas()).array()).sum();
 
     // Species habitat damage costs (accumulates over each species)
@@ -188,7 +195,7 @@ void Costs::computeLocationCosts() {
                     species[ii]->getHabitatTypes();
 
             Eigen::VectorXi habTypes(segments->getVegetation().size());
-            igl::slice(habMapPtr,segments->getCellRefs(),habTypes);
+            Utility::sliceIdx(habMapPtr,segments->getCellRefs(),habTypes);
 
             for (int jj = 0; jj < habitatTypes.size(); jj++) {
                 Eigen::VectorXi ofType = (habTypes.array() ==

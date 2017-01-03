@@ -1,6 +1,4 @@
 #include "../transportbase.h"
-#include <gnuplot-iostream-master/gnuplot-iostream.h>
-
 RoadSegments::RoadSegments(RoadPtr road) {
 	this->road = road;
 }
@@ -283,10 +281,9 @@ void RoadSegments::computeSegments() {
 
 void RoadSegments::placeNetwork() {
 
-    RoadPtr roadPtrShared = this->road.lock();
-
     RegionPtr region = this->road.lock()->getOptimiser()->getRegion();
 
+    this->e.resize(this->x.size());
     region->placeNetwork(this->x, this->y, this->e);
 }
 

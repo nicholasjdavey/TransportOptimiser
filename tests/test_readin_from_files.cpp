@@ -7,7 +7,7 @@ int main(int argc, char **argv) {
     std::string solScheme = "GA";
 
     RoadGAPtr roadGA(new RoadGA(0.4,0.55,500,400,0.1,0.95,0.95,10,solScheme,5,
-            Optimiser::MTE,1.0,50,0.05,50,3,10,RoadGA::TOURNAMENT,
+            Optimiser::SIMPLEPENALTY,1.0,50,0.05,50,3,10,RoadGA::TOURNAMENT,
             RoadGA::RANK,0.4,0.8,5));
 
     // Initialise the input classes
@@ -26,6 +26,9 @@ int main(int argc, char **argv) {
 
     std::vector<SpeciesPtr> species(1);
     species[0] = animal;
+
+    // Habitat map and initial populaiton
+
 
     // DESIGN PARAMETERS
     DesignParametersPtr desParams(new DesignParameters(100,0,0,8500,3000,
@@ -119,16 +122,48 @@ int main(int argc, char **argv) {
     std::string regionData = "Input Data/region.csv";
     RegionPtr region(new Region(regionData,true));
 
+    // Create X and Y matrices
+    Eigen::VectorXd x = Eigen::VectorXd::LinSpaced(201,-1000,15250);
+    Eigen::RowVectorXd y = Eigen::RowVectorXd::LinSpaced(201,-1000,17000);
+
+    Eigen::MatrixXd X = x.replicate<1,201>();
+    Eigen::MatrixXd Y = y.replicate<201,1>();
+
     // Read in region Z coordinates
-    ifstream regionFile("/Input Data/Regions/Region_1/zcoordsMatrix.csv");
+    std::ifstream regionFile;
 
-    while (regionFile.good()) {
+    regionFile.open("Input_Data/Inputs/Regions/Region_1/zcoordsMatrix2.csv", std::ifstream::in);
+    Eigen::MatrixXd Z(201,201);
+
+    for (int ii = 0; ii < 201; ii++) {
         std::string line;
-        getline(regionFile,line, "\n");
+        std::getline(regionFile,line,'\n');
         std::stringstream ss(line);
-
-
+        for (int jj = 0; jj < 201; jj++) {
+            std::string substr;
+            std::getline(ss,substr,',');
+            std::stringstream subss(substr);
+            double val;
+            if (substr != "NaN") {
+                subss >> val;
+                Z(ii,jj) = val;
+            } else {
+                Z(ii,jj) = std::numeric_limits<double>::quiet_NaN();
+            }
+        }
     }
+
+    regionFile.close();
+    region->setX(X);
+    region->setY(Y);
+    region->setZ(Z);
+    Eigen::MatrixXi veg = Eigen::MatrixXi::Constant(201,201,1);
+    region->setVegetation(veg);
+
+    Eigen::MatrixXd acq = Eigen::MatrixXd::Constant(201,201,500);
+    region->setAcquisitionCost(acq);
+    Eigen::MatrixXd stab = Eigen::MatrixXd::Constant(201,201,50);
+    region->setSoilStabilisationCost(stab);
 
     // ADD THE COMPONENTS TO THE OPTIMISER OBJECT
     roadGA->setPrograms(programs);
