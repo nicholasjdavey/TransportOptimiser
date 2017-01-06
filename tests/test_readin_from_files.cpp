@@ -11,24 +11,124 @@ int main(int argc, char **argv) {
             RoadGA::RANK,0.4,0.8,5));
 
     // Initialise the input classes
+    // REGION
+    std::string regionData = "Input Data/region.csv";
+    RegionPtr region(new Region(regionData,true));
+
+    // Create X and Y matrices
+    Eigen::VectorXd x = Eigen::VectorXd::LinSpaced(201,-1000,15250);
+    Eigen::RowVectorXd y = Eigen::RowVectorXd::LinSpaced(201,-1000,17000);
+
+    Eigen::MatrixXd X = x.replicate<1,201>();
+    Eigen::MatrixXd Y = y.replicate<201,1>();
+
+    // Read in region Z coordinates
+    std::ifstream regionFile;
+
+    regionFile.open("Input_Data/Inputs/Regions/Region_1/zcoordsMatrix2.csv", std::ifstream::in);
+    Eigen::MatrixXd Z(201,201);
+
+    for (int ii = 0; ii < 201; ii++) {
+        std::string line;
+        std::getline(regionFile,line,'\n');
+        std::stringstream ss(line);
+        for (int jj = 0; jj < 201; jj++) {
+            std::string substr;
+            std::getline(ss,substr,',');
+            std::stringstream subss(substr);
+            double val;
+            if (substr != "NaN") {
+                subss >> val;
+                Z(ii,jj) = val;
+            } else {
+                Z(ii,jj) = std::numeric_limits<double>::quiet_NaN();
+            }
+        }
+    }
+    regionFile.close();
+
+    std::ifstream habFile;
+
+    habFile.open("Input_Data/Inputs/Regions/Region_1/habMatrix2.csv");
+    Eigen::MatrixXi V(201,201);
+
+    for (int ii = 0; ii < 201; ii++) {
+        std::string line;
+        std::getline(habFile,line,'\n');
+        std::stringstream ss(line);
+        for (int jj = 0; jj < 201; jj++) {
+            std::string substr;
+            std::getline(ss,substr,',');
+            std::stringstream subss(substr);
+            double val;
+            if (substr != "NaN") {
+                subss >> val;
+                V(ii,jj) = val;
+            } else {
+                V(ii,jj) = std::numeric_limits<int>::quiet_NaN();
+            }
+        }
+    }
+    habFile.close();
+
+    region->setX(X);
+    region->setY(Y);
+    region->setZ(Z);
+    region->setVegetation(V);
+
+    Eigen::MatrixXd acq = Eigen::MatrixXd::Constant(201,201,500);
+    region->setAcquisitionCost(acq);
+    Eigen::MatrixXd stab = Eigen::MatrixXd::Constant(201,201,50);
+    region->setSoilStabilisationCost(stab);
+
     // SPECIES
-    Eigen::VectorXi habVec(1);
-    habVec << 1;
-    HabitatTypePtr habType(new HabitatType(HabitatType::PRIMARY, 0.1, habVec,
-            2.5714e-5,0,1000000));
-    std::vector<HabitatTypePtr> habTyps(1);
-    habTyps[0] = habType;
+    // Habitat types. Always ordered as:
+    // 0. PRIMARY
+    // 1. MARGINAL
+    // 2. OTHER
+    // 3. CLEAR
+    // 4. ROAD
+    std::vector<HabitatTypePtr> habTypes(5);
+    // PRIMARY/SECONDARY
+    Eigen::VectorXi primaryVegSpec1(1);
+    primaryVegSpec1 << 4;
+    HabitatTypePtr primary(new HabitatType(HabitatType::PRIMARY,0.005,
+            primaryVegSpec1,0,0,1e8));
+    habTypes[0] = primary;
+    // MARGINAL
+    Eigen::VectorXi marginalVegSpec1(1);
+    marginalVegSpec1 << 3;
+    HabitatTypePtr marginal(new HabitatType(HabitatType::MARGINAL,0.0025,
+            marginalVegSpec1,-0.262,0.073,5e7));
+    habTypes[1] = marginal;
+    // OTHER
+    Eigen::VectorXi otherVegSpec1(1);
+    otherVegSpec1 << 2;
+    HabitatTypePtr other(new HabitatType(HabitatType::OTHER,0.001,
+            otherVegSpec1,-0.396,0.120,5e6));
+    habTypes[2] = other;
+    // CLEAR
+    Eigen::VectorXi clearVegSpec1(1);
+    clearVegSpec1 << 1;
+    HabitatTypePtr clear(new HabitatType(HabitatType::CLEAR,0.0000,
+            clearVegSpec1,-0.373,0.175,0));
+    habTypes[3] = clear;
+    // ROAD
+    Eigen::VectorXi roadVegSpec1(1);
+    roadVegSpec1 << 0;
+    HabitatTypePtr road(new HabitatType(HabitatType::ROAD,0.000,
+            roadVegSpec1,-1000,0,0));
+    habTypes[4] = road;
 
     std::string nm = "species1";
 
     SpeciesPtr animal(new Species(nm,false,2.52e-3,0.0928e-3,-2.52e-3,0.1014e-3,
-            1.4,0.5,0.7,0.012,2.78,1.39,0.1,true,habTyps));
+            1.4,0.5,0.7,0.012,2.78,1.39,0.1,true,1000,habTypes));
 
     std::vector<SpeciesPtr> species(1);
     species[0] = animal;
 
     // Habitat map and initial populaiton
-
 
     // DESIGN PARAMETERS
     DesignParametersPtr desParams(new DesignParameters(100,0,0,8500,3000,
@@ -118,53 +218,6 @@ int main(int argc, char **argv) {
     // ECONOMIC
     EconomicPtr economic(new Economic());
 
-    // REGION
-    std::string regionData = "Input Data/region.csv";
-    RegionPtr region(new Region(regionData,true));
-
-    // Create X and Y matrices
-    Eigen::VectorXd x = Eigen::VectorXd::LinSpaced(201,-1000,15250);
-    Eigen::RowVectorXd y = Eigen::RowVectorXd::LinSpaced(201,-1000,17000);
-
-    Eigen::MatrixXd X = x.replicate<1,201>();
-    Eigen::MatrixXd Y = y.replicate<201,1>();
-
-    // Read in region Z coordinates
-    std::ifstream regionFile;
-
-    regionFile.open("Input_Data/Inputs/Regions/Region_1/zcoordsMatrix2.csv", std::ifstream::in);
-    Eigen::MatrixXd Z(201,201);
-
-    for (int ii = 0; ii < 201; ii++) {
-        std::string line;
-        std::getline(regionFile,line,'\n');
-        std::stringstream ss(line);
-        for (int jj = 0; jj < 201; jj++) {
-            std::string substr;
-            std::getline(ss,substr,',');
-            std::stringstream subss(substr);
-            double val;
-            if (substr != "NaN") {
-                subss >> val;
-                Z(ii,jj) = val;
-            } else {
-                Z(ii,jj) = std::numeric_limits<double>::quiet_NaN();
-            }
-        }
-    }
-
-    regionFile.close();
-    region->setX(X);
-    region->setY(Y);
-    region->setZ(Z);
-    Eigen::MatrixXi veg = Eigen::MatrixXi::Constant(201,201,1);
-    region->setVegetation(veg);
-
-    Eigen::MatrixXd acq = Eigen::MatrixXd::Constant(201,201,500);
-    region->setAcquisitionCost(acq);
-    Eigen::MatrixXd stab = Eigen::MatrixXd::Constant(201,201,50);
-    region->setSoilStabilisationCost(stab);
-
     // ADD THE COMPONENTS TO THE OPTIMISER OBJECT
     roadGA->setPrograms(programs);
     roadGA->setOtherInputs(otherInputs);
@@ -180,6 +233,59 @@ int main(int argc, char **argv) {
     // we can initialise the storage elements
     roadGA->initialiseStorage();
 
+    // Initialise species habitat maps and initial populations
+    animal->generateHabitatMap(roadGA);
+
+    // Build the initial population map if it doesn't already exist
+    std::ifstream initPopFile;
+    initPopFile.open("Input_Data/Inputs/Regions/Region_1/initPopFile.csv");
+
+    if (initPopFile.good()) {
+        Eigen::MatrixXd IP(Z.rows(),Z.cols());
+        for (int ii = 0; ii < Z.rows(); ii++) {
+            std::string line;
+            std::getline(habFile,line,'\n');
+            std::stringstream ss(line);
+            for (int jj = 0; jj < Z.cols(); jj++) {
+                std::string substr;
+                std::getline(ss,substr,',');
+                std::stringstream subss(substr);
+                double val;
+                if (substr != "NaN") {
+                    subss >> val;
+                    IP(ii,jj) = val;
+                } else {
+                    IP(ii,jj) = std::numeric_limits<int>::quiet_NaN();
+                }
+            }
+        }
+        initPopFile.close();
+        animal->setPopulationMap(IP);
+
+    } else {
+        initPopFile.close();
+        std::ofstream initPopFile;
+        initPopFile.open("Input_Data/Inputs/Regions/Region_1/initPopFile.csv",
+                std::ios::out);
+
+        animal->initialisePopulationMap(roadGA);
+
+        for (int ii = 0; ii < animal->getHabitatMap().rows(); ii++) {
+            for (int jj = 0; jj < animal->getHabitatMap().cols(); jj++) {
+                initPopFile << animal->getHabitatMap()(ii,jj);
+
+                if (jj < (animal->getHabitatMap().cols() - 1)) {
+                    initPopFile << ",";
+                }
+            }
+
+            if (ii < (animal->getHabitatMap().rows()-1)) {
+                initPopFile << std::endl;
+            }
+        }
+    }
+    initPopFile.close();
+
     // ADD A TEST ROAD
     Eigen::RowVectorXd genome(30);
 
@@ -189,5 +295,5 @@ int main(int argc, char **argv) {
     std::cout << "Read in test success" << std::endl;
 
     trialRoad->designRoad();
-    //trialRoad->evaluateRoad();
+    trialRoad->evaluateRoad(false);
 }

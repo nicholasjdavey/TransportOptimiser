@@ -40,7 +40,7 @@ public:
      */
     Species(std::string nm, bool sex, double lm, double lsd, double rcm,
             double rcsd, double grm, double grsd, double lenm, double lensd,
-            double spm, double spsd, double cpa, bool active,
+            double spm, double spsd, double cpa, bool active, double initPop,
             std::vector<HabitatTypePtr>& habitat);
 
     /**
@@ -50,7 +50,7 @@ public:
      */
     Species(std::string nm, bool sex, double lm, double lsd, double rcm,
             double rcsd, double grm, double grsd, double lenm, double lensd,
-            double spm, double spsd, double cpa, bool active,
+            double spm, double spsd, double cpa, bool active, double initPop,
             std::vector<HabitatTypePtr> &habitat, double current);
 
     /**
@@ -366,6 +366,23 @@ public:
         this->threshold = threshold;
     }
 
+    /**
+     * Returns the initial population in the region
+     *
+     * @return Population as double
+     */
+    double getInitialPopulation() {
+        return this->initialPop;
+    }
+    /**
+     * Sets the initial population in the region
+     *
+     * @param populatin as double
+     */
+    void setInitialPopulation(double population) {
+        this->initialPop = population;
+    }
+
     // STATIC ROUTINES /////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ////////////////////////////////////////////////////
@@ -374,8 +391,20 @@ public:
      * Builds the habitat map using input vegetation data.
      *
      * This routine is only run once at the beginning of the analysis.
+     *
+     * @param optimiser as OptimiserPtr
      */
     void generateHabitatMap(OptimiserPtr optimiser);
+
+    /**
+     * Creates an initial distribution of animals based on input parameters.
+     *
+     * This assigns animals to areas based on the habitat type at this stage.
+     * In later versions, this can also take into consideration home ranges.
+     *
+     * @param optimiser as OptimiserPtr
+     */
+    void initialisePopulationMap(OptimiserPtr optimiser);
 
 ////////////////////////////////////////////////////////////////////////////////
 private:
@@ -397,6 +426,7 @@ private:
     Eigen::MatrixXi habitatMap;         /**< Breakdown of region into the four base habitat types */
     Eigen::MatrixXd populationMap;      /**< Population of animals in each cell */
     double threshold;                   /**< Target threshold as proportion of initial population */
+    double initialPop;                  /**< Initial population of animals in region */
     SpeciesPtr me();                    /**< Enables sharing from this */
 };
 

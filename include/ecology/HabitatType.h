@@ -11,73 +11,73 @@ class HabitatType : public std::enable_shared_from_this<HabitatType> {
 
 public:
 
-	// ENUMERATIONS ///////////////////////////////////////////////////////////
-	typedef enum {
-		PRIMARY,
+    // ENUMERATIONS ///////////////////////////////////////////////////////////
+    typedef enum {
+        PRIMARY,
         MARGINAL,
         OTHER,
         CLEAR,
         ROAD
-	} habType;
+    } habType;
 
-	// CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
+    // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
-	/**
-	 * Constructor I
-	 *
-	 * Constructs a %HabitatType object with default values.
-	 */
-	HabitatType();
+    /**
+     * Constructor I
+     *
+     * Constructs a %HabitatType object with default values.
+     */
+    HabitatType();
 
-	/**
-	 * Constructor II
-	 *
-	 * Constructs a %HabitatType object with assigned habitat
-	 */
+    /**
+     * Constructor II
+     *
+     * Constructs a %HabitatType object with assigned habitat
+     */
     HabitatType(HabitatType::habType typ, double maxPop, const Eigen::VectorXi&
-                vegetations, double habPrefMean, double habPrefSD,
-                double cost);
+            vegetations, double habPrefMean, double habPrefSD,
+            double cost);
 
-	/**
-	 * Destructor
-	 */
-	~HabitatType();
+    /**
+     * Destructor
+     */
+    ~HabitatType();
 
-	// ACCESSORS //////////////////////////////////////////////////////////////
+    // ACCESSORS //////////////////////////////////////////////////////////////
 
-	/**
-	 * Returns the type of habitat
-	 *
-	 * @return Type of habitat as HabitatType::habType
-	 */
-	 HabitatType::habType getType() {
-		 return this->type;
-	}
-	/**
-	 * Sets the type of habitat
-	 *
-	 * @param type of habitat as HabitatType::habType
-	 */
-	void setType(HabitatType::habType type) {
-		this->type = type;
-	}
+    /**
+     * Returns the type of habitat
+     *
+     * @return Type of habitat as HabitatType::habType
+     */
+     HabitatType::habType getType() {
+             return this->type;
+    }
+    /**
+     * Sets the type of habitat
+     *
+     * @param type of habitat as HabitatType::habType
+     */
+    void setType(HabitatType::habType type) {
+            this->type = type;
+    }
 
-	/**
-	 * Returns the population per m^2
-	 *
-	 * @return Population per m^2 as double
-	 */
-	double getMaxPop() {
-		return this->maxPop;
-	}
-	/**
-	 * Sets the population per m^2
-	 *
-	 * @param pop as double
-	 */
-	void setMaxPop(double pop) {
-		this->maxPop = pop;
-	}
+    /**
+     * Returns the population per m^2
+     *
+     * @return Population per m^2 as double
+     */
+    double getMaxPop() {
+            return this->maxPop;
+    }
+    /**
+     * Sets the population per m^2
+     *
+     * @param pop as double
+     */
+    void setMaxPop(double pop) {
+            this->maxPop = pop;
+    }
 
     /**
      * Return the vegetations corresponding to this habitat
@@ -153,7 +153,7 @@ public:
         this->cost = cost;
     }
 
-	// STATIC ROUTINES ////////////////////////////////////////////////////////
+    // STATIC ROUTINES ////////////////////////////////////////////////////////
     /**
      * Return all vegetations
      *
@@ -171,7 +171,7 @@ public:
         HabitatType::allVegetations = veg;
     }
 
-	// CALCULATION ROUTINES ///////////////////////////////////////////////////
+    // CALCULATION ROUTINES ///////////////////////////////////////////////////
 
 private:
     HabitatType::habType type;	/**< Habitat type */

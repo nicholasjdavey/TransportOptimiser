@@ -276,19 +276,20 @@ void Costs::computeLengthCosts() {
         cphr(ii) = vehicles[ii]->getHourlyCost();
     }
 
-    Eigen::MatrixXd params(4,gr.size()-1);
+    Eigen::MatrixXd params(4,gr.size());
 
     params.block(0,0,1,gr.size()) = Eigen::RowVectorXd::Constant(gr.size(),1);
     params.block(1,0,1,gr.size()) = gr.transpose();
-    params.block(2,0,1,gr.size()) = v.transpose();
-    params.block(3,0,1,gr.size()) = v.transpose().array().pow(2);
+    params.block(2,0,1,gr.size()) = v.segment(0,gr.size()).transpose();
+    params.block(3,0,1,gr.size()) = v.segment(0,gr.size()).transpose()
+            .array().pow(2);
 
     Eigen::MatrixXd fcinter = (coeffSE*params + coeffES*params)*
             (s.segment(1,gr.size())-s.segment(0,gr.size()));
     Eigen::VectorXd fc = (fcinter.array()*prop.array()).matrix();
 
     Eigen::MatrixXd fcrep(vehicles.size(),3);
-    igl::repmat(fc,0,3,fcrep);
+    igl::repmat(fc,1,3,fcrep);
 
     this->unitFuelVar = fcrep*Q;
 

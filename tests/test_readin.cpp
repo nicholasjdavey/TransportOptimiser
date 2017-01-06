@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
     std::string nm = "species1";
 
     SpeciesPtr animal(new Species(nm,false,2.52e-3,0.0928e-3,-2.52e-3,0.1014e-3,
-            1.4,0.5,0.7,0.012,2.78,1.39,0.1,true,habTyps));
+            1.4,0.5,0.7,0.012,2.78,1.39,0.1,true,1000,habTyps));
 
     std::vector<SpeciesPtr> species(1);
     species[0] = animal;
