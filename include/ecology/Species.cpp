@@ -3,7 +3,7 @@
 Species::Species(std::string nm, bool sex, double lm, double lsd, double rcm,
         double rcsd, double grm, double grsd, double lenm, double lensd,
         double spm, double spsd, double cpa, bool active, double initPop,
-        std::vector<HabitatTypePtr> &habitat) {
+        double t,std::vector<HabitatTypePtr> &habitat) {
 
 	// Initialise object values
     this->setName(nm);
@@ -22,12 +22,13 @@ Species::Species(std::string nm, bool sex, double lm, double lsd, double rcm,
     this->setActive(active);
     this->habitat = habitat;
     this->initialPop = initPop;
+    this->threshold = t;
 }
 
 Species::Species(std::string nm, bool sex, double lm, double lsd, double rcm,
         double rcsd, double grm, double grsd, double lenm, double lensd,
         double spm, double spsd, double cpa, bool active, double initPop,
-        std::vector<HabitatTypePtr>& habitat, double current) {
+        double t, std::vector<HabitatTypePtr>& habitat, double current) {
 
     // Initialise object values
     this->setName(nm);
@@ -46,6 +47,7 @@ Species::Species(std::string nm, bool sex, double lm, double lsd, double rcm,
     this->setActive(active);
     this->habitat = habitat;
     this->initialPop = initPop;
+    this->threshold = t;
 }
 
 Species::~Species() {
@@ -72,8 +74,8 @@ void Species::generateHabitatMap(OptimiserPtr optimiser) {
 }
 
 void Species::initialisePopulationMap(OptimiserPtr optimiser) {
-    this->populationMap.resize(this->habitatMap.rows(),
-            this->habitatMap.cols());
+    this->populationMap = Eigen::MatrixXd::Constant(this->habitatMap.rows(),
+            this->habitatMap.cols(),0);
 
     // For now, we can only deal with regular rectangular grids
     double xSpan = optimiser->getRegion()->getX()(1,0) -
@@ -119,6 +121,7 @@ void Species::initialisePopulationMap(OptimiserPtr optimiser) {
     double* popMapPtr = this->populationMap.data();
 
     for (int ii = 0; ii < this->initialPop; ii++) {
-        popMapPtr[events[ii]] = popMapPtr[events[ii]] + 1.0;
+        this->populationMap(events[ii])++;
+        //popMapPtr[events[ii]] = popMapPtr[events[ii]] + 1.0;
     }
 }

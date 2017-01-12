@@ -1563,10 +1563,13 @@ void RoadGA::defaultSurrogate() {
             Eigen::VectorXd abscissa = Eigen::VectorXd::LinSpaced(11,0,1);
             Eigen::VectorXd ordinate = Eigen::VectorXd::Constant(11,1.0);
 
-            inputX.setcontent(this->noSamples,abscissa.data());
-            inputY.setcontent(this->noSamples,ordinate.data());
+            inputX.setcontent(abscissa.size(),abscissa.data());
+            inputY.setcontent(ordinate.size(),ordinate.data());
 
             alglib::spline1dfitreport report;
+            alglib::spline1dinterpolant s;
+            this->surrogate[2*this->scenario->getCurrentScenario()][this->
+                    scenario->getRun()][ii] = s;
 
             // Mean
             alglib::spline1dfitpenalized(inputX,inputY,m,rho,info,this->surrogate[
@@ -1574,9 +1577,12 @@ void RoadGA::defaultSurrogate() {
                     getRun()][ii],report);
             // Standard deviation
             ordinate = Eigen::VectorXd::Zero(11);
+            inputY.setcontent(ordinate.size(),ordinate.data());
 
-            inputX.setcontent(this->noSamples,abscissa.data());
-            inputY.setcontent(this->noSamples,ordinate.data());
+            alglib::spline1dinterpolant s2;
+            this->surrogate[2*this->scenario->getCurrentScenario()+1][this->
+                    scenario->getRun()][ii] = s2;
+
             alglib::spline1dfitpenalized(inputX,inputY,m,rho,info,this->surrogate[
                     2*this->scenario->getCurrentScenario()+1][this->scenario->
                     getRun()][ii],report);

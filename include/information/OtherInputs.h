@@ -16,7 +16,8 @@ public:
      */
     OtherInputs(std::string& idf, std::string& orf, std::string& itf,
             std::string& erf, double minLat, double maxLat, double minLon,
-            double maxLon, unsigned long latPoints, unsigned long habGridRes);
+            double maxLon, unsigned long latPoints, unsigned long lonPoints,
+            unsigned long habGridRes, unsigned long noPaths);
 
     /**
      * Destructor

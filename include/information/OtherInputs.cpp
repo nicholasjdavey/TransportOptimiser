@@ -2,7 +2,8 @@
 
 OtherInputs::OtherInputs(std::string& idf, std::string& orf, std::string& itf,
         std::string& erf, double minLat, double maxLat, double minLon,
-        double maxLon, unsigned long latPoints, unsigned long habGridRes) {
+        double maxLon, unsigned long latPoints, unsigned long lonPoints,
+        unsigned long habGridRes, unsigned long noPaths) {
 
     // Initialise object
     this->inputDataFile = idf;
@@ -16,6 +17,7 @@ OtherInputs::OtherInputs(std::string& idf, std::string& orf, std::string& itf,
     this->latPoints = latPoints;
     this->lonPoints = lonPoints;
     this->habGridRes = habGridRes;
+    this->noPaths = noPaths;
 }
 
 OtherInputs::~OtherInputs() {

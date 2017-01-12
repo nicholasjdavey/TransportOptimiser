@@ -20,6 +20,11 @@ public:
 // CONSTRUCTORS ///////////////////////////////////////////////////////////////
     ThreadManager(unsigned long max_threads);
 
+    /**
+     * Destructor
+     */
+    ~ThreadManager();
+
 // ACCESSORS //////////////////////////////////////////////////////////////////
     /**
      * Returns the user-input desired number of threads
@@ -60,11 +65,11 @@ public:
      * @param Rest is the argument list for the input function (excluding the
      * initial int parameter)
      *
-     * @return Results as std::vector< std::future< <void> > >
+     * @return Results as std::vector< std::future< <F> > >
      */
     template<typename F, typename... Rest>
     auto push(F && f, Rest&&... rest) ->std::future<decltype(f(0, rest...))> {
-        this->pool->push(f, rest...);
+        return this->pool->push(f, rest...);
     }
 
     /**

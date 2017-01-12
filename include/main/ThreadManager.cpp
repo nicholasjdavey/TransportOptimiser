@@ -9,6 +9,8 @@ ThreadManager::ThreadManager(unsigned long max_threads) {
             max_threads);
 
     PoolPtr pool(new ctpl::thread_pool(this->noThreads));
-    this->pool.reset();
     this->pool = pool;
+}
+
+ThreadManager::~ThreadManager(){
 }

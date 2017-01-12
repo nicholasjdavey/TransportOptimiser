@@ -370,23 +370,23 @@ public:
         this->traffic = traffic;
     }
 
-    /**
-     * Returns the TrafficProgram over which the optimisation is run.
-     *
-     * @return TrafficProgram as TrafficProgramPtr
-     */
-    TrafficProgramPtr getTrafficProgram() {
-        return this->trafficProgram;
-    }
-    /**
-     * Sets the TrafficProgram over which the optimisation is run.
-     *
-     * @param tp as TrafficProgramPtr
-     */
-    void setTrafficProgram(TrafficProgramPtr tp) {
-        this->trafficProgram.reset();
-        this->trafficProgram = tp;
-    }
+//    /**
+//     * Returns the TrafficProgram over which the optimisation is run.
+//     *
+//     * @return TrafficProgram as TrafficProgramPtr
+//     */
+//    TrafficProgramPtr getTrafficProgram() {
+//        return this->trafficProgram;
+//    }
+//    /**
+//     * Sets the TrafficProgram over which the optimisation is run.
+//     *
+//     * @param tp as TrafficProgramPtr
+//     */
+//    void setTrafficProgram(TrafficProgramPtr tp) {
+//        this->trafficProgram.reset();
+//        this->trafficProgram = tp;
+//    }
 
     /**
      * Returns the region data
@@ -748,7 +748,7 @@ protected:
     std::vector<SpeciesPtr> species;                                                /**< Species studied */
     EconomicPtr economic;                                                           /**< Economic parameters */
     TrafficPtr traffic;                                                             /**< Traffic details */
-    TrafficProgramPtr trafficProgram;                                               /**< Traffic program used */
+    //TrafficProgramPtr trafficProgram;                                             /**< Traffic program used */
     RegionPtr region;                                                               /**< Region of interest */
     UnitCostsPtr unitCosts;                                                         /**< Unit Costs */
     unsigned long generation;                                                       /**< Current generation in optimisation process */

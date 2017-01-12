@@ -7,8 +7,12 @@ int main(int argc, char **argv) {
     std::string solScheme = "GA";
 
     RoadGAPtr roadGA(new RoadGA(0.4,0.55,500,400,0.1,0.95,0.95,10,solScheme,5,
-            Optimiser::SIMPLEPENALTY,1.0,50,0.05,50,3,10,RoadGA::TOURNAMENT,
+            Optimiser::MTE,1.0,50,0.05,50,3,10,RoadGA::TOURNAMENT,
             RoadGA::RANK,0.4,0.8,5));
+
+    // SET THREADER
+    ThreadManagerPtr threader(new ThreadManager(8));
+    roadGA->setThreadManager(threader);
 
     // Initialise the input classes
     // REGION
@@ -16,8 +20,10 @@ int main(int argc, char **argv) {
     RegionPtr region(new Region(regionData,true));
 
     // Create X and Y matrices
-    Eigen::VectorXd x = Eigen::VectorXd::LinSpaced(201,-1000,15250);
-    Eigen::RowVectorXd y = Eigen::RowVectorXd::LinSpaced(201,-1000,17000);
+    //Eigen::VectorXd x = Eigen::VectorXd::LinSpaced(201,-1000,15250);
+    //Eigen::RowVectorXd y = Eigen::RowVectorXd::LinSpaced(201,-1000,17000);
+    Eigen::VectorXd x = Eigen::VectorXd::LinSpaced(201,-500,9500);
+    Eigen::RowVectorXd y = Eigen::RowVectorXd::LinSpaced(201,-500,9500);
 
     Eigen::MatrixXd X = x.replicate<1,201>();
     Eigen::MatrixXd Y = y.replicate<201,1>();
@@ -71,6 +77,15 @@ int main(int argc, char **argv) {
     }
     habFile.close();
 
+    // Set column-major cell indices for region
+    Eigen::MatrixXi idx(X.rows(),X.cols());
+    for (int ii = 0; ii < X.cols(); ii++) {
+        for (int jj = 0; jj < X.rows(); jj++) {
+            idx(jj,ii) = jj + ii*X.rows();
+        }
+    }
+
+    region->setCellIdx(idx);
     region->setX(X);
     region->setY(Y);
     region->setZ(Z);
@@ -92,19 +107,19 @@ int main(int argc, char **argv) {
     // PRIMARY/SECONDARY
     Eigen::VectorXi primaryVegSpec1(1);
     primaryVegSpec1 << 4;
-    HabitatTypePtr primary(new HabitatType(HabitatType::PRIMARY,0.005,
+    HabitatTypePtr primary(new HabitatType(HabitatType::PRIMARY,0.0005,
             primaryVegSpec1,0,0,1e8));
     habTypes[0] = primary;
     // MARGINAL
     Eigen::VectorXi marginalVegSpec1(1);
     marginalVegSpec1 << 3;
-    HabitatTypePtr marginal(new HabitatType(HabitatType::MARGINAL,0.0025,
+    HabitatTypePtr marginal(new HabitatType(HabitatType::MARGINAL,0.00025,
             marginalVegSpec1,-0.262,0.073,5e7));
     habTypes[1] = marginal;
     // OTHER
     Eigen::VectorXi otherVegSpec1(1);
     otherVegSpec1 << 2;
-    HabitatTypePtr other(new HabitatType(HabitatType::OTHER,0.001,
+    HabitatTypePtr other(new HabitatType(HabitatType::OTHER,0.0001,
             otherVegSpec1,-0.396,0.120,5e6));
     habTypes[2] = other;
     // CLEAR
@@ -123,7 +138,7 @@ int main(int argc, char **argv) {
     std::string nm = "species1";
 
     SpeciesPtr animal(new Species(nm,false,2.52e-3,0.0928e-3,-2.52e-3,0.1014e-3,
-            1.4,0.5,0.7,0.012,2.78,1.39,0.1,true,1000,habTypes));
+            1.4,0.5,0.7,0.012,2.78,1.39,1e7,true,1000,0.7,habTypes));
 
     std::vector<SpeciesPtr> species(1);
     species[0] = animal;
@@ -136,16 +151,24 @@ int main(int argc, char **argv) {
             0.355,0.1562,2.4282,4.331,0.1704,false));
 
     // COMMODITIES
+    std::vector<CommodityPtr> fuels(2);
+    std::vector<CommodityPtr> commodities(1);
     std::string dieselName = "diesel";
     std::string petrolName = "petrol";
     std::string commodityName = "ore";
 
-    CommodityPtr diesel(new Commodity(roadGA,dieselName,1.2,0.01,0.01,true));
+    CommodityPtr diesel(new Commodity(roadGA,dieselName,1.2,0.01,0.01,true,0,0));
     diesel->setCurrent(1.2);
-    CommodityPtr petrol(new Commodity(roadGA,petrolName,1.05,0.01,0.01,true));
+    fuels[0] = diesel;
+    CommodityPtr petrol(new Commodity(roadGA,petrolName,1.05,0.01,0.01,true,0,0));
     petrol->setCurrent(1.05);
-    CommodityPtr ore(new Commodity(roadGA,commodityName,100,0.1,0.01,true));
+    fuels[1] = petrol;
+    CommodityPtr ore(new Commodity(roadGA,commodityName,100,0.1,0.01,true,0.8,0.20));
     ore->setCurrent(120);
+    commodities[0] = ore;
+
+    // ECONOMIC
+    EconomicPtr economic(new Economic(commodities,fuels,7,50));
 
     // VEHICLES
     std::string smallCarName = "small";
@@ -180,7 +203,7 @@ int main(int argc, char **argv) {
     std::string itf = "Input Data/input_terrain_file.csv";
     std::string erf = "Input Data/existing_roads_file.csv";
     OtherInputsPtr otherInputs(new OtherInputs(idf,orf,itf,erf,0,1,0,1,1000,
-            20));
+            1000,20,5000));
 
     // EARTHWORK COSTS
     Eigen::VectorXd cd(6);
@@ -199,7 +222,7 @@ int main(int argc, char **argv) {
     Eigen::VectorXi bridge(1);
     bridge << 0;
     Eigen::VectorXd hp(1);
-    hp << 100;
+    hp << 0;
     Eigen::VectorXd l(3);
     l << -1,0,1;
     Eigen::VectorXd beta(1);
@@ -215,8 +238,11 @@ int main(int argc, char **argv) {
     VariableParametersPtr varParams(new VariableParameters(popLevels,bridge,
             hp,l,beta,pgr,pgrsd,c,csd));
 
-    // ECONOMIC
-    EconomicPtr economic(new Economic());
+    // EXPERIMENTAL SCENARIO
+    ExperimentalScenarioPtr scenario(new ExperimentalScenario(roadGA,0,0,0,0,0,
+            0,0,0,0,0,0));
+
+    scenario->setCurrentScenario(0);
 
     // ADD THE COMPONENTS TO THE OPTIMISER OBJECT
     roadGA->setPrograms(programs);
@@ -229,9 +255,11 @@ int main(int argc, char **argv) {
     roadGA->setEconomic(economic);
     roadGA->setTraffic(traffic);
     roadGA->setRegion(region);
+    roadGA->setScenario(scenario);
     // Now that we have all of the contained objects within the roadGA object,
     // we can initialise the storage elements
     roadGA->initialiseStorage();
+    roadGA->defaultSurrogate();
 
     // Initialise species habitat maps and initial populations
     animal->generateHabitatMap(roadGA);
@@ -244,7 +272,7 @@ int main(int argc, char **argv) {
         Eigen::MatrixXd IP(Z.rows(),Z.cols());
         for (int ii = 0; ii < Z.rows(); ii++) {
             std::string line;
-            std::getline(habFile,line,'\n');
+            std::getline(initPopFile,line,'\n');
             std::stringstream ss(line);
             for (int jj = 0; jj < Z.cols(); jj++) {
                 std::string substr;
@@ -272,7 +300,7 @@ int main(int argc, char **argv) {
 
         for (int ii = 0; ii < animal->getHabitatMap().rows(); ii++) {
             for (int jj = 0; jj < animal->getHabitatMap().cols(); jj++) {
-                initPopFile << animal->getHabitatMap()(ii,jj);
+                initPopFile << animal->getPopulationMap()(ii,jj);
 
                 if (jj < (animal->getHabitatMap().cols() - 1)) {
                     initPopFile << ",";
@@ -286,6 +314,12 @@ int main(int argc, char **argv) {
     }
     initPopFile.close();
 
+    // Find the expected present value of each commodity
+    petrol->computeExpPV();
+    diesel->computeExpPV();
+    ore->computeExpPV();
+    Costs::computeUnitRevenue(roadGA);
+
     // ADD A TEST ROAD
     Eigen::RowVectorXd genome(30);
 
@@ -295,5 +329,7 @@ int main(int argc, char **argv) {
     std::cout << "Read in test success" << std::endl;
 
     trialRoad->designRoad();
-    trialRoad->evaluateRoad(false);
+    std::cout << "Design success" << std::endl;
+    trialRoad->evaluateRoad(true);
+    std::cout << "Evaluate success" << std::endl;
 }

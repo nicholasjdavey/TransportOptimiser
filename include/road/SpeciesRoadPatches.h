@@ -260,11 +260,9 @@ public:
     void computeAAR(const Eigen::VectorXd& pops, Eigen::VectorXd& aar);
 
     /**
-     * Returns the AARs for this species and road using initial populations
-     *
-     * @return Initial AAR as Eigen::VectorXd&
+     * Computes the AARs for this species and road using initial populations
      */
-    void computeInitialAAR(Eigen::VectorXd& iar);
+    void computeInitialAAR();
 
 ///////////////////////////////////////////////////////////////////////////////
 private:

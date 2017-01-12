@@ -96,6 +96,50 @@ namespace Utility {
     }
 
     /**
+     * Assigns to the corresponding entries at each index in I of matrix X and
+     * based on an input vectr, Y.
+     *
+     * @param X as m by n matrix (Eigen)
+     * @param I list of indices (Eigen)
+     * @return Y list of corresponding values (Eigen)
+     */
+    template <typename T>
+    static void sliceIntoIdx(
+            Eigen::Matrix<T,Eigen::Dynamic,Eigen::Dynamic>& X,
+            const Eigen::Matrix<int,Eigen::Dynamic,1>& I,
+            const Eigen::Matrix<T,Eigen::Dynamic,1>& Y) {
+
+        T* data = X.data();
+
+        // Loop over indices. The data input matrix is in COLUMN-MAJOR form
+        for (int ii = 0; ii < I.size(); ii++) {
+            data[I(ii)] = Y(ii);
+        }
+    }
+
+    /**
+     * Assigns to the corresponding entries at each I,J pair of matrix X and
+     * based on an input vectr, Y.
+     *
+     * @param X as m by n matrix to read (Eigen)
+     * @param I list of X indices (Eigen)
+     * @param J list of corresponding Y indices (Eigen)
+     * @return Y as m by n matrix to update (Eigen)
+     */
+    template <typename T>
+    static void sliceIntoPairs(
+            const Eigen::Matrix<T,Eigen::Dynamic,1>& X,
+            const Eigen::Matrix<int,Eigen::Dynamic,1>& I,
+            const Eigen::Matrix<int,Eigen::Dynamic,1>& J,
+            Eigen::Matrix<T,Eigen::Dynamic,Eigen::Dynamic>& Y) {
+
+        // Loop over pairs
+        for (int ii = 0; ii < I.size(); ii++) {
+            Y(I(ii),J(ii)) = X(ii);
+        }
+    }
+
+    /**
      * Allows determining where values in a matrix are finite
      */
     template<typename Derived>

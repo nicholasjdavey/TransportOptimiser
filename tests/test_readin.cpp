@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
     std::string nm = "species1";
 
     SpeciesPtr animal(new Species(nm,false,2.52e-3,0.0928e-3,-2.52e-3,0.1014e-3,
-            1.4,0.5,0.7,0.012,2.78,1.39,0.1,true,1000,habTyps));
+            1.4,0.5,0.7,0.012,2.78,1.39,0.1,true,1000,0.7,habTyps));
 
     std::vector<SpeciesPtr> species(1);
     species[0] = animal;
@@ -37,11 +37,11 @@ int main(int argc, char **argv) {
     std::string petrolName = "petrol";
     std::string commodityName = "ore";
 
-    CommodityPtr diesel(new Commodity(roadGA,dieselName,1.2,0.01,0.01,true));
+    CommodityPtr diesel(new Commodity(roadGA,dieselName,1.2,0.01,0.01,true,0,0));
     diesel->setCurrent(1.2);
-    CommodityPtr petrol(new Commodity(roadGA,petrolName,1.05,0.01,0.01,true));
+    CommodityPtr petrol(new Commodity(roadGA,petrolName,1.05,0.01,0.01,true,0,0));
     petrol->setCurrent(1.05);
-    CommodityPtr ore(new Commodity(roadGA,commodityName,100,0.1,0.01,true));
+    CommodityPtr ore(new Commodity(roadGA,commodityName,100,0.1,0.01,true,80,20));
     ore->setCurrent(120);
 
     // VEHICLES
@@ -77,7 +77,7 @@ int main(int argc, char **argv) {
     std::string itf = "Input Data/input_terrain_file.csv";
     std::string erf = "Input Data/existing_roads_file.csv";
     OtherInputsPtr otherInputs(new OtherInputs(idf,orf,itf,erf,0,1,0,1,1000,
-            20));
+            20,20,2000));
 
     // EARTHWORK COSTS
     Eigen::VectorXd cd(6);

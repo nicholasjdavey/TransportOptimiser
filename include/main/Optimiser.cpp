@@ -11,7 +11,7 @@ Optimiser::Optimiser(double mr, double cf, unsigned long gens, unsigned
 
 //	std::vector<ProgramPtr>* programs(new std::vector<ProgramPtr>());
     unsigned long const hardware_threads = std::thread::hardware_concurrency();
-    ThreadManagerPtr threader(new ThreadManager(hardware_threads));
+//    ThreadManagerPtr threader(new ThreadManager(hardware_threads));
     this->threader = threader;
     this->mutationRate = mr;
     this->crossoverFrac = cf;
@@ -59,6 +59,10 @@ void Optimiser::initialiseStorage() {
             br.push_back(brr);
     }
     this->bestRoads = br;
+
+    this->surrogate.resize(noTests,std::vector<std::vector<
+            alglib::spline1dinterpolant>>(noRuns,std::vector<
+            alglib::spline1dinterpolant>(this->getSpecies().size())));
 }
 
 void Optimiser::computeHabitatMaps() {
@@ -103,14 +107,14 @@ void Optimiser::evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd
 
     for (int ii = 0; ii < this->species.size(); ii++) {
 
-        Eigen::VectorXd initAAR = speciesRoadPatches[ii]->getInitAAR();
+        const Eigen::VectorXd& initAAR = speciesRoadPatches[ii]->getInitAAR();
 
         pops(ii) = alglib::spline1dcalc(this->surrogate[2*this->scenario->
                 getCurrentScenario()][this->scenario->getRun()][ii],initAAR(
-                initAAR.size()));
+                initAAR.size()-1));
         popsSD(ii) = alglib::spline1dcalc(this->surrogate[2*this->scenario->
                 getCurrentScenario()+1][this->scenario->getRun()][ii],initAAR(
-                initAAR.size()));
+                initAAR.size()-1));
     }
 }
 

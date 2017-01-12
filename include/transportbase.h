@@ -27,6 +27,7 @@
 #include <thread>
 #include <random>
 #include <assert.h>
+#include <chrono>
 
 // HEADER-ONLY LIBRARIES //////////////////////////////////////////////////////
 // EIGEN
@@ -48,7 +49,7 @@
 // BOOST
 
 // CTPL
-#include <CTPL-master/ctpl.h>
+#include <CTPL-master/ctpl_stl.h>
 
 // GNUPLOTIOSTREAM
 // Only include in the specific CPP source files where required. The wrapper

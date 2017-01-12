@@ -37,11 +37,9 @@ void Simulator::simulateMTE() {
 
         for (int ii = 0; ii < srp.size(); ii++) {
             // Push onto the pool with a lambda expression
-            results[ii] = threader->push([ii,controls,srp](int id){
-                Eigen::VectorXd iarsCont(controls);
-                srp[ii]->createSpeciesModel();
-                srp[ii]->computeInitialAAR(iarsCont);
-                return iarsCont(controls-1);
+            results[ii] = threader->push([ii,srp](int id){
+                srp[ii]->computeInitialAAR();
+                return srp[ii]->getInitAAR()(srp[ii]->getInitAAR().size()-1);
             });
         }
 
@@ -53,10 +51,8 @@ void Simulator::simulateMTE() {
     } else {
 
         for (int ii = 0; ii < srp.size(); ii++) {
-            Eigen::VectorXd iarsCont(controls);
-            srp[ii]->createSpeciesModel();
-            srp[ii]->computeInitialAAR(iarsCont);
-            iar(ii) = iarsCont(controls-1);
+            srp[ii]->computeInitialAAR();
+            iar(ii) = srp[ii]->getInitAAR()(srp[ii]->getInitAAR().size()-1);
         }
     }
 
@@ -70,7 +66,7 @@ void Simulator::simulateMTE() {
         initPops[ii].resize(srp[ii]->getHabPatches().size());
         capacities[ii].resize(srp[ii]->getHabPatches().size());
 
-        for (int jj = 0; jj < srp.size(); jj++) {
+        for (int jj = 0; jj < srp[ii]->getHabPatches().size(); jj++) {
             initPops[ii](jj) = srp[ii]->getHabPatches()[jj]->getPopulation();
             capacities[ii](jj) = srp[ii]->getHabPatches()[jj]->getCapacity();
         }
@@ -85,14 +81,27 @@ void Simulator::simulateMTE() {
     // We check to see if there is any uncertainty first to ensure we
     // really need to perform Monte Carlo simulation
 
-    if ((varParams->getLambda()(scenario->getLambda()) == 0) &&
-            (varParams->getHabPref()(scenario->getHabPref()) == 0) &&
-            (varParams->getBeta()(scenario->getRangingCoeff()) == 0)) {
+//    (varParams->getLambda()(scenario->getLambda()) == 0) &&
+//                (varParams->getHabPref()(scenario->getHabPref()) == 0) &&
+//                (varParams->getBeta()(scenario->getRangingCoeff()) == 0) &&
+
+    if (varParams->getGrowthRateSDMultipliers()(scenario->getPopGRSD()) == 0) {
+
+        Eigen::RowVectorXd endPopulations(srp.size());
+
         // No need for Monte Carlo simulation
+        std::vector<Eigen::VectorXd> finalPops =
+                initPops;
+        this->simulateMTEPath(srp,initPops,
+                capacities,finalPops);
+        for (int ii = 0; ii < srp.size();
+                ii++) {
+            endPopulations(ii) = finalPops[ii].sum();
+        }
 
     } else {
         // We evaluate the actual road using Monte Carlo simulation
-        std::vector<std::future<Eigen::RowVectorXd>> results(srp.size());
+        std::vector<std::future<Eigen::RowVectorXd>> results(noPaths);
 
         // Create a matrix to store the end populations of each species
         // in each run
@@ -165,11 +174,6 @@ void Simulator::simulateMTE(std::vector<Eigen::MatrixXd>& visualiseResults) {
     RoadPtr road = this->road.lock();
     OptimiserPtr optimiser = road->getOptimiser();
     ThreadManagerPtr threader = optimiser->getThreadManager();
-    ExperimentalScenarioPtr scenario = optimiser->getScenario();
-
-    TrafficProgramPtr program = (road->getOptimiser()
-            ->getPrograms())[scenario->getProgram()];
-    int controls = program->getFlowRates().size();
 
     std::vector<SpeciesRoadPatchesPtr> srp = road->
             getSpeciesRoadPatches();
@@ -183,11 +187,9 @@ void Simulator::simulateMTE(std::vector<Eigen::MatrixXd>& visualiseResults) {
 
         for (int ii = 0; ii < srp.size(); ii++) {
             // Push onto the pool with a lambda expression
-            results[ii] = threader->push([ii,controls,srp](int id){
-                Eigen::VectorXd iarsCont(controls);
-                srp[ii]->createSpeciesModel();
-                srp[ii]->computeInitialAAR(iarsCont);
-                return iarsCont(controls-1);
+            results[ii] = threader->push([ii,srp](int id){
+                srp[ii]->computeInitialAAR();
+                return srp[ii]->getInitAAR()(srp[ii]->getInitAAR().size()-1);
             });
         }
 
@@ -199,10 +201,8 @@ void Simulator::simulateMTE(std::vector<Eigen::MatrixXd>& visualiseResults) {
     } else {
 
         for (int ii = 0; ii < srp.size(); ii++) {
-            Eigen::VectorXd iarsCont(controls);
-            srp[ii]->createSpeciesModel();
-            srp[ii]->computeInitialAAR(iarsCont);
-            iar(ii) = iarsCont(controls-1);
+            srp[ii]->computeInitialAAR();
+            iar(ii) = srp[ii]->getInitAAR()(srp[ii]->getInitAAR().size()-1);
         }
     }
 
@@ -222,6 +222,9 @@ void Simulator::simulateMTE(std::vector<Eigen::MatrixXd>& visualiseResults) {
         }
     }
 
+    // When visualising, we also need to know where the road cells are, so we
+    // compute these for the habitat patches
+
     // Compute one path for visualising the results
     this->simulateMTEPath(srp,initPops,capacities,visualiseResults);
 }
@@ -238,13 +241,6 @@ void Simulator::simulateROVCR() {
     RoadPtr road = this->road.lock();
     OptimiserPtr optimiser = road->getOptimiser();
     ThreadManagerPtr threader = optimiser->getThreadManager();
-    ExperimentalScenarioPtr scenario = optimiser->getScenario();
-    VariableParametersPtr varParams = optimiser->getVariableParams();
-
-    TrafficProgramPtr program = optimiser->getPrograms()
-            [scenario->getProgram()];
-    int controls = program->getFlowRates().size();
-    unsigned long noPaths = optimiser->getOtherInputs()->getNoPaths();
 
     std::vector<SpeciesRoadPatchesPtr> srp = road->getSpeciesRoadPatches();
     Eigen::VectorXd iar(srp.size());
@@ -257,11 +253,9 @@ void Simulator::simulateROVCR() {
 
         for (int ii = 0; ii < srp.size(); ii++) {
             // Push onto the pool with a lambda expression
-            results[ii] = threader->push([ii,controls,srp](int id){
-                Eigen::VectorXd iarsCont(controls);
-                srp[ii]->createSpeciesModel();
-                srp[ii]->computeInitialAAR(iarsCont);
-                return iarsCont(controls-1);
+            results[ii] = threader->push([ii,srp](int id){
+                srp[ii]->computeInitialAAR();
+                return srp[ii]->getInitAAR()(srp[ii]->getInitAAR().size()-1);
             });
         }
 
@@ -273,10 +267,8 @@ void Simulator::simulateROVCR() {
     } else {
 
         for (int ii = 0; ii < srp.size(); ii++) {
-            Eigen::VectorXd iarsCont(controls);
-            srp[ii]->createSpeciesModel();
-            srp[ii]->computeInitialAAR(iarsCont);
-            iar(ii) = iarsCont(controls-1);
+            srp[ii]->computeInitialAAR();
+            iar(ii) = srp[ii]->getInitAAR()(srp[ii]->getInitAAR().size()-1);
         }
     }
 
@@ -325,7 +317,9 @@ void Simulator::naturalBirthDeath(const SpeciesRoadPatchesPtr species, const
 //    double stepSize = road->getOptimiser()->getEconomic()->getTimeStep();
 
     // Initialise random number generator
-    std::mt19937_64 generator;
+    unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().
+            count();
+    std::mt19937 generator(seed1);
     std::normal_distribution<double> growth(spec->getGrowthRateMean(),
             spec->getGrowthRateSD());
 
@@ -335,7 +329,8 @@ void Simulator::naturalBirthDeath(const SpeciesRoadPatchesPtr species, const
         gr(ii) = growth(generator)*0.01;
     }
 
-    gr = (pops.array() - capacities.array())/(capacities.array());
+    gr = (gr.array()*(capacities.array() - pops.array())).array()/
+            (capacities.array());
 
     pops = pops.array()*(1 + gr.array());
 }
@@ -361,8 +356,8 @@ void Simulator::simulateMTEPath(const std::vector<SpeciesRoadPatchesPtr>&
     // the start of a period (for a single species) to the population at the
     // end of the period by accounting for transition and mortality.
     for (int ii = 0; ii < species.size(); ii++) {
-        reArrMat[ii] = (species[ii]->getTransProbs())*(species[ii]->
-                getSurvivalProbs()[controls-1]);
+        reArrMat[ii] = (species[ii]->getTransProbs()).array()*(species[ii]->
+                getSurvivalProbs()[controls-1]).array();
     }
 
     for (int ii = 0; ii < timeSteps; ii++) {
@@ -372,7 +367,7 @@ void Simulator::simulateMTEPath(const std::vector<SpeciesRoadPatchesPtr>&
 
         // Next, compute animal movement and road mortality
         for (int jj = 0; jj < species.size(); jj++) {
-            pops[jj] =reArrMat[ii]*initPops[jj];
+            pops[jj] =reArrMat[jj].transpose()*initPops[jj];
         }
 
         // Finally, account for natural birth and death

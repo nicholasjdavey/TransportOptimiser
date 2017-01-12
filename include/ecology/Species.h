@@ -41,7 +41,7 @@ public:
     Species(std::string nm, bool sex, double lm, double lsd, double rcm,
             double rcsd, double grm, double grsd, double lenm, double lensd,
             double spm, double spsd, double cpa, bool active, double initPop,
-            std::vector<HabitatTypePtr>& habitat);
+            double t, std::vector<HabitatTypePtr>& habitat);
 
     /**
      * Constructor II
@@ -51,7 +51,7 @@ public:
     Species(std::string nm, bool sex, double lm, double lsd, double rcm,
             double rcsd, double grm, double grsd, double lenm, double lensd,
             double spm, double spsd, double cpa, bool active, double initPop,
-            std::vector<HabitatTypePtr> &habitat, double current);
+            double t, std::vector<HabitatTypePtr> &habitat, double current);
 
     /**
      * Destructor

@@ -110,6 +110,23 @@ public:
     }
 
     /**
+     * Returns the matrix of cell indices
+     *
+     * @return Idx matrix as const Eigen::MatrixXi&
+     */
+    const Eigen::MatrixXi& getCellIdx() {
+        return this->Idx;
+    }
+    /**
+     * Sets the matrix of cell indices
+     *
+     * @param Z as const Eigen::MatrixXi&
+     */
+    void setCellIdx(const Eigen::MatrixXi& idx) {
+        this->Idx = idx;
+    }
+
+    /**
      * Returns the matrix of vegetations
      *
      * @return Vegetation matrix as const Eigen::MatrixXi&
@@ -225,6 +242,7 @@ private:
     Eigen::MatrixXd X;              /**< X coordinates matrix (all columns the same) */
     Eigen::MatrixXd Y;              /**< Y coordinates matrix (all rows the same) */
     Eigen::MatrixXd Z;              /**< Z coordinates matrix */
+    Eigen::MatrixXi Idx;            /**< Cell indices in column-major format */
     Eigen::MatrixXi veg;            /**< Vegetation at each grid reference */
     Eigen::MatrixXd acCost;         /**< Acquisition cost per sq m */
     Eigen::MatrixXd soilStabCost;   /**< Soil characteristics */

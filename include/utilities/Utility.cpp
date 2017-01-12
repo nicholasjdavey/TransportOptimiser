@@ -10,10 +10,10 @@ Eigen::MatrixXi Utility::lineSegmentIntersect(const Eigen::MatrixXd& XY1,
 
     Eigen::MatrixXd XY2T = XY2.transpose();
 
-    Eigen::MatrixXd X3 = XY2.block(0,0,1,XY2.cols()).replicate(XY1.rows(),1);
-    Eigen::MatrixXd X4 = XY2.block(0,2,1,XY2.cols()).replicate(XY1.rows(),1);
-    Eigen::MatrixXd Y3 = XY2.block(0,1,1,XY2.cols()).replicate(XY1.rows(),1);
-    Eigen::MatrixXd Y4 = XY2.block(0,3,1,XY2.cols()).replicate(XY1.rows(),1);
+    Eigen::MatrixXd X3 = XY2T.block(0,0,1,XY2T.cols()).replicate(XY1.rows(),1);
+    Eigen::MatrixXd X4 = XY2T.block(2,0,1,XY2T.cols()).replicate(XY1.rows(),1);
+    Eigen::MatrixXd Y3 = XY2T.block(1,0,1,XY2T.cols()).replicate(XY1.rows(),1);
+    Eigen::MatrixXd Y4 = XY2T.block(3,0,1,XY2T.cols()).replicate(XY1.rows(),1);
 
     Eigen::MatrixXd X4_X3 = (X4-X3);
     Eigen::MatrixXd Y1_Y3 = (Y1-Y3);
@@ -55,10 +55,10 @@ void Utility::lineSegmentIntersect(
 
     Eigen::MatrixXd XY2T = XY2.transpose();
 
-    Eigen::MatrixXd X3 = XY2.block(0,0,1,XY2.cols()).replicate(XY1.rows(),1);
-    Eigen::MatrixXd X4 = XY2.block(0,2,1,XY2.cols()).replicate(XY1.rows(),1);
-    Eigen::MatrixXd Y3 = XY2.block(0,1,1,XY2.cols()).replicate(XY1.rows(),1);
-    Eigen::MatrixXd Y4 = XY2.block(0,3,1,XY2.cols()).replicate(XY1.rows(),1);
+    Eigen::MatrixXd X3 = XY2T.block(0,0,1,XY2T.cols()).replicate(XY1.rows(),1);
+    Eigen::MatrixXd X4 = XY2T.block(2,0,1,XY2T.cols()).replicate(XY1.rows(),1);
+    Eigen::MatrixXd Y3 = XY2T.block(1,0,1,XY2T.cols()).replicate(XY1.rows(),1);
+    Eigen::MatrixXd Y4 = XY2T.block(3,0,1,XY2T.cols()).replicate(XY1.rows(),1);
 
     Eigen::MatrixXd X4_X3 = (X4-X3);
     Eigen::MatrixXd Y1_Y3 = (Y1-Y3);

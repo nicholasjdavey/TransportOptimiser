@@ -115,7 +115,8 @@ void Road::computeOperating(bool learning) {
                     double t = optPtrShared->getEconomic()->getYears();
                     double g = optPtrShared->getTraffic()->getGR();
                     const Eigen::VectorXd& Qs = optPtrShared
-                            ->getTrafficProgram()->getFlowRates();
+                            ->getPrograms()[optPtrShared->getScenario()->
+                            getProgram()]->getFlowRates();
                     const std::vector<VehiclePtr>& vehicles = optPtrShared
                             ->getTraffic()->getVehicles();
                     double Q = Qs(Qs.size());
@@ -198,11 +199,6 @@ void Road::computeOperating(bool learning) {
                 } else {
                     // Surrogate model
 
-                    TrafficProgramPtr program = (this->getOptimiser()
-                            ->getPrograms())[this->getOptimiser()->getScenario()
-                            ->getProgram()];
-                    int controls = program->getFlowRates().size();
-
                     // First compute initial AAR (this is an input to the
                     // surrogate)
                     this->computeSimulationPatches();
@@ -211,9 +207,9 @@ void Road::computeOperating(bool learning) {
                     Eigen::VectorXd aar(noSpecies);
 
                     for (int ii = 0; ii < noSpecies; ii++) {
-                        Eigen::VectorXd speciesAARs(controls);
-                        this->srp[ii]->computeInitialAAR(speciesAARs);
-                        aar[ii] = speciesAARs(speciesAARs.size());
+                        this->srp[ii]->computeInitialAAR();
+                        aar(ii) = this->srp[ii]->getInitAAR()(this->srp[ii]->
+                                getInitAAR().size()-1);
                     }
                     this->attributes->setIAR(aar);
 
@@ -252,7 +248,7 @@ void Road::computeOperating(bool learning) {
                                 (roadPopXconf*endPopsSD(ii) + endPops(ii)))*
                                 perAnimalPenalty;
                     }
-                    this->getCosts()->setPenalty(0.0);
+                    this->getCosts()->setPenalty(penalty);
                     this->getAttributes()->setTotalValueSD(0.0);
                 }
             }
@@ -272,22 +268,6 @@ void Road::computeOperating(bool learning) {
                 // whether the function is called from within the population
                 // evaluation routine or the surrogate model learning routine.
 
-                // First compute the initial AAR under the full traffic flow
-                // (this is an input to the surrogate)
-                TrafficProgramPtr program = (this->getOptimiser()
-                        ->getPrograms())[this->getOptimiser()->getScenario()
-                        ->getProgram()];
-                int controls = program->getFlowRates().size();
-
-                int noSpecies = this->optimiser.lock()->getSpecies().size();
-                std::vector<Eigen::VectorXd> aar(noSpecies);
-
-                for (int ii = 0; ii < noSpecies; ii++) {
-                    Eigen::VectorXd speciesAARs(controls);
-                    this->srp[ii]->computeInitialAAR(speciesAARs);
-                    aar[ii] = speciesAARs;
-                }
-
                 // Call the surrogate model or full simulation.
                 if (learning) {
                     // Full simulation
@@ -295,6 +275,17 @@ void Road::computeOperating(bool learning) {
                     this->simulator.reset();
                     this->simulator = simulator;
                     this->simulator->simulateROVCR();
+                } else {
+                    // First compute the initial AAR under the full traffic flow
+                    // (this is an input to the surrogate)
+
+                    int noSpecies = this->optimiser.lock()->getSpecies().size();
+                    std::vector<Eigen::VectorXd> aar(noSpecies);
+
+                    for (int ii = 0; ii < noSpecies; ii++) {
+                        this->srp[ii]->computeInitialAAR();
+                        aar[ii] = this->srp[ii]->getInitAAR();
+                    }
                 }
                 // There is no penalty for this road as traffic is controlled
                 // to maintain the populations above critical thresholds.
@@ -398,12 +389,13 @@ void Road::computeVarProfitICFixedFlow() {
     OptimiserPtr optPtrShared = this->optimiser.lock();
 
     const Eigen::VectorXd& Qs = optPtrShared
-            ->getTrafficProgram()->getFlowRates();
+            ->getPrograms()[optPtrShared->getScenario()->
+            getProgram()]->getFlowRates();
     const std::vector<VehiclePtr>& vehicles = optPtrShared
             ->getTraffic()->getVehicles();
-    double Q = Qs(Qs.size());
+    double Q = Qs(Qs.size()-1);
 
-    Eigen::VectorXd fuelExpPV1UnitTraffic;
+    Eigen::VectorXd fuelExpPV1UnitTraffic(vehicles.size());
 
     for (int ii = 0; ii < vehicles.size(); ii++) {
         fuelExpPV1UnitTraffic(ii) = vehicles[ii]->getFuel()->

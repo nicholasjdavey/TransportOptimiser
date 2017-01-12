@@ -36,13 +36,19 @@ void Uncertainty::computeExpPV() {
     // Place to store simulation results
     Eigen::VectorXd finalResults(paths);
 
-    if (threader != nullptr) {
+    //std::chrono::steady_clock::time_point beginTime = std::chrono::steady_clock::now();
+
+    if (true/*threader != nullptr*/) {
+        ctpl::thread_pool p(8);
+
         std::vector< std::future<double> > results(paths);
 
         for (unsigned long ii = 0; ii < paths; ii++)  {
             // Push onto the pool with a lambda expression
-            results[ii] = threader->push([this](int id){return
+            results[ii] = p.push([this](int) {return
                     this->singlePathValue();});
+            //results[ii] = threader->push([this](int){return
+            //        this->singlePathValue();});
         }
 
         for (unsigned long ii = 0; ii < paths; ii++) {
@@ -57,6 +63,10 @@ void Uncertainty::computeExpPV() {
         }
     }
 
+
+    //std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
+    //std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(endTime - beginTime).count() <<std::endl;
+
     this->expPV = total/paths;
     this->expPVSD = sqrt(((finalResults.array() - expPV).square()).sum());
 }
@@ -69,7 +79,9 @@ double Uncertainty::singlePathValue() {
     double gr = optimiser->getTraffic()->getGR();
     // Instantiate the default C++11 Mersenne twiser pseudo random number
     // generator
-    std::mt19937_64 generator;
+    unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().
+            count();
+    std::mt19937_64 generator(seed1);
     // Brownian motion uncertainty
     std::normal_distribution<double> brownian(0,this->standardDev);
     // Jump size uncertainty
@@ -87,4 +99,6 @@ double Uncertainty::singlePathValue() {
                 curr*jump(generator);
         value += pow(1+gr,ii)*curr/pow((1+economic->getRRR()),ii);
     }
+
+    return value;
 }

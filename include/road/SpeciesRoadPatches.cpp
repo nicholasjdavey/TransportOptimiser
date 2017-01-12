@@ -21,8 +21,8 @@ SpeciesRoadPatches::~SpeciesRoadPatches() {}
 
 void SpeciesRoadPatches::createSpeciesModel() {
     this->generateHabitatPatchesGrid();
-    this->getDistances();
-    this->getCrossings();
+    this->habitatPatchDistances();
+    this->roadCrossings();
     this->computeTransitionProbabilities();
     this->computeSurvivalProbabilities();
 }
@@ -39,9 +39,9 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
     int res = roadPtrShared->getOptimiser()->getGridRes();
 
     Eigen::VectorXd xspacing = (X.block(1,0,X.rows()-1,1)
-            - X.block(0,0,X.rows()-1,1)).transpose();
-    Eigen::VectorXd yspacing = Y.block(0,1,1,Y.cols()-1)
-            - Y.block(0,0,1,Y.cols()-1);
+            - X.block(0,0,X.rows()-1,1));
+    Eigen::VectorXd yspacing = (Y.block(0,1,1,Y.cols()-1)
+            - Y.block(0,0,1,Y.cols()-1)).transpose();
 
     // Grid will be evenly spaced upon call
     if ((xspacing.segment(1,xspacing.size()-1)
@@ -51,19 +51,19 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
         throw std::invalid_argument("Grid must be evenly spaced in both X and Y");
     }
 
-    const Eigen::MatrixXi modHab = this->species->getHabitatMap();
-    Eigen::MatrixXi tempHabVec = Eigen::MatrixXi::Constant(1,
+    Eigen::MatrixXi modHab(this->species->getHabitatMap());
+    Eigen::VectorXi tempHabVec = Eigen::VectorXi::Constant(
             roadPtrShared->getRoadCells()->getUniqueCells().size(),
             (int)(HabitatType::ROAD));
-    igl::slice_into(modHab,roadPtrShared->getRoadCells()->getUniqueCells(),
+    Utility::sliceIntoIdx(modHab,roadPtrShared->getRoadCells()->getUniqueCells(),
             tempHabVec);
 
     // We create bins for each habitat type into which we place the patches. We
     // ignore CLEAR and ROAD habitats, hence -2
-    unsigned short W = (X.rows());
-    unsigned short H = (Y.cols());
-    unsigned short xRes = W % res == 0 ? res : res + 1;
-    unsigned short yRes = H % res == 0 ? res : res + 1;
+    unsigned long W = (X.rows());
+    unsigned long H = (Y.cols());
+    unsigned long xRes = W % res == 0 ? res : res + 1;
+    unsigned long yRes = H % res == 0 ? res : res + 1;
 
     // Number of cells in each coarse grid cell used for creating habitat
     // patches (a sub patch)
@@ -87,23 +87,21 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
 
     for (int ii = 0; ii < habTyps.size(); ii++) {
         if (habTyps[ii]->getType() == HabitatType::ROAD ||
-                habTyps[iterator]->getType() == HabitatType::CLEAR) {
+                habTyps[ii]->getType() == HabitatType::CLEAR) {
             continue;
         }
         Eigen::MatrixXi input = (modHab.array() ==
-                (int)(habTyps[iterator]->getType())).cast<int>();
+                (int)(habTyps[ii]->getType())).cast<int>();
         // Map the input array to a plain integer C-array
-        int* cinput;
-        Eigen::Map<Eigen::MatrixXi>(cinput,W,H) = input;
+//        int* inputData = input.data();
+//        Eigen::Map<Eigen::MatrixXi> cinput(inputData,input.size());
 
         // Map output C-array to an Eigen int matrix
-        int* coutput = (int*) malloc(W*H*sizeof(int));
-        memset(coutput,0,W*H*sizeof(int));
-        Eigen::MatrixXi output = Eigen::Map<Eigen::MatrixXi>(coutput,W,H);
+        Eigen::MatrixXi output(W,H);
 
         // Separate contiguous regions of this habitat type
-        int regions = LabelImage(W,H,cinput,coutput);
-        free(coutput);
+        // LabelImage is found within utilities/labelmethod.cpp
+        int regions = LabelImage(W,H,input.data(),output.data());
 
         // Iterate through every large cell present in the overall region
         for (int jj = 0; jj < xRes; jj++) {
@@ -112,28 +110,30 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
 
                 int blockSizeX;
                 int blockSizeY;
-                if (jj*skpx <= W) {
+                if ((jj+1)*skpx <= W) {
                     blockSizeX = skpx;
                 } else {
                     blockSizeX = W-jj*skpx;
                 }
 
-                if (kk*skpy <= H) {
+                if ((kk+1)*skpy <= H) {
                     blockSizeY = skpy;
                 } else {
                     blockSizeY = H-kk*skpy;
                 }
 
                 tempGrid.block(jj*skpx,kk*skpy,blockSizeX,blockSizeY) =
-                        Eigen::MatrixXi::Constant(skpx,skpy,1);
+                        Eigen::MatrixXi::Constant(blockSizeX,blockSizeY,1);
 
                 // For every valid habitat type, we must create a new animal
                 // patch. If the patch contains valid habitat, we add it to
                 // our list of patches for use later.
                 for (int ll = 1; ll <= regions; ll++) {
                     Eigen::MatrixXi tempGrid2;
+//                    Eigen::MatrixXi tempGrid3;
                     tempGrid2 = ((output.array() == ll).cast<int>()
                             *tempGrid.array()).matrix();
+//                    tempGrid3 = (tempGrid2.array()*(region->getCellIdx().array()+1));
 
                     // If the patch contains this habitat, we continue
                     int noCells = tempGrid2.sum();
@@ -151,10 +151,23 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
                         hab->setCY((double)(yspacing(0)*(tempGrid2*yidx).sum()/
                                 noCells + Y(0,0) - yspacing(0)));
 
+                        ///////////////////////////////////////////////////////
+                        // Get a list of cell indices occupied by this patch
+//                        Eigen::VectorXi I;
+//                        Eigen::VectorXi J;
+//                        Eigen::VectorXi V;
+
+//                        igl::find(tempGrid3,I,J,V);
+
+//                        V = V.array() - 1;
+//                        hab->setCells(V);
+                        ///////////////////////////////////////////////////////
+
                         hab->setType(habTyps[ii]);
                         double thisPop = (tempGrid2.array().cast<double>()*
                                 (this->species->getPopulationMap()).array()).sum()*factor;
                         hab->setPopulation(thisPop);
+                        hab->setCapacity(habTyps[ii]->getMaxPop()*hab->getArea());
                         // For now do not store the indices of the points
                         this->habPatch[patches] = hab;
                         patches++;
@@ -164,7 +177,6 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
                 }
             }
         }
-        iterator++;
     }
 
     // Remove excess patches in container
@@ -263,8 +275,8 @@ void SpeciesRoadPatches::roadCrossings() {
         for (int jj = ii+1; jj < this->habPatch.size(); jj++) {
             if (this->dists(ii,jj) <= maxDist) {
                 validCrossings++;
-                indices(validCrossings,1) = ii;
-                indices(validCrossings,2) = jj;
+                indices(validCrossings,0) = ii;
+                indices(validCrossings,1) = jj;
                 lines.block(validCrossings,0,1,4) <<
                         this->habPatch[ii]->getCX(),
                         this->habPatch[ii]->getCY(),
@@ -273,17 +285,19 @@ void SpeciesRoadPatches::roadCrossings() {
             }
         }
     }
-    Eigen::MatrixXi crossings = Utility::lineSegmentIntersect(lines,
-            roadSegsVisible);
     // Find the number of road crossings for the valid transitions identified
     // above.
     Eigen::MatrixXi orgs = indices.block(0,0,validCrossings,1);
     Eigen::MatrixXi dests = indices.block(0,1,validCrossings,1);
+    lines.resize(validCrossings,4);
 
-    this->crossings = Eigen::MatrixXi(this->habPatch.size(),
+    Eigen::VectorXi crossings = Utility::lineSegmentIntersect(lines,
+            roadSegsVisible);
+
+    this->crossings = Eigen::MatrixXi::Zero(this->habPatch.size(),
             this->habPatch.size());
-    igl::slice_into(crossings,orgs,dests,this->crossings);
-    igl::slice_into(crossings,dests,orgs,this->crossings);
+    Utility::sliceIntoPairs(crossings,orgs,dests,this->crossings);
+    Utility::sliceIntoPairs(crossings,dests,orgs,this->crossings);
 }
 
 void SpeciesRoadPatches::computeTransitionProbabilities() {
@@ -292,7 +306,8 @@ void SpeciesRoadPatches::computeTransitionProbabilities() {
 
     double lda = (roadPtrShared->getOptimiser()->getVariableParams()
             ->getLambda())(roadPtrShared->getOptimiser()->getScenario()
-            ->getLambda());
+            ->getLambda())*(this->species->getLambdaSD()) +
+            this->species->getLambdaMean();
     double hp = (roadPtrShared->getOptimiser()->getVariableParams()
             ->getHabPref()(roadPtrShared->getOptimiser()->getScenario()
             ->getHabPref()));
@@ -305,7 +320,7 @@ void SpeciesRoadPatches::computeTransitionProbabilities() {
     for (int ii = 0; ii < this->habPatch.size(); ii++) {
         double summ = 0;
 
-        for (int jj = 0; ii < this->habPatch.size(); jj++) {
+        for (int jj = 0; jj < this->habPatch.size(); jj++) {
             if (this->dists(ii,jj) <= maxDist) {
                 if (ii == jj) {
                     this->transProbs(ii,jj) = this->habPatch[jj]->getArea()
@@ -345,10 +360,11 @@ void SpeciesRoadPatches::computeSurvivalProbabilities() {
 
     int controls = program->getFlowRates().size();
 
+
     for (int ii = 0; ii < controls; ii++) {
-        this->survProbs[ii] = (-this->crossings.array()*(
+        this->survProbs.push_back(((-this->crossings.array().cast<double>()*(
                 (program->getFlowRates())[ii])*(avVehWidth+len)/(spd*3600))
-                .exp().cast<double>();
+                .exp()).cast<double>());
     }
 }
 
@@ -364,13 +380,22 @@ void SpeciesRoadPatches::computeAAR(const Eigen::VectorXd& pops,
     double popInit = pops.sum();
 
     for (int ii = 0; ii < controls; ii++) {
-        Eigen::VectorXd newPops = this->transProbs*
-                this->survProbs[ii].transpose()*pops;
+        Eigen::VectorXd newPops = (this->transProbs.array()*
+                this->survProbs[ii].array()).transpose().matrix()*pops;
         aar(ii) = 1-newPops.sum()/popInit;
     }
 }
 
-void SpeciesRoadPatches::computeInitialAAR(Eigen::VectorXd &iar) {
+void SpeciesRoadPatches::computeInitialAAR() {
+
+    RoadPtr roadPtrShared = this->road.lock();
+    // No asserts are performed here as the population input vector must be
+    // checked for sizing requirements before use by the calling function
+    TrafficProgramPtr program = (roadPtrShared->getOptimiser()->getPrograms())[
+            roadPtrShared->getOptimiser()->getScenario()->getProgram()];
+    int controls = program->getFlowRates().size();
+
+    this->initAAR.resize(controls);
 
     int hps = this->habPatch.size();
     Eigen::VectorXd pops(hps);
@@ -379,5 +404,5 @@ void SpeciesRoadPatches::computeInitialAAR(Eigen::VectorXd &iar) {
         pops(ii) = this->habPatch[ii]->getPopulation();
     }
 
-    this->computeAAR(pops,iar);
+    this->computeAAR(pops,this->initAAR);
 }
