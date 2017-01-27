@@ -57,7 +57,7 @@ void Costs::computeEarthworkCosts() {
             ->getFillRep();
 
     Eigen::VectorXd avDepth = 0.5*(depth.segment(1,segs)
-                    + depth.segment(0,segs));
+            + depth.segment(0,segs));
     Eigen::VectorXi type = Eigen::VectorXi::Constant(segs,
             (int)(RoadSegments::ROAD));
     roadPtrShared->getRoadSegments()->setType(type);
@@ -211,6 +211,7 @@ void Costs::computeLocationCosts() {
 }
 
 void Costs::computeLengthCosts() {
+    // All costs end up as per unit traffic volume PER YEAR
     RoadPtr roadPtrShared = this->road.lock();
 
     RoadCellsPtr cells = roadPtrShared->getRoadCells();
@@ -227,14 +228,18 @@ void Costs::computeLengthCosts() {
     this->lengthFixed = (desParams->getCostPerSM()*
             areas.array()).sum();
 
-    Eigen::VectorXd gr = 100*((z.segment(1,z.size()-1)
-            - z.segment(0,z.size()-1)).array()/(s.segment(1,s.size()-1)
-            - s.segment(0,s.size()-1)).array());
+    Eigen::VectorXd gr = Eigen::VectorXd::Zero(z.size()-1);
+    gr = 100*((z.segment(1,z.size()-1)
+            - z.segment(0,z.size()-1)).array()/((s.segment(1,s.size()-1)
+            - s.segment(0,s.size()-1)).array()));
 
     Eigen::VectorXd vel = 3.6*(v.segment(0,v.size()-1));
-    double travelTime = (s.segment(1,s.size()-1).array()/vel.array()).sum();
+    // Travel time in hours of a single journey
+    double travelTime = ((s.segment(1,s.size()-1).array() -
+            s.segment(0,s.size()-1).array())/(1000*vel.array())).sum();
 
-    double enviroCost = 0.001*length*(
+    // Enviro cost for full length for one vehicle for a whole year
+    double enviroCost = 6570*0.001*0.01*length*(
             unitCosts->getAirPollution()
             + unitCosts->getNoisePollution()
             + unitCosts->getWaterPollution()
@@ -250,9 +255,9 @@ void Costs::computeLengthCosts() {
             getPeakHours();
 
     Eigen::VectorXd Q(3);
-    Q << 1.0e-6*K*D*154.5,
-            1.0e-6*K*(1-D)*154.5,
-            5.0e-7*(6570-309*Hp)*(1-K)/(18-Hp);
+    Q << 1.0e-6*K*D*154.5*18,
+            1.0e-6*K*(1-D)*154.5*18,
+            5.0e-7*(6570-309*Hp)*(1-K)/(18-Hp)*18;
 
     const std::vector<VehiclePtr>& vehicles = roadPtrShared->getOptimiser()
             ->getTraffic()->getVehicles();
@@ -278,24 +283,26 @@ void Costs::computeLengthCosts() {
 
     Eigen::MatrixXd params(4,gr.size());
 
+    // Velocities in km/hr
     params.block(0,0,1,gr.size()) = Eigen::RowVectorXd::Constant(gr.size(),1);
-    params.block(1,0,1,gr.size()) = gr.transpose();
-    params.block(2,0,1,gr.size()) = v.segment(0,gr.size()).transpose();
-    params.block(3,0,1,gr.size()) = v.segment(0,gr.size()).transpose()
-            .array().pow(2);
+    params.block(1,0,1,gr.size()) = gr.transpose(); // G in percent
+    params.block(2,0,1,gr.size()) = 3.6*v.segment(0,gr.size()).transpose();
+    params.block(3,0,1,gr.size()) = 12.96*(v.segment(0,gr.size()).transpose()
+            .array().pow(2));
 
-    Eigen::MatrixXd fcinter = (coeffSE*params + coeffES*params)*
-            (s.segment(1,gr.size())-s.segment(0,gr.size()));
+    Eigen::VectorXd diffs = (s.segment(1,gr.size())-s.segment(0,gr.size()));
+    Eigen::MatrixXd fcinter = (coeffSE*params + coeffES*params)*diffs;
     Eigen::VectorXd fc = (fcinter.array()*prop.array()).matrix();
 
     Eigen::MatrixXd fcrep(vehicles.size(),3);
     igl::repmat(fc,1,3,fcrep);
 
+    // Fuel usage per year
     this->unitFuelVar = fcrep*Q;
 
     Eigen::Vector3d repTcphr = Eigen::Vector3d::Constant(prop.transpose()*
             cphr);
-    double travelCost = 2000*travelTime*repTcphr.transpose()*Q;
+    double travelCost = (2.0e6)*travelTime*repTcphr.transpose()*Q;
 
     this->lengthVar = enviroCost + travelCost;
 }
@@ -307,15 +314,19 @@ void Costs::computeAccidentCosts() {
     const Eigen::VectorXd& delta = roadPtrShared->getHorizontalAlignment()->getDeltas();
     const Eigen::VectorXd& R = roadPtrShared->getHorizontalAlignment()->getRadii();
     const Eigen::VectorXd& ssd = roadPtrShared->getVerticalAlignment()->getSSDs();
+    const Eigen::VectorXd& vels = roadPtrShared->getRoadSegments()->getVelocities();
     double width = roadPtrShared->getOptimiser()->getDesignParameters()
             ->getRoadWidth();
     double accCost = roadPtrShared->getOptimiser()->getUnitCosts()
             ->getAccidentCost();
 
     double qfac = 6570*(1.0e-6);
+    bool spiral = roadPtrShared->getOptimiser()->getDesignParameters()
+            ->getSpiral();
 
+    // Zegeer et al.
     this->accidentVar = accCost*qfac*(0.96*(R.array())*(delta.array())/1000
-            +0.14*(delta.array()*180/M_PI - 0.12)).sum() *
+            +0.14*(delta.array()*180/M_PI - 0.12*(double)spiral)).sum() *
             pow(0.978,3.28*width-30);
 
     Eigen::VectorXd mActual = R.array()*(1-cos(delta.array()/2));
@@ -325,6 +336,25 @@ void Costs::computeAccidentCosts() {
     Eigen::VectorXd diffsq = diff.array().pow(2);
     Eigen::VectorXd tooSmall = (mActual.array() > mReq.array()).cast<double>();
     this->accidentFixed = (accCost/5)*tooSmall.transpose()*diffsq;
+
+    // Penalise roads that require a speed that is less than half the original
+    // design speed
+    OptimiserPtr optimiserPtrShared = roadPtrShared->getOptimiser();
+    double velReq = 0.5*optimiserPtrShared->getDesignParameters()->
+            getDesignVelocity();
+    if (vels.minCoeff() < velReq) {
+        Eigen::VectorXd invalidCurves = (vels.array() < velReq).cast<double>();
+        Eigen::VectorXd velDiff = invalidCurves.array()*(velReq -
+                vels.array());
+
+        // For each road curve that is below the minimum (half the design
+        // speed) we add a penalty that is equal to the difference multiplied
+        // by the fixed road costs so far. This is arbitrary but encourages
+        // safer curves.
+        double unitPenalty = this->lengthFixed;
+
+        this->accidentFixed += (velDiff.array().pow(2)*unitPenalty).sum();
+    }
 }
 
 void Costs::computePenaltyCost() {

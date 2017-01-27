@@ -13,11 +13,13 @@ Simulator::~Simulator() {
 void Simulator::simulateMTE() {
     // This routine computes the animal costs based on mean time to extinction.
     // We use Monte Carlo simulation (if any uncertainty) where we run the road
-    // at full flow until the end of the design horizon.
+    // at full flow until the end of the design horizon. This is used for
+    // computation, not for visualisation.
 
     RoadPtr road = this->road.lock();
     OptimiserPtr optimiser = road->getOptimiser();
     ThreadManagerPtr threader = optimiser->getThreadManager();
+    bool gpu = optimiser->getGPU();
     ExperimentalScenarioPtr scenario = optimiser->getScenario();
     VariableParametersPtr varParams = optimiser->getVariableParams();
 
@@ -110,19 +112,30 @@ void Simulator::simulateMTE() {
         if (threader != nullptr) {
             for (unsigned long ii = 0; ii < noPaths; ii++) {
                 // Push onto the thread pool with a lambda expression
-                results[ii] = threader->push([this,srp, initPops, capacities]
-                        (int id){
-                    Eigen::RowVectorXd endPops(srp.size());
-                    std::vector<Eigen::VectorXd> finalPops =
-                            initPops;
-                    this->simulateMTEPath(srp,initPops,
-                            capacities,finalPops);
-                    for (int jj = 0; jj < srp.size();
-                            jj++) {
-                        endPops(jj) = finalPops[jj].sum();
-                    }
-                    return endPops;
-                });
+                // If we have access to GPU-enabled computing, we exploit it
+                // here and at the calling function in the GA optimiser, we
+                // implement the standard multi-threading on the host. If not,
+                // we do not implement multi-threading at the higher level and
+                // instead implement it here.
+                if (gpu) {
+                // Call the external, CUDA-compiled code but do not use the
+                // host threading routine.
+
+                } else {
+                    results[ii] = threader->push([this,srp, initPops, capacities]
+                            (int id){
+                        Eigen::RowVectorXd endPops(srp.size());
+                        std::vector<Eigen::VectorXd> finalPops =
+                                initPops;
+                        this->simulateMTEPath(srp,initPops,
+                                capacities,finalPops);
+                        for (int jj = 0; jj < srp.size();
+                                jj++) {
+                            endPops(jj) = finalPops[jj].sum();
+                        }
+                        return endPops;
+                    });
+                }
             }
 
             for (unsigned long ii = 0; ii < noPaths; ii++) {
@@ -130,7 +143,9 @@ void Simulator::simulateMTE() {
             }
 
         } else {
-            // Compute serially
+            // Compute serially. We cal also use GPU computing here but the
+            // earlier calling function does not use multi-threading on the
+            // host.
             for (unsigned long ii = 0; ii < noPaths; ii++) {
 
                 for (int jj = 0; jj < srp.size(); jj++) {
@@ -159,6 +174,8 @@ void Simulator::simulateMTE() {
             variances.col(ii) = endPopulations.col(ii).array() -
                     endPopMean(ii);
             endPopSD(ii) = sqrt(variances.col(ii).array().square().mean());
+            srp[ii]->setEndPopMean(endPopMean(ii));
+            srp[ii]->setEndPopSD(endPopSD(ii));
         }
 
         road->getAttributes()->setEndPopMTE(endPopMean);

@@ -7,7 +7,7 @@ Optimiser::Optimiser() {
 Optimiser::Optimiser(double mr, double cf, unsigned long gens, unsigned
         long popSize, double stopTol, double confInt, double confLvl, unsigned
         long habGridRes, std::string solScheme, unsigned long noRuns,
-        Optimiser::Type type, unsigned long sg) {
+        Optimiser::Type type, unsigned long sg, double msr, bool gpu) {
 
 //	std::vector<ProgramPtr>* programs(new std::vector<ProgramPtr>());
     unsigned long const hardware_threads = std::thread::hardware_concurrency();
@@ -26,6 +26,8 @@ Optimiser::Optimiser(double mr, double cf, unsigned long gens, unsigned
     this->stallGenerations = sg;
     this->stallGen = 0;
     this->type = type;
+    this->maxSampleRate = msr;
+    this->gpu = gpu;
 }
 
 Optimiser::~Optimiser() {
@@ -56,7 +58,7 @@ void Optimiser::initialiseStorage() {
 
     for(unsigned int ii=0; ii<this->noRuns;ii++) {
             std::vector<RoadPtr> brr(this->noRuns);
-            br.push_back(brr);
+            br[ii] = brr;
     }
     this->bestRoads = br;
 
@@ -83,7 +85,7 @@ void Optimiser::computeExpPv() {
     }
 }
 
-void Optimiser::optimiseRoad() {
+void Optimiser::optimise(bool plot) {
 
     // FOR SIMPLEPENALTY  AND MTE /////////////////////////////////////////////
     // If Fuel and commodity prices are stochastic, compute the mean expected

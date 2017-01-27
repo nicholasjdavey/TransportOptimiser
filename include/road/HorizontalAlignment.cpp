@@ -79,7 +79,7 @@ void HorizontalAlignment::computeAlignment() {
         this->sideFriction(vmax,fsmax);
 
         // Minimum curvature radius for desired speed (superelevations < 10deg)
-        this->radiiReq = (vmax.array()/3.6).pow(2) / (9.8*(fsmax.array() + maxSE/100));
+        this->radiiReq = (vmax.array()).pow(2) / (9.8*(fsmax.array() + maxSE/100));
 
         // Initialise class attributes variables using predefined size. As we
         // have removed duplicates, the following lists also do not contain
@@ -98,6 +98,8 @@ void HorizontalAlignment::computeAlignment() {
         this->vel.resize(ip);
 
         // If we are designing with spiral transition curves (for safety)
+        // In the following code, the indices for the circular arc points
+        // are such that the first circle has index 1.
         if (spiral) {
         } else {
             // Simple circular transitions
@@ -123,51 +125,55 @@ void HorizontalAlignment::computeAlignment() {
 
             ///////////////////////////////////////////////////////////////////
             // For the next lines, we work on a curve basis, therefore, index
-            // 0 refers to the first curve, not the first intersection point.
+            // ii refers to the iith curve, not the iith intersection point.
 
             // First and last arcs must be constrained so as not to overshoot
             // the start and end points.
             double cp2 = sqrt(pow(this->pocx(0)-xCoords(1),2)
                     +pow(this->pocy(0)-yCoords(1),2));
-            double tanlen = sqrt(pow(xCoords(1)-xCoords(0),2)
+            double tanLen = sqrt(pow(xCoords(1)-xCoords(0),2)
                     +pow(yCoords(1)-yCoords(0),2));
 
-            if (cp2 > tanlen) {
+            if ((cp2 - tanLen) > DBL_PREC) {
                 // We must set the poc of the first arc to the start point
-                this->radii(0) = radNewPOC(xCoords, yCoords, this->deltas, 0,
-                        tanlen, xCoords(0), yCoords(0));
+                this->radii(0) = radNewPOC(xCoords, yCoords, this->deltas, 1,
+                        tanLen, xCoords(0), yCoords(0));
 
                 this->radiiReq(0) = this->radii(0);
 
                 this->potx(0) = this->computePOTX(this->radiiReq,
-                        this->deltas,xCoords,yCoords,0);
+                        this->deltas,xCoords,yCoords,1);
                 this->poty(0) = this->computePOTY(this->radiiReq,
-                        this->deltas,xCoords,yCoords,0);
-                this->pocx(0) = this->computePOCX(this->radiiReq,
-                        this->deltas,xCoords,yCoords,0);
-                this->pocy(0) = this->computePOCY(this->radiiReq,
-                        this->deltas,xCoords,yCoords,0);
+                        this->deltas,xCoords,yCoords,1);
+                this->pocx(0) = xCoords(0);
+                this->pocy(0) = yCoords(0);
+//                this->pocx(0) = this->computePOCX(this->radiiReq,
+//                        this->deltas,xCoords,yCoords,1);
+//                this->pocy(0) = this->computePOCY(this->radiiReq,
+//                        this->deltas,xCoords,yCoords,1);
             }
 
-            double tpn1 = sqrt(pow(this->potx(ip-1)-xCoords(ip+1),2)
-                            + pow(this->poty(ip-1)-yCoords(ip+1),2));
-            tanlen = sqrt(pow(xCoords(ip+1)-xCoords(ip),2)
-                            + pow(yCoords(ip+1)-yCoords(ip),2));
+            double tpn1 = sqrt(pow(this->potx(ip-1)-xCoords(ip),2)
+                    + pow(this->poty(ip-1)-yCoords(ip),2));
+            tanLen = sqrt(pow(xCoords(ip+1)-xCoords(ip),2)
+                    + pow(yCoords(ip+1)-yCoords(ip),2));
 
-            if (tpn1 > tanlen) {
+            if ((tpn1 - tanLen) > DBL_PREC) {
                 // We must set the pot of the last arc to the end point
-                this->radii(ip-1) = radNewPOT(xCoords, yCoords, this->deltas, ip-1,
-                        tanlen, xCoords(ip+1), yCoords(ip+1));
+                this->radii(ip-1) = radNewPOT(xCoords, yCoords, this->deltas, ip,
+                        tanLen, xCoords(ip+1), yCoords(ip+1));
                 this->radiiReq(ip-1) = this->radii(ip-1);
 
-                this->potx(ip-1) = this->computePOTX(this->radiiReq,
-                        this->deltas,xCoords,yCoords,ip-1);
-                this->poty(ip-1) = this->computePOTY(this->radiiReq,
-                        this->deltas,xCoords,yCoords,ip-1);
+//                this->potx(ip-1) = this->computePOTX(this->radiiReq,
+//                        this->deltas,xCoords,yCoords,ip);
+//                this->poty(ip-1) = this->computePOTY(this->radiiReq,
+//                        this->deltas,xCoords,yCoords,ip);
+                this->potx(ip-1) = xCoords(ip+1);
+                this->poty(ip-1) = yCoords(ip+1);
                 this->pocx(ip-1) = this->computePOCX(this->radiiReq,
-                        this->deltas,xCoords,yCoords,ip-1);
+                        this->deltas,xCoords,yCoords,ip);
                 this->pocy(ip-1) = this->computePOCY(this->radiiReq,
-                        this->deltas,xCoords,yCoords,ip-1);
+                        this->deltas,xCoords,yCoords,ip);
             }
 
             /* Now check if the curves created above are continuous. If not, we
@@ -181,11 +187,12 @@ void HorizontalAlignment::computeAlignment() {
             int counter = 0;
             bool continuous = false;
 
+            // We start at the second curve and go to the last one
             while (counter <= maxiter && !continuous) {
-                // Find midpoint of tangent line
-                for (unsigned int ii = 1; ii < ip-1; ii++) {
+                for (unsigned int ii = 1; ii < ip; ii++) {
+                    // Find midpoint of tangent line
                     double midx = 0.5*(xCoords(ii)+xCoords(ii+1));
-                    double midy = 0.5*(yCoords(ii)+xCoords(ii+1));
+                    double midy = 0.5*(yCoords(ii)+yCoords(ii+1));
 
                     /* If ||T(i-1)->P(i-1)|| + ||C(i)->P(i)|| >
                      * ||P(i-1)->P(i)||, we must reduce one or both of the radii
@@ -196,83 +203,92 @@ void HorizontalAlignment::computeAlignment() {
                             pow(this->poty(ii-1)-yCoords(ii),2));
                     double cArcLen = sqrt(pow(xCoords(ii+1)-this->pocx(ii),2)+
                             pow(yCoords(ii+1)-this->pocy(ii),2));
-                    double tanLen = sqrt(pow(xCoords(ii+1)-xCoords(ii),2)+
+                    tanLen = sqrt(pow(xCoords(ii+1)-xCoords(ii),2)+
                             pow(yCoords(ii+1)-yCoords(ii),2));
 
-                    if (tanLen < (pArcLen + cArcLen)) {
+                    if (((pArcLen + cArcLen) - tanLen) > DBL_PREC) {
                         // We need to adjust the radii
 
-                        if (pArcLen > 0.5*tanLen && cArcLen > 0.5*tanLen) {
+                        if (((pArcLen - 0.5*tanLen) > DBL_PREC) &&
+                                ((cArcLen - 0.5*tanLen) > DBL_PREC)) {
                             // Make both meet at the midpoint as a compromise
                             this->radii(ii-1) = this->radNewPOT(xCoords,
-                                    yCoords, this->deltas, ii-1, tanlen,
+                                    yCoords, this->deltas, ii, tanLen,
                                     midx, midy);
                             this->radii(ii) = this->radNewPOC(xCoords,
-                                    yCoords, this->deltas, ii, tanlen, midx,
+                                    yCoords, this->deltas, ii+1, tanLen, midx,
                                     midy);
 
                             // Now adjust all previous values to reflect this
                             // change
 
                             // Previous circle
-                            this->potx(ii-1) = this->computePOTX(
-                                    this->radiiReq, this->deltas, xCoords,
-                                    yCoords,ii-1);
-                            this->poty(ii-1) = this->computePOTY(
-                                    this->radiiReq, this->deltas, xCoords,
-                                    yCoords,ii-1);
+//                            this->potx(ii-1) = this->computePOTX(
+//                                    this->radii, this->deltas, xCoords,
+//                                    yCoords,ii);
+//                            this->poty(ii-1) = this->computePOTY(
+//                                    this->radii, this->deltas, xCoords,
+//                                    yCoords,ii);
+                            this->potx(ii-1) = midx;
+                            this->poty(ii-1) = midy;
                             this->pocx(ii-1) = this->computePOCX(
-                                    this->radiiReq, this->deltas, xCoords,
-                                    yCoords,ii-1);
+                                    this->radii, this->deltas, xCoords,
+                                    yCoords,ii);
                             this->pocy(ii-1) = this->computePOCY(
-                                    this->radiiReq, this->deltas, xCoords,
-                                    yCoords,ii-1);
+                                    this->radii, this->deltas, xCoords,
+                                    yCoords,ii);
 
                             // Current circle
-                            this->potx(ii) = this->computePOTX(this->radiiReq,
-                                    this->deltas,xCoords,yCoords,ii);
-                            this->poty(ii) = this->computePOTY(this->radiiReq,
-                                    this->deltas,xCoords,yCoords,ii);
-                            this->pocx(ii) = this->computePOCX(this->radiiReq,
-                                    this->deltas,xCoords,yCoords,ii);
-                            this->pocy(ii) = this->computePOCY(this->radiiReq,
-                                    this->deltas,xCoords,yCoords,ii);
+                            this->potx(ii) = this->computePOTX(this->radii,
+                                    this->deltas,xCoords,yCoords,ii+1);
+                            this->poty(ii) = this->computePOTY(this->radii,
+                                    this->deltas,xCoords,yCoords,ii+1);
+                            this->pocx(ii) = midx;
+                            this->pocy(ii) = midy;
+//                            this->pocx(ii) = this->computePOCX(this->radii,
+//                                    this->deltas,xCoords,yCoords,ii+1);
+//                            this->pocy(ii) = this->computePOCY(this->radii,
+//                                    this->deltas,xCoords,yCoords,ii+1);
 						
-                        } else if (pArcLen > 0.5*tanLen) {
+                        } else if ((pArcLen - 0.5*tanLen) > DBL_PREC) {
                             // Reduce the radius of the circle at the previous
                             // PI to meet the start of the current circle.
                             this->radii(ii-1) = this->radNewPOT(xCoords,
-                                    yCoords, this->deltas, ii-1, tanlen,
-                            this->pocx(ii), this->pocy(ii));
+                                    yCoords, this->deltas, ii, tanLen,
+                                    this->pocx(ii), this->pocy(ii));
 
-                            this->potx(ii-1) = this->computePOTX(
-                                    this->radiiReq, this->deltas, xCoords,
-                                    yCoords,ii-1);
-                            this->poty(ii-1) = this->computePOTY(
-                                    this->radiiReq, this->deltas, xCoords,
-                                    yCoords,ii-1);
+//                            this->potx(ii-1) = this->computePOTX(
+//                                    this->radii, this->deltas, xCoords,
+//                                    yCoords,ii);
+//                            this->poty(ii-1) = this->computePOTY(
+//                                    this->radii, this->deltas, xCoords,
+//                                    yCoords,ii);
+                            this->potx(ii-1) = this->pocx(ii);
+                            this->poty(ii-1) = this->pocy(ii);
                             this->pocx(ii-1) = this->computePOCX(
-                                    this->radiiReq, this->deltas, xCoords,
-                                    yCoords,ii-1);
+                                    this->radii, this->deltas, xCoords,
+                                    yCoords,ii);
                             this->pocy(ii-1) = this->computePOCY(
-                                    this->radiiReq, this->deltas, xCoords,
-                                    yCoords,ii-1);
+                                    this->radii, this->deltas, xCoords,
+                                    yCoords,ii);
 
                         } else {
                             // Reduce the radius of the current circle to meet
                             // the end of the circle at the previous PI
                             this->radii(ii) = this->radNewPOC(xCoords,
-                                    yCoords, this->deltas, ii, tanlen,
+                                    yCoords, this->deltas, ii+1, tanLen,
                                     this->potx(ii-1), this->poty(ii-1));
 
-                            this->potx(ii) = this->computePOTX(this->radiiReq,
-                                    this->deltas,xCoords,yCoords,ii);
-                            this->poty(ii) = this->computePOTY(this->radiiReq,
-                                    this->deltas,xCoords,yCoords,ii);
-                            this->pocx(ii) = this->computePOCX(this->radiiReq,
-                                    this->deltas,xCoords,yCoords,ii);
-                            this->pocy(ii) = this->computePOCY(this->radiiReq,
-                                    this->deltas,xCoords,yCoords,ii);
+                            this->potx(ii) = this->computePOTX(this->radii,
+                                    this->deltas,xCoords,yCoords,ii+1);
+                            this->poty(ii) = this->computePOTY(this->radii,
+                                    this->deltas,xCoords,yCoords,ii+1);
+                            this->pocx(ii) = this->potx(ii-1);
+                            this->pocy(ii) = this->poty(ii-1);
+//                            this->pocx(ii) = this->computePOCX(this->radii,
+//                                    this->deltas,xCoords,yCoords,ii+1);
+//                            this->pocy(ii) = this->computePOCY(this->radii,
+//                                    this->deltas,xCoords,yCoords,ii+1);
                         }
                     }
                 }
@@ -280,9 +296,9 @@ void HorizontalAlignment::computeAlignment() {
                 counter++;
 
                 // Now run through each arc to increase the radius where
-                // possible
+                // possible. We don't do the start and end curves yet.
                 for (unsigned int ii = 1; ii < ip-1; ii++) {
-                    if (this->radii(ii) < this->radiiReq(ii)) {
+                    if ((this->radiiReq(ii) - this->radii(ii)) > DBL_PREC) {
                         double tan1 = sqrt(pow(xCoords(ii+1)-xCoords(ii),2)
                                 + pow(yCoords(ii+1)-yCoords(ii),2));
                         double tan2 = sqrt(pow(xCoords(ii+2)-xCoords(ii+1),2)
@@ -298,27 +314,28 @@ void HorizontalAlignment::computeAlignment() {
                                 -this->pocy(ii+1),2));
 
                         // If there is room to expand the radius
-                        if ((pTLen+cCLen)<tan1 && (cTLen+nCLen)<tan2) {
+                        if (((tan1 - (pTLen+cCLen)) > DBL_PREC ) &&
+                                ((tan2 - (cTLen+nCLen)) > DBL_PREC)) {
 
                             double R1 = this->radNewPOC(xCoords,
-                                    yCoords, this->deltas, ii, tan1,
+                                    yCoords, this->deltas, ii+1, tan1,
                                     this->potx(ii-1), this->poty(ii-1));
                             double R2 = this->radNewPOT(xCoords,
-                                    yCoords, this->deltas, ii, tan2,
+                                    yCoords, this->deltas, ii+1, tan2,
                                     this->pocx(ii+1), this->pocy(ii+1));
-                                    this->radii(ii) = std::min(this->radiiReq(ii),
+                            this->radii(ii) = std::min(this->radiiReq(ii),
                                     std::min(R1,R2));
 
                             // Now adjust all previous values to reflect this
                             // change
-                            this->potx(ii) = this->computePOTX(this->radiiReq,
-                                    this->deltas,xCoords,yCoords,ii);
-                            this->poty(ii) = this->computePOTY(this->radiiReq,
-                                    this->deltas,xCoords,yCoords,ii);
-                            this->pocx(ii) = this->computePOCX(this->radiiReq,
-                                    this->deltas,xCoords,yCoords,ii);
-                            this->pocy(ii) = this->computePOCY(this->radiiReq,
-                                    this->deltas,xCoords,yCoords,ii);
+                            this->potx(ii) = this->computePOTX(this->radii,
+                                    this->deltas,xCoords,yCoords,ii+1);
+                            this->poty(ii) = this->computePOTY(this->radii,
+                                    this->deltas,xCoords,yCoords,ii+1);
+                            this->pocx(ii) = this->computePOCX(this->radii,
+                                    this->deltas,xCoords,yCoords,ii+1);
+                            this->pocy(ii) = this->computePOCY(this->radii,
+                                    this->deltas,xCoords,yCoords,ii+1);
                         }
                     }
                 }
@@ -327,7 +344,7 @@ void HorizontalAlignment::computeAlignment() {
                 // so
 
                 // Start curve
-                if (this->radii(0) < this->radiiReq(0)) {
+                if ((this->radiiReq(0) - this->radii(0)) > DBL_PREC) {
                     double tan1 = sqrt(pow(xCoords(1)-xCoords(0),2)
                             + pow(yCoords(1)-yCoords(0),2));
                     double tan2 = sqrt(pow(xCoords(2)-xCoords(1),2)
@@ -340,27 +357,28 @@ void HorizontalAlignment::computeAlignment() {
                             + pow(yCoords(2)-this->pocy(1),2));
 
                     // If there is room to expand the radius
-                    if (cCLen<tan1 && (cTLen+nCLen)<tan2) {
+                    if (((tan1 - cCLen) > DBL_PREC) &&
+                            ((tan2 - (cTLen+nCLen)) > DBL_PREC)) {
                         double R2 = this->radNewPOT(xCoords,
-                                yCoords, this->deltas, 0, tan2,
+                                yCoords, this->deltas, 1, tan2,
                                 this->pocx(1), this->pocy(1));
-                    this->radii(0) = std::min(this->radiiReq(0),R2);
+                        this->radii(0) = std::min(this->radiiReq(0),R2);
 
-                    // Now adjust all the previous values to reflect this
-                    // change
-                    this->potx(0) = this->computePOTX(this->radiiReq,
-                            this->deltas,xCoords,yCoords,0);
-                    this->poty(0) = this->computePOTY(this->radiiReq,
-                            this->deltas,xCoords,yCoords,0);
-                    this->pocx(0) = this->computePOCX(this->radiiReq,
-                            this->deltas,xCoords,yCoords,0);
-                    this->pocy(0) = this->computePOCY(this->radiiReq,
-                            this->deltas,xCoords,yCoords,0);
+                        // Now adjust all the previous values to reflect this
+                        // change
+                        this->potx(0) = this->computePOTX(this->radii,
+                                this->deltas,xCoords,yCoords,1);
+                        this->poty(0) = this->computePOTY(this->radii,
+                                this->deltas,xCoords,yCoords,1);
+                        this->pocx(0) = this->computePOCX(this->radii,
+                                this->deltas,xCoords,yCoords,1);
+                        this->pocy(0) = this->computePOCY(this->radii,
+                                this->deltas,xCoords,yCoords,1);
                     }
                 }
 
                 // End Curve
-                if (this->radii(ip-1) < this->radiiReq(ip-1)) {
+                if ((this->radiiReq(ip-1) - this->radii(ip-1)) > DBL_PREC) {
                     double tan1 = sqrt(pow(xCoords(ip)-xCoords(ip-1),2)
                             + pow(yCoords(ip)-yCoords(ip-1),2));
                     double tan2 = sqrt(pow(xCoords(ip+1)-xCoords(ip),2)
@@ -373,22 +391,23 @@ void HorizontalAlignment::computeAlignment() {
                             + pow(this->poty(ip-1)-yCoords(ip),2));
 
                     // If there is room to expand the radius
-                    if ((pTLen+cCLen)<tan1 && (cTLen)<tan2) {
+                    if (((tan1 - (pTLen+cCLen)) > DBL_PREC) &&
+                            ((tan2 - (cTLen)) > DBL_PREC)) {
                         double R1 = this->radNewPOC(xCoords, yCoords,
-                                this->deltas, ip-1, tan1, this->potx(ip-2),
+                                this->deltas, ip, tan1, this->potx(ip-2),
                                 this->poty(ip-2));
-                        this->radii(ip-1) = std::min(R1,this->radii(ip-1));
+                        this->radii(ip-1) = std::min(R1,this->radiiReq(ip-1));
 
                         // Now adjust all the previous values to reflect this
                         // change
                         this->potx(ip-1) = this->computePOTX(this->radiiReq,
-                                this->deltas,xCoords,yCoords,ip-1);
+                                this->deltas,xCoords,yCoords,ip);
                         this->poty(ip-1) = this->computePOTY(this->radiiReq,
-                                this->deltas,xCoords,yCoords,ip-1);
+                                this->deltas,xCoords,yCoords,ip);
                         this->pocx(ip-1) = this->computePOCX(this->radiiReq,
-                                this->deltas,xCoords,yCoords,ip-1);
+                                this->deltas,xCoords,yCoords,ip);
                         this->pocy(ip-1) = this->computePOCY(this->radiiReq,
-                                this->deltas,xCoords,yCoords,ip-1);
+                                this->deltas,xCoords,yCoords,ip);
                     }
                 }
 
@@ -407,7 +426,7 @@ void HorizontalAlignment::computeAlignment() {
                     double tanLen = sqrt(pow(xCoords(ii+1)-xCoords(ii),2)+
                             pow(yCoords(ii+1)-yCoords(ii),2));
 
-                    if (tanLen*1.000001 < (pArcLen + cArcLen)) {
+                    if (((pArcLen + cArcLen) - tanLen) > DBL_PREC) {
                         continuous = false;
                     }
                 }
@@ -419,11 +438,11 @@ void HorizontalAlignment::computeAlignment() {
                 this->my(ii) = 0.5*(this->pocy(ii)+this->poty(ii));
 
                 this->delx(ii) = curveCentreX(xCoords, yCoords,
-                        this->radii, this->deltas, this->mx, this->my, ii);
+                        this->radii, this->deltas, this->mx, this->my, ii+1);
                 this->dely(ii) = curveCentreY(xCoords, yCoords,
-                        this->radii, this->deltas, this->mx, this->my, ii);
+                        this->radii, this->deltas, this->mx, this->my, ii+1);
 
-                if (this->radii(ii) < this->radiiReq(ii)) {
+                if ((this->radiiReq(ii) - this->radii(ii)) > DBL_PREC) {
                     // Iterate to calculate the new velocity
 
                     unsigned int velcount = 1;
@@ -477,15 +496,19 @@ void HorizontalAlignment::sideFriction(const Eigen::VectorXd &vels,
 double HorizontalAlignment::computeDelta(const Eigen::VectorXd &xCoords,
         const Eigen::VectorXd &yCoords, int ii) {
 
-    double delta = acos(((xCoords(ii) - xCoords(ii-1)) *
-            (xCoords(ii+1) - xCoords(ii)) + (yCoords(ii)
-            - yCoords(ii-1)) * (yCoords(ii+1)	- yCoords(ii))) /
-            (sqrt(pow((xCoords(ii) - xCoords(ii-1)), 2)
-            + pow((yCoords(ii) - yCoords(ii-1)), 2))
-            * sqrt(pow((xCoords(ii+1) - xCoords(ii)), 2)
-            + pow((yCoords(ii+1) - yCoords(ii)), 2))));
+    double val = ((xCoords(ii) - xCoords(ii-1)) *
+                 (xCoords(ii+1) - xCoords(ii)) + (yCoords(ii)
+                 - yCoords(ii-1)) * (yCoords(ii+1) - yCoords(ii))) /
+                 (sqrt(pow((xCoords(ii) - xCoords(ii-1)), 2)
+                 + pow((yCoords(ii) - yCoords(ii-1)), 2))
+                 * sqrt(pow((xCoords(ii+1) - xCoords(ii)), 2)
+                 + pow((yCoords(ii+1) - yCoords(ii)), 2)));
 
-    if (std::abs(delta) < (1e-4)) {
+    val = (val > 1.0 ? 1.0 : (val < -1.0 ? -1.0 : val));
+
+    double delta = acos(val);
+
+    if (std::abs(delta) < (DBL_PREC)) {
         delta = 0;
     }
 
@@ -562,12 +585,12 @@ double HorizontalAlignment::radNewPOC(const Eigen::VectorXd &xCoords,
     const Eigen::VectorXd &yCoords, const Eigen::VectorXd &delta, int ii,
     double tanlen, double revPOCX, double revPOCY) {
 
-    if (xCoords(ii)==xCoords(ii+1)) {
-        return (revPOCX - xCoords(ii+1)) * tanlen / (tan(delta(ii)/2) *
-                (xCoords(ii)-xCoords(ii+1)));
+    if (xCoords(ii-1)!=xCoords(ii)) {
+        return (revPOCX - xCoords(ii)) * tanlen / (tan(delta(ii-1)/2) *
+                (xCoords(ii-1)-xCoords(ii)));
     } else {
-        return (revPOCY - yCoords(ii+1)) * tanlen / (tan(delta(ii)/2) *
-                (yCoords(ii)-yCoords(ii+1)));
+        return (revPOCY - yCoords(ii)) * tanlen / (tan(delta(ii-1)/2) *
+                (yCoords(ii-1)-yCoords(ii)));
     }
 }
 
@@ -575,12 +598,12 @@ double HorizontalAlignment::radNewPOT(const Eigen::VectorXd& xCoords,
         const Eigen::VectorXd& yCoords, const Eigen::VectorXd& delta, int ii,
         double tanlen, double revPOTX, double revPOTY) {
 
-    if (xCoords(ii)==xCoords(ii+1)) {
-        return (revPOTX - xCoords(ii+1)) * tanlen / (tan(delta(ii)/2) *
-                (xCoords(ii+2)-xCoords(ii+1)));
+    if (xCoords(ii)!=xCoords(ii+1)) {
+        return (revPOTX - xCoords(ii)) * tanlen / (tan(delta(ii-1)/2) *
+                (xCoords(ii+1)-xCoords(ii)));
     } else {
-        return (revPOTY - yCoords(ii+1)) * tanlen / (tan(delta(ii)/2) *
-                (yCoords(ii+2)-yCoords(ii+1)));
+        return (revPOTY - yCoords(ii)) * tanlen / (tan(delta(ii-1)/2) *
+                (yCoords(ii+1)-yCoords(ii)));
     }
 }
 
@@ -589,9 +612,9 @@ double HorizontalAlignment::curveCentreX(const Eigen::VectorXd &xCoords,
     const Eigen::VectorXd &delta, const Eigen::VectorXd &mx,
     const Eigen::VectorXd &my, int ii) {
 
-    return xCoords(ii+1) + (rad(ii))*(1/cos((delta(ii))/2))*(mx(ii)
-            -xCoords(ii+1))/sqrt(pow((mx(ii)-xCoords(ii+1)),2)
-            +pow((my(ii)-yCoords(ii+1)),2));
+    return xCoords(ii) + (rad(ii-1))*(1/cos((delta(ii-1))/2))*(mx(ii-1)
+            -xCoords(ii))/sqrt(pow((mx(ii-1)-xCoords(ii)),2)
+            +pow((my(ii-1)-yCoords(ii)),2));
 }
 
 double HorizontalAlignment::curveCentreY(const Eigen::VectorXd& xCoords,
@@ -599,7 +622,7 @@ double HorizontalAlignment::curveCentreY(const Eigen::VectorXd& xCoords,
     const Eigen::VectorXd& delta, const Eigen::VectorXd& mx,
     const Eigen::VectorXd& my, int ii) {
 
-    return yCoords(ii+1) + (rad(ii))*(1/cos((delta(ii))/2))*(my(ii)
-            -yCoords(ii+1))/sqrt(pow((mx(ii)-xCoords(ii+1)),2)
-            +pow((my(ii)-yCoords(ii+1)),2));
+    return yCoords(ii) + (rad(ii-1))*(1/cos((delta(ii-1))/2))*(my(ii-1)
+            -yCoords(ii))/sqrt(pow((mx(ii-1)-xCoords(ii)),2)
+            +pow((my(ii-1)-yCoords(ii)),2));
 }

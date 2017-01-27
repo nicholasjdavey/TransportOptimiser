@@ -151,12 +151,12 @@ public:
 
 private:
     double perAccident;         /**< Cost per accident */
-    double airPollution;        /**< Air pollution cost per km */
-    double noisePollution;      /**< Noise pollution cost per km */
-    double waterPollution;      /**< Water pollution cost per km */
-    double oilExtractDistUse;   /**< Oil extraction cost per km */
-    double landUse;             /**< Land use cost per km */
-    double solidChemWaste;      /**< Solid and chemical disposal cost per km */
+    double airPollution;        /**< Air pollution cost (c per km) */
+    double noisePollution;      /**< Noise pollution cost (c per km) */
+    double waterPollution;      /**< Water pollution cost (c per km) */
+    double oilExtractDistUse;   /**< Oil extraction cost (c per km) */
+    double landUse;             /**< Land use cost (c per km) */
+    double solidChemWaste;      /**< Solid and chemical disposal cost (c per km) */
 };
 
 #endif

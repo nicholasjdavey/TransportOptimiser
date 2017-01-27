@@ -79,9 +79,9 @@ double Uncertainty::singlePathValue() {
     double gr = optimiser->getTraffic()->getGR();
     // Instantiate the default C++11 Mersenne twiser pseudo random number
     // generator
-    unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().
-            count();
-    std::mt19937_64 generator(seed1);
+//    unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().
+//            count();
+//    std::mt19937_64 generator(seed1);
     // Brownian motion uncertainty
     std::normal_distribution<double> brownian(0,this->standardDev);
     // Jump size uncertainty

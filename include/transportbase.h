@@ -5,6 +5,9 @@
 // If wish to compile on a Windows machine, uncomment the line below
 //#include "targetver.h"
 
+#ifndef TRANSPORTBASE_H
+#define TRANSPORTBASE_H
+
 #define _USE_MATH_DEFINES
 #define NOMINMAX
 
@@ -28,6 +31,9 @@
 #include <random>
 #include <assert.h>
 #include <chrono>
+#include <execinfo.h>
+#include <signal.h>
+#include <unistd.h>
 
 // HEADER-ONLY LIBRARIES //////////////////////////////////////////////////////
 // EIGEN
@@ -46,6 +52,7 @@
 #include <igl/unique.h>
 #include <igl/find.h>
 #include <igl/mat_max.h>
+#include <igl/mat_min.h>
 // BOOST
 
 // CTPL
@@ -55,6 +62,7 @@
 // Only include in the specific CPP source files where required. The wrapper
 // was written with bad practices including initialising static members in the
 // header instead of the source file.
+#include <gnuplot-iostream-master/gnuplot-iostream.h>
 
 // EXTERNAL PROJECTS INCLUDED IN SOURCE CODE (AS PER USAGE INSTRUCTIONS) //////
 #include "utilities/labelmethod.h"
@@ -122,3 +130,8 @@
 
 // Random number generator seed for all utilised distributions:
 static std::default_random_engine generator;
+
+// Double precision (Max precision for double numbers)
+static double DBL_PREC = 1e-6;
+
+#endif

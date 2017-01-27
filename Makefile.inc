@@ -4,7 +4,7 @@ LD = g++
 AR = ar
 ARFLAGS =
 RANLIB = ranlib
-DEBUG = -g
+DEBUG = -g -rdynamic
 ECHO = echo
 OS := $(shell uname)
 
@@ -19,8 +19,13 @@ else
 endif
 
 LDLIBS = -lpthread -lboost_iostreams -lboost_system -lboost_filesystem
+# Uncomment the below two lines to enable debugging
 CXXFLAGS = -std=gnu++11 -pthread -c $(CFLAGS) $(DEBUG)
 LXXFLAGS = -std=gnu++11 -pthread $(CFLAGS) $(LFLAGS) $(LDLIBS) $(DEBUG)
+
+# The two lines below enable optimisation
+#CXXFLAGS = -std=gnu++11 -pthread -O2 -c $(CFLAGS)
+#LXXFLAGS = -std=gnu++11 -pthread -O2 $(CFLAGS) $(LFLAGS) $(LDLIBS)
 
 SHELL = /bin/sh
 

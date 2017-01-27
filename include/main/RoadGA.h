@@ -87,7 +87,7 @@ public:
             learnPeriod, double surrThresh, unsigned long maxLearnNo, unsigned
             long minLearnNo, unsigned long sg, RoadGA::Selection selector,
             RoadGA::Scaling fitscale, double topProp, double
-            maxSurvivalRate, int ts);
+            maxSurvivalRate, int ts, double msr, bool gpu = false);
 
     // ACCESSORS //////////////////////////////////////////////////////////////
 
@@ -260,11 +260,11 @@ public:
         this->av = av;
     }
 
-    Eigen::VectorXd& getSurrFit() {
+    Eigen::MatrixXd& getSurrFit() {
         return this->surrFit;
     }
 
-    void setSurrFit(Eigen::VectorXd& sf) {
+    void setSurrFit(Eigen::MatrixXd& sf) {
         this->surrFit = sf;
     }
 
@@ -409,8 +409,13 @@ public:
             Eigen::MatrixXd& children);
     /**
      * Runs the optimisation algorithm to devise the best Road
+     *
+     * If the argument "true" is passed, plots of the best road and
+     * optimisation metrics are generated.
+     *
+     * @param plot as bool (default = false)
      */
-    virtual void optimise();
+    virtual void optimise(bool plot = false);
 
     /**
      * Evaluates a single generation of the GA
@@ -497,6 +502,13 @@ public:
      */
     virtual void buildSurrogateModelROVCR();
 
+    /**
+     * Plot routine for visualising the results at each generation
+     *
+     * @param plot as bool (default = false)
+     */
+    virtual void plotResults(bool plot = false);
+
 private:
     double scale;               /**< Cooling rate for mutation */
     Eigen::VectorXd xO;         /**< X coordinate of plane origins */
@@ -519,7 +531,7 @@ private:
     // Values for progression of GA ///////////////////////////////////////////
     Eigen::VectorXd best;       /**< Best cost for each generation */
     Eigen::VectorXd av;         /**< Average cost for each generation */
-    Eigen::VectorXd surrFit;    /**< Fitness of the surrogate model */
+    Eigen::MatrixXd surrFit;    /**< Standard error of the surrogate model for each generation */
     // Retained values for surrogates models //////////////////////////////////
     Eigen::MatrixXd iars;       /**< IARS for surrogate model (each column for each species) */
     Eigen::MatrixXd pops;       /**< Full traffic flow end pops for surrogate model */

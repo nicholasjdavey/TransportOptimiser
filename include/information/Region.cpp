@@ -84,18 +84,20 @@ void Region::placeNetwork(double& x, double& y, double& z) {
     unsigned int nxd = this->X.rows();
     unsigned int nyd = this->Y.cols();
 
-    double* xd;
-    double* yd;
-    double* zd;
-    double* pwl = &z;
+//    double* xd;
+//    double* yd;
+//    double* zd;
+    double* pwl;
 
     Eigen::MatrixXd xvals = this->X.block(0,0,nxd,1).transpose();
-    Eigen::MatrixXd yvals = this->X.block(0,0,1,nyd);
+    Eigen::MatrixXd yvals = this->Y.block(0,0,1,nyd);
 
     // Convert the Eigen matrices to standard C++ arrays for use
-    Eigen::Map<Eigen::MatrixXd>(xd,xvals.rows(),xvals.cols()) = xvals;
-    Eigen::Map<Eigen::MatrixXd>(yd,yvals.rows(),yvals.cols()) = yvals;
-    Eigen::Map<Eigen::MatrixXd>(zd,Z.rows(),Z.cols()) = Z;
+//    Eigen::Map<Eigen::MatrixXd>(xd,xvals.rows(),xvals.cols()) = xvals;
+//    Eigen::Map<Eigen::MatrixXd>(yd,yvals.rows(),yvals.cols()) = yvals;
+//    Eigen::Map<Eigen::MatrixXd>(zd,Z.rows(),Z.cols()) = Z;
 
-    pwl = pwl_interp_2d(nxd,nyd,xd,yd,zd,1,&x,&y);
+    pwl = pwl_interp_2d(nxd,nyd,xvals.data(),yvals.data(),this->Z.data(),1,&x,
+            &y);
+    z = *pwl;
 }

@@ -270,18 +270,18 @@ public:
 
 private:
     std::weak_ptr<Road> road;			/**< Road */
-    Eigen::VectorXd deltas;				/**< Arc angle of curve (rad) */
-    Eigen::VectorXd radii;				/**< Radii of curvature of PIs (rad) */
+    Eigen::VectorXd deltas;                     /**< Arc angle of curve (rad) */
+    Eigen::VectorXd radii;                      /**< Radii of curvature of PIs (rad) */
     Eigen::VectorXd radiiReq;			/**< Required radii of curvature based on desired speed (rad) */
-    Eigen::VectorXd pocx;				/**< Points of curvature, x (m) */
-    Eigen::VectorXd pocy;				/**< Points of curvature, y (m) */
-    Eigen::VectorXd potx;				/**< Points of tangency, x (m) */
-    Eigen::VectorXd poty;				/**< Points of tangency, y (m) */
-    Eigen::VectorXd mx;					/**< Chord midpoints, x (m) */
-    Eigen::VectorXd my;					/**< Chord midpoints, y (m) */
-    Eigen::VectorXd delx;				/**< Centre of curvature, x (m) */
-    Eigen::VectorXd dely;				/**< Centre of curvature, y (m) */
-    Eigen::VectorXd vel;				/**< Design velocity (m/s) */
+    Eigen::VectorXd pocx;                       /**< Points of curvature, x (m) */
+    Eigen::VectorXd pocy;			/**< Points of curvature, y (m) */
+    Eigen::VectorXd potx;			/**< Points of tangency, x (m) */
+    Eigen::VectorXd poty;			/**< Points of tangency, y (m) */
+    Eigen::VectorXd mx;				/**< Chord midpoints, x (m) */
+    Eigen::VectorXd my;				/**< Chord midpoints, y (m) */
+    Eigen::VectorXd delx;			/**< Centre of curvature, x (m) */
+    Eigen::VectorXd dely;			/**< Centre of curvature, y (m) */
+    Eigen::VectorXd vel;			/**< Design velocity (m/s) */
 
     // PRIVATE ROUTINES ///////////////////////////////////////////////////////
 
@@ -300,6 +300,8 @@ private:
      * @param xCoords as const Eigen::VectorXd&
      * @param yCoords as const Eigen::VectorXd&
      * @param ii as int
+     *
+     * @note The first curve has index 1
      */
     double computeDelta(const Eigen::VectorXd& xCoords, const Eigen::VectorXd&
             yCoords, int ii);
@@ -313,6 +315,8 @@ private:
      * @param yCoords as const Eigen::VectorXd&
      * @param ii as int
      * @return POTX as double
+     *
+     * @note The first curve has index 1
      */
     double computePOTX(const Eigen::VectorXd& rad, const Eigen::VectorXd&
             delta, const Eigen::VectorXd& xCoords, const Eigen::VectorXd&
@@ -327,6 +331,8 @@ private:
      * @param yCoords as const Eigen::VectorXd&
      * @param ii as int
      * @return POTY as double
+     *
+     * @note The first curve has index 1
      */
     double computePOTY(const Eigen::VectorXd& rad, const Eigen::VectorXd&
             delta, const Eigen::VectorXd& xCoords, const Eigen::VectorXd&
@@ -341,6 +347,8 @@ private:
      * @param yCoords as const Eigen::VectorXd&
      * @param ii as int
      * @return POCX as double
+     *
+     * @note The first curve has index 1
      */
     double computePOCX(const Eigen::VectorXd& rad, const Eigen::VectorXd&
             delta, const Eigen::VectorXd& xCoords, const Eigen::VectorXd&
@@ -355,6 +363,8 @@ private:
      * @param yCoords as const Eigen::VectorXd&
      * @param ii as int
      * @return POCY as double
+     *
+     * @note The first curve has index 1
      */
     double computePOCY(const Eigen::VectorXd &rad, const Eigen::VectorXd &delta,
         const Eigen::VectorXd &xCoords, const Eigen::VectorXd &yCoords, int ii);

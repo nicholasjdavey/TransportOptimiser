@@ -31,6 +31,9 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
     // First initialise the number of habitat patches. We expect there to be no
     // more than n x y where n is the number of habitat patches and y is the
     // number of grid cells.
+
+    // This is a very computationally-intensive aspect of the code. Need to
+    // find a way to speed it up.
     RoadPtr roadPtrShared = this->road.lock();
     RegionPtr region = roadPtrShared->getOptimiser()->getRegion();
     const Eigen::MatrixXd& X = region->getX();
@@ -45,9 +48,9 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
 
     // Grid will be evenly spaced upon call
     if ((xspacing.segment(1,xspacing.size()-1)
-            - xspacing.segment(0,xspacing.size()-1)).sum() > 1e-4 ||
+            - xspacing.segment(0,xspacing.size()-1)).sum() > DBL_PREC ||
             (yspacing.segment(1,yspacing.size()-1)
-            - yspacing.segment(0,yspacing.size()-1)).sum() > 1e-4) {
+            - yspacing.segment(0,yspacing.size()-1)).sum() > DBL_PREC) {
         throw std::invalid_argument("Grid must be evenly spaced in both X and Y");
     }
 
@@ -85,19 +88,29 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
     // Factor by which to increase each population
     double factor = totalPop/(totalPop - relocateAnimals);
 
+    // Initialise matrices for masks to speed memory allocation
+    Eigen::MatrixXi input = Eigen::MatrixXi::Zero(W,H);
+    Eigen::MatrixXi output = Eigen::MatrixXi::Zero(W,H);
+    Eigen::MatrixXi tempGrid = Eigen::MatrixXi::Zero(W,H);
+    Eigen::MatrixXi tempGrid2 = Eigen::MatrixXi::Zero(W,H);
+    Eigen::VectorXi xidx =
+            Eigen::VectorXi::LinSpaced(W,1,W);
+    Eigen::VectorXi yidx =
+            Eigen::VectorXi::LinSpaced(H,1,H);
+
     for (int ii = 0; ii < habTyps.size(); ii++) {
         if (habTyps[ii]->getType() == HabitatType::ROAD ||
                 habTyps[ii]->getType() == HabitatType::CLEAR) {
             continue;
         }
-        Eigen::MatrixXi input = (modHab.array() ==
-                (int)(habTyps[ii]->getType())).cast<int>();
+
+        input = (modHab.array() == (int)(habTyps[ii]->getType())).cast<int>();
         // Map the input array to a plain integer C-array
 //        int* inputData = input.data();
 //        Eigen::Map<Eigen::MatrixXi> cinput(inputData,input.size());
 
         // Map output C-array to an Eigen int matrix
-        Eigen::MatrixXi output(W,H);
+        output = Eigen::MatrixXi::Zero(W,H);
 
         // Separate contiguous regions of this habitat type
         // LabelImage is found within utilities/labelmethod.cpp
@@ -106,7 +119,7 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
         // Iterate through every large cell present in the overall region
         for (int jj = 0; jj < xRes; jj++) {
             for (int kk = 0; kk < yRes; kk++) {
-                Eigen::MatrixXi tempGrid = Eigen::MatrixXi::Zero(W,H);
+                tempGrid = Eigen::MatrixXi::Zero(W,H);
 
                 int blockSizeX;
                 int blockSizeY;
@@ -129,7 +142,6 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
                 // patch. If the patch contains valid habitat, we add it to
                 // our list of patches for use later.
                 for (int ll = 1; ll <= regions; ll++) {
-                    Eigen::MatrixXi tempGrid2;
 //                    Eigen::MatrixXi tempGrid3;
                     tempGrid2 = ((output.array() == ll).cast<int>()
                             *tempGrid.array()).matrix();
@@ -140,10 +152,6 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
                     if (noCells > 0) {
                         HabitatPatchPtr hab(new HabitatPatch());
                         hab->setArea((double)(tempGrid2.sum()*subPatchArea));
-                        Eigen::VectorXi xidx =
-                                Eigen::VectorXi::LinSpaced(W,1,W);
-                        Eigen::VectorXi yidx =
-                                Eigen::VectorXi::LinSpaced(H,1,H);
 
                         hab->setCX((double)(xspacing(0)*((xidx.transpose()*
                                 tempGrid2).sum())/noCells + X(0,0)
@@ -164,8 +172,9 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
                         ///////////////////////////////////////////////////////
 
                         hab->setType(habTyps[ii]);
-                        double thisPop = (tempGrid2.array().cast<double>()*
+                        double thisPop = ((tempGrid2.cast<double>().array())*
                                 (this->species->getPopulationMap()).array()).sum()*factor;
+
                         hab->setPopulation(thisPop);
                         hab->setCapacity(habTyps[ii]->getMaxPop()*hab->getArea());
                         // For now do not store the indices of the points

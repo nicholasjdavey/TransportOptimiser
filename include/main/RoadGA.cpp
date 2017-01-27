@@ -19,9 +19,9 @@ RoadGA::RoadGA(double mr, double cf, unsigned long gens, unsigned long popSize,
     scale, unsigned long learnPeriod, double surrThresh, unsigned long
     maxLearnNo, unsigned long minLearnNo, unsigned long sg, RoadGA::Selection
     selector, RoadGA::Scaling fitscale, double topProp, double
-    maxSurvivalRate, int ts) :
+    maxSurvivalRate, int ts, double msr, bool gpu) :
     Optimiser(mr, cf, gens, popSize, stopTol, confInt, confLvl, habGridRes,
-            solScheme, noRuns, type, sg) {
+            solScheme, noRuns, type, sg, msr, gpu) {
 
     this->theta = 0;
     this->generation = 0;
@@ -63,6 +63,7 @@ void RoadGA::initialiseStorage() {
 
     this->best = Eigen::VectorXd::Zero(this->generations);
     this->av = Eigen::VectorXd::Zero(this->generations);
+    this->surrFit = Eigen::VectorXd::Zero(this->generations);
 
     this->iars = Eigen::MatrixXd::Zero(this->generations*this->
             populationSizeGA*this->maxSampleRate,noSpecies);
@@ -86,12 +87,12 @@ void RoadGA::creation() {
     double ey = this->designParams->getEndY();
 
     // Region limits. We ignore the two outermost cell boundaries
-    double minLon = (this->getRegion()->getX())(3,1);
+    double minLon = (this->getRegion()->getX())(2,1);
     double maxLon = (this->getRegion()->getX())(this->getRegion()->getX().
-            rows()-2,1);
-    double minLat = (this->getRegion()->getY())(1,3);
+            rows()-3,1);
+    double minLat = (this->getRegion()->getY())(1,2);
     double maxLat = (this->getRegion()->getY())(1,this->getRegion()->getY().
-            cols()-2);
+            cols()-3);
 
     if (sx > maxLon || sx < minLon || ex > maxLon || ex < minLon ||
             sy > maxLat || sy < minLat || ey > maxLat || ey < minLat) {
@@ -233,7 +234,7 @@ void RoadGA::crossover(const Eigen::VectorXi& parentsIdx, Eigen::MatrixXd&
     // First ensure that the parents provided are valid
     //this->replaceInvalidRoads(parents, costs);
 
-    std::default_random_engine generator;
+    //std::default_random_engine generator;
     std::uniform_int_distribution<int> crossMethod(1,4);
     std::uniform_int_distribution<int> cross1(1,intersectPts);
     std::uniform_real_distribution<double> cross3(0,1);
@@ -336,12 +337,12 @@ void RoadGA::mutation(const Eigen::VectorXi &parentsIdx,
     Eigen::MatrixXd& parents = this->currentRoadPopulation;
 
     // Region limits. We ignore the two outermost cell boundaries
-    double minLon = (this->getRegion()->getX())(3,1);
+    double minLon = (this->getRegion()->getX())(2,1);
     double maxLon = (this->getRegion()->getX())(this->getRegion()->getX().
-            rows()-2,1);
-    double minLat = (this->getRegion()->getY())(1,3);
+            rows()-3,1);
+    double minLat = (this->getRegion()->getY())(1,2);
     double maxLat = (this->getRegion()->getY())(1,this->getRegion()->getY().
-            cols()-2);
+            cols()-3);
 
     try {
         assert(parentsIdx.size() == children.rows());
@@ -352,7 +353,7 @@ void RoadGA::mutation(const Eigen::VectorXi &parentsIdx,
 
     unsigned long intersectPts = this->designParams->getIntersectionPoints();
 
-    std::default_random_engine generator;
+    //std::default_random_engine generator;
     std::uniform_int_distribution<int> mutateMethod(1,4);
     std::uniform_int_distribution<int> cross1(1,intersectPts);
     std::uniform_real_distribution<double> mutate1(0,1);
@@ -403,7 +404,7 @@ void RoadGA::mutation(const Eigen::VectorXi &parentsIdx,
             // A and B will not be the same thanks to the random shuffle.
             // This ensures that we do actually get mutation.
             if ((twoPts(1) - twoPts(0)) >= 2) {
-                int jj = twoPts(1);
+                int jj = twoPts(0);
                 int kk = twoPts(1);
 
                 // X values
@@ -412,26 +413,26 @@ void RoadGA::mutation(const Eigen::VectorXi &parentsIdx,
                 Eigen::MatrixXd xvals = (children(ii,3*jj) +
                         (level*(children(ii,3*kk) - children(ii,3*jj))/
                         ((double)(kk - jj))).array()).matrix();
-                Eigen::VectorXi xIdxI = Eigen::VectorXi::LinSpaced(kk-jj-1,
+                Eigen::VectorXi xIdxJ = Eigen::VectorXi::LinSpaced(kk-jj-1,
                         3*(jj+1),3*(kk-1));
-                Eigen::VectorXi IdxJ = Eigen::VectorXi::Constant(kk-jj-1,ii);
-                igl::slice_into(xvals,xIdxI,IdxJ,children);
+                Eigen::VectorXi IdxI = Eigen::VectorXi::Constant(kk-jj-1,ii);
+                Utility::sliceIntoPairs(xvals,IdxI,xIdxJ,children);
 
                 // Y values
                 Eigen::MatrixXd yvals = (children(ii,3*jj+1) +
                         (level*(children(ii,3*kk+1) - children(ii,3*jj+1))/
                         ((double)(kk - jj))).array()).matrix();
-                Eigen::VectorXi yIdxI = Eigen::VectorXi::LinSpaced(kk-jj-1,
+                Eigen::VectorXi yIdxJ = Eigen::VectorXi::LinSpaced(kk-jj-1,
                         3*(jj+1)+1,3*(kk-1)+1);
-                igl::slice_into(yvals,yIdxI,IdxJ,children);
+                Utility::sliceIntoPairs(yvals,IdxI,yIdxJ,children);
 
                 // Z values
                 Eigen::MatrixXd zvals = (children(ii,3*jj+2) +
                         (level*(children(ii,3*kk+2) - children(ii,3*jj+2))/
                         ((double)(kk - jj))).array()).matrix();
-                Eigen::VectorXi zIdxI = Eigen::VectorXi::LinSpaced(kk-jj-1,
+                Eigen::VectorXi zIdxJ = Eigen::VectorXi::LinSpaced(kk-jj-1,
                         3*(jj+1)+2,3*(kk-1)+2);
-                igl::slice_into(zvals,zIdxI,IdxJ,children);
+                Utility::sliceIntoPairs(zvals,IdxI,zIdxJ,children);
             }
 
 
@@ -441,8 +442,8 @@ void RoadGA::mutation(const Eigen::VectorXi &parentsIdx,
             double rd1 = mutate3(generator);
             double rd2 = mutate3(generator);
 
-            double scaling = pow((1 - this->generation/this->generations),
-                    this->scale);
+            double scaling = pow((1.0 - (double)this->generation/((double)
+                    this->generations)),(double)this->scale);
 
             if (rd1 == 0) {
                 children(ii,3*kk) = children(ii,3*kk) - (children(ii,3*kk) -
@@ -460,7 +461,7 @@ void RoadGA::mutation(const Eigen::VectorXi &parentsIdx,
                         ii,3*kk+1))*mutate1(generator)*scaling;
             }
 
-            // Randomly select two points, one on either side (l and m), to
+            // Randomly select two points, one on either side (jj and ll), to
             // act as the two other independent locii for the CURVE ELIMINATION
             // PROCEDURE and modify all intervening points.
             std::uniform_int_distribution<int> cross1a(0,kk - 1);
@@ -494,15 +495,16 @@ void RoadGA::mutation(const Eigen::VectorXi &parentsIdx,
                 double rd1 = mutate3(generator);
                 double rd2 = mutate3(generator);
 
+                // New X value
                 if (rd1 == 0) {
-                    children(ii,3*kk) = children(ii,3*kk) -
-                            (children(ii,3*kk) - minLon)*
-                            mutate1(generator)*scaling;
+                    children(ii,3*kk) = children(ii,3*kk) - (children(ii,3*kk)
+                            - minLon)*mutate1(generator)*scaling;
                 } else {
                     children(ii,3*kk) = children(ii,3*kk) + (maxLon - children(
                             ii,3*kk))*mutate1(generator)*scaling;
                 }
 
+                // New Y value
                 if (rd2 == 0) {
                     children(ii,3*kk+1) = children(ii,3*kk+1) - (children(ii,
                             3*kk+1) - minLat)*mutate1(generator)*scaling;
@@ -541,41 +543,53 @@ void RoadGA::elite(const Eigen::VectorXi& parentsIdx,
     int cols = this->currentRoadPopulation.cols();
     Eigen::RowVectorXi colIdx = Eigen::RowVectorXi::LinSpaced(cols,0,
             cols-1);
-    int rows = parentsIdx.size();
 
-    Eigen::MatrixXi rowRefs = parentsIdx.rowwise().replicate(cols);
-    Eigen::MatrixXi colRefs = colIdx.colwise().replicate(rows);
-
-    igl::slice(this->currentRoadPopulation,rowRefs,colRefs,children);
+    igl::slice(this->currentRoadPopulation,parentsIdx,colIdx,children);
 }
 
-void RoadGA::optimise() {
+void RoadGA::optimise(bool plot) {
+    if (plot) {
+        GnuplotPtr plotPtr(new Gnuplot);
+
+        this->plothandle.reset();
+        this->plothandle = plotPtr;
+
+        if (this->type > Optimiser::SIMPLEPENALTY) {
+            GnuplotPtr surrPlotPtr(new Gnuplot);
+
+            this->surrPlotHandle.reset();
+            this->surrPlotHandle = surrPlotPtr;
+        }
+    }
+
     this->creation();
 
     int status = 0;
 
     // Initially, the surrogate model is simply a straight line for all
     // AAR values (100% survival)
-    this->defaultSurrogate();
+    //this->defaultSurrogate();
+    // Evaluate once to initialise the surrogate if we are using MTE or ROV
+//    if (this->type > Optimiser::SIMPLEPENALTY) {
+//        this->evaluateGeneration();
+//        this->computeSurrogate();
+//    } else {
+//        surrErr = 0;
+//    }
 
     while ((status == 0) && (this->generation <= this->generations)) {
-        // Evaluate current generation
+        // Evaluate the current generation using the new surrogate
         this->evaluateGeneration();
         this->output();
         this->assignBestRoad();
-        status = this->stopCheck();
-
-        if (status != 0) {
-            continue;
-        }
 
         // Prepare for next generation
-        this->computeSurrogate();
-        // Re-evaluate the current generation using the new surrogate
-        this->evaluateGeneration();
+        if (this->type > Optimiser::SIMPLEPENALTY) {
+            this->computeSurrogate();
+        }
 
-        int pc = (floor(this->populationSizeGA * this->crossoverFrac));
-        int pm = floor(this->populationSizeGA * this->mutationRate);
+        int pc = 2*floor((this->populationSizeGA * this->crossoverFrac)/2);
+        int pm = 2*floor((this->populationSizeGA * this->mutationRate)/2);
         int pe = this->populationSizeGA - pc - pm;
         int cols = this->currentRoadPopulation.cols();
 
@@ -600,7 +614,300 @@ void RoadGA::optimise() {
         this->currentRoadPopulation.block(pc,0,pm,cols) = mutationChildren;
         this->currentRoadPopulation.block(pc+pm,0,pe,cols) = eliteChildren;
 
+        // Print important results to console
+        std::cout << "Generation: " << this->generation << "\t Average Cost: "
+                << this->costs(this->generation) << "\t Best Road: " <<
+                this->best(this->generation);
+
+        if (this->type > Optimiser::SIMPLEPENALTY) {
+            std::cout << "\t Surrogate Error: " <<
+                    this->surrFit(this->generation);
+        }
+
+        std::cout << std::endl;
+
+//        Eigen::MatrixXd xvals;
+//        Eigen::MatrixXd yvals;
+//        Eigen::MatrixXd zvals;
+
+//        Eigen::VectorXi rows = Eigen::VectorXi::LinSpaced(pm,pc,pc+pm-1);
+//        int ip = this->designParams->getIntersectionPoints();
+//        ip += 2;
+//        Eigen::VectorXi xcols = Eigen::VectorXi::LinSpaced(ip,0,ip-1);
+//        Eigen::VectorXi ycols = 3*xcols.array()+1;
+//        Eigen::VectorXi zcols = 3*xcols.array()+2;
+//        igl::slice(this->currentRoadPopulation,rows,xcols,xvals);
+//        igl::slice(this->currentRoadPopulation,rows,ycols,yvals);
+//        igl::slice(this->currentRoadPopulation,rows,zcols,zvals);
+//        double xmax = xvals.maxCoeff();
+//        double ymax = yvals.maxCoeff();
+//        double xmin = xvals.minCoeff();
+//        double ymin = yvals.minCoeff();
+
+//        Eigen::MatrixXi valid = (this->currentRoadPopulation.unaryExpr([](double v){ return
+//                std::isfinite(v); }).cast<int>());
+//        Eigen::MatrixXi invalid = (valid.array() == 0).cast<int>();
+//        long noBadRows = invalid.count();
+
+        Optimiser::optimise(plot);
+        this->plotResults(plot);
+
+        status = this->stopCheck();
+
+        if (status != 0) {
+            continue;
+        }
+
         this->generation++;
+    }
+
+    std::cout << "Press any key to end..." << std::endl;
+    std::cin.get();
+}
+
+void RoadGA::plotResults(bool plot) {
+
+    if (plot) {
+        // Need to insert a routine to exploit multithreading to speed this up
+        RoadPtr bestRoad = this->bestRoads[this->scenario->
+                getCurrentScenario()][this->scenario->getRun()];
+        bestRoad->designRoad();
+
+        // Prepare terrain data
+        std::vector<std::vector<std::vector<double>>> terr;
+        terr.resize(region->getX().rows());
+
+        for (int ii = 0; ii < this->region->getX().rows()-2; ii++) {
+            terr[ii].resize(this->region->getX().rows()-2);
+            for (int jj = 0; jj < this->region->getX().cols()-2; jj++) {
+                terr[ii][jj].resize(3);
+            }
+        }
+
+        Eigen::MatrixXd X = this->region->getX();
+        Eigen::MatrixXd Y = this->region->getY();
+        Eigen::MatrixXd Z = this->region->getZ();
+
+        // We first need to adjust the terrain elevation along the road path so
+        // that it coincides with the road's elevation at each station
+        for (int ii = 0; ii < bestRoad->getRoadCells()->getUniqueCells().
+                size(); ii++) {
+            Eigen::VectorXd validCells(bestRoad->getRoadCells()->getCellRefs()
+                    .size());
+
+            validCells = (bestRoad->getRoadCells()->getCellRefs().array()
+                    == bestRoad->getRoadCells()->getUniqueCells()(ii))
+                    .cast<double>();
+
+            double adjLevel = (validCells.array()*bestRoad->getRoadCells()->
+                    getZ().segment(0,validCells.size()).array() + (1 -
+                    validCells.array())*bestRoad->getRoadCells()->getZ().
+                    maxCoeff()).minCoeff();
+
+//            double adjLevel = ((bestRoad->getRoadCells()->getCellRefs().array()
+//                    == bestRoad->getRoadCells()->getUniqueCells()(ii)))
+//                    .select(bestRoad->getRoadSegments()->getZ().array(),
+//                    std::numeric_limits<double>::infinity()).minCoeff();
+            Eigen::MatrixXi adjMat = Eigen::MatrixXi::Zero(
+                    this->region->getZ().rows(),this->region->getZ().cols());
+            Eigen::VectorXd cellX(1);
+            Eigen::VectorXd cellY(1);
+            Eigen::VectorXd cellVal(1);
+            cellVal(0) = bestRoad->getRoadCells()->getUniqueCells()(ii);
+
+            Utility::ind2sub(adjMat,cellVal,cellX,cellY);
+
+            adjMat(cellX(0),cellY(0)) = 1;
+            adjMat(cellX(0)+1,cellY(0)) = 1;
+            adjMat(cellX(0),cellY(0)+1) = 1;
+            adjMat(cellX(0)+1,cellY(0)+1) = 1;
+
+            Z = Z.array()*(1 - adjMat.array().cast<double>()) +
+                    adjMat.array().cast<double>()*adjLevel;
+        }
+
+        for (int ii = 1; ii < this->region->getX().rows()-1; ii++) {
+            for (int jj = 1; jj < this->region->getX().rows()-1; jj++) {
+                terr[ii-1][jj-1][0] = X(ii,jj);
+                terr[ii-1][jj-1][1] = Y(ii,jj);
+                terr[ii-1][jj-1][2] = Z(ii,jj);
+            }
+        }
+
+        // Prepare vegetation data
+        std::vector<std::vector<std::vector<double>>> veg;
+        veg.resize(this->region->getVegetation().rows()-2);
+
+        for (int ii = 0; ii < this->region->getVegetation().rows()-2; ii++) {
+            veg[ii].resize(this->region->getVegetation().rows()-2);
+            for (int jj = 0; jj < this->region->getVegetation().rows()-2;
+                    jj++) {
+                veg[ii][jj].resize(3);
+            }
+        }
+
+        Eigen::MatrixXi V = this->region->getVegetation();
+
+        // Plot the road cells in the image
+        for (int ii = 0; ii < bestRoad->getRoadCells()->getUniqueCells().
+                size(); ii++) {
+
+            V.data()[bestRoad->getRoadCells()->getUniqueCells()[ii]] = 0;
+        }
+
+        for (int ii = 1; ii < this->region->getVegetation().rows()-1; ii++) {
+            for (int jj = 1; jj < this->region->getVegetation().rows()-1; jj++) {
+                veg[ii-1][jj-1][0] = X(ii,jj);
+                veg[ii-1][jj-1][1] = Y(ii,jj);
+                veg[ii-1][jj-1][2] = V(ii,jj);
+            }
+        }
+
+        // Prepare road path data
+        std::vector<std::vector<double>> elev;
+        elev.resize(bestRoad->getRoadSegments()->getX().size(),
+                std::vector<double>(3));
+
+        for (int ii = 0; ii < bestRoad->getRoadSegments()->getX().size();
+                ii++) {
+            elev[ii][0] = bestRoad->getRoadSegments()->getX()(ii);
+            elev[ii][1] = bestRoad->getRoadSegments()->getY()(ii);
+            elev[ii][2] = bestRoad->getRoadSegments()->getZ()(ii);
+        }
+
+        // Prepare best roads data
+        std::vector<std::vector<double>> genCostsBest;
+        std::vector<std::vector<double>> genCostsAv;
+
+        genCostsBest.resize((this->generation+1),std::vector<double>(2));
+        genCostsAv.resize((this->generation+1),std::vector<double>(2));
+
+        for (int ii = 0; ii <= this->generation; ii++) {
+            genCostsBest[ii][0] = ii+1;
+            genCostsBest[ii][1] = this->best(ii);
+            genCostsAv[ii][0] = ii+1;
+            genCostsAv[ii][1] = this->av(ii);
+        }
+
+        // PLOTS //////////////////////////////////////////////////////////////
+        // Clear Previous plot
+        if (this->type > Optimiser::SIMPLEPENALTY) {
+            (*this->plothandle) << "set multiplot layout 1,3\n";
+            (*this->surrPlotHandle) << "set multiplot layout " <<
+                    this->species.size() <<",2\n";
+        } else {
+            (*this->plothandle) << "set multiplot layout 1,3\n";
+        }
+
+        // Plot 1 (Terrain with Road)
+        (*this->plothandle) << "set title '3D View of Terrain'\n";
+        (*this->plothandle) << "set grid\n";
+        (*this->plothandle) << "set hidden3d\n";
+        //(*this->plothandle) << "unset logscale y\n";
+        (*this->plothandle) << "unset key\n";
+        (*this->plothandle) << "unset view\n";
+        (*this->plothandle) << "unset pm3d\n";
+        (*this->plothandle) << "unset xlabel\n";
+        (*this->plothandle) << "unset ylabel\n";
+        (*this->plothandle) << "set xrange [*:*]\n";
+        (*this->plothandle) << "set view 45,45\n";
+        (*this->plothandle) << "splot '-' with lines, '-' with lines lw 2\n";
+        (*this->plothandle).send2d(terr);
+        (*this->plothandle).send1d(elev);
+        (*this->plothandle).flush();
+
+        // Plot 2 (Road on Vegetation)
+        (*this->plothandle) << "set title 'Road Path Through Vegetation'\n";
+        (*this->plothandle) << "unset key\n";
+        (*this->plothandle) << "set pm3d\n";
+        (*this->plothandle) << "set view map\n";
+        (*this->plothandle) << "plot '-' with image\n";
+        (*this->plothandle).send2d(veg);
+        (*this->plothandle).flush();
+
+        // Plot 3 (Stopping Criteria/Best and Average)
+        // Best and Average Option
+        (*this->plothandle) << "set title 'Best and Average Roads'\n";
+        (*this->plothandle) << "unset key\n";
+        (*this->plothandle) << "set grid\n";
+        (*this->plothandle) << "set xlabel 'Generation'\n";
+        (*this->plothandle) << "set ylabel 'Cost (AUD)'\n";
+        //(*this->plothandle) << "set logscale y\n";
+        std::string xrange = "set xrange [0:" +
+                std::to_string(this->generations) + "]\n";
+        (*this->plothandle) << xrange;
+        (*this->plothandle) << "plot '-' with points pointtype 5, '-' with points pointtype 7 \n";
+        (*this->plothandle).send1d(genCostsBest);
+        (*this->plothandle).send1d(genCostsAv);
+
+
+        // Stopping Criteria Option
+
+        if (this->type > Optimiser::SIMPLEPENALTY) {
+            // Prepare surrogate data for species present
+            for (int ii = 0; ii < this->species.size(); ii++) {
+                std::vector<std::vector<double>> surrData;
+                surrData.resize(this->noSamples,std::vector<double>(2));
+                std::vector<std::vector<double>> surrSDData;
+                surrSDData.resize(this->noSamples,std::vector<double>(2));
+                std::vector<std::vector<double>> surrErrData;
+                surrErrData.resize(this->generation+1,std::vector<double>(2));
+
+                // Surrogate sample data
+                for (int jj = 0; jj < this->noSamples; jj++) {
+                    surrData[jj][0] = this->iars(jj,ii);
+                    surrData[jj][1] = this->pops(jj,ii);
+                    surrSDData[jj][0] = this->iars(jj,ii);
+                    surrSDData[jj][1] = this->popsSD(jj,ii);
+                }
+
+                // Surrogate error data
+                for (int jj = 0; jj <= this->generation; jj++) {
+                    surrErrData[jj][0] = jj;
+                    surrErrData[jj][1] = this->surrFit(jj,ii);
+                }
+
+                // Surrogate model
+                double minIAR = 0;
+                double maxIAR = this->iars.col(ii).maxCoeff();
+
+                Eigen::VectorXd iarsTemp = Eigen::VectorXd::LinSpaced(200,
+                        minIAR,maxIAR);
+                std::vector<std::vector<double>> surrModel;
+                surrModel.resize(200,std::vector<double>(2));
+
+                for (int jj = 0; jj < 200; jj++) {
+                    surrModel[jj][0] = iarsTemp(jj);
+                    surrModel[jj][1] = alglib::spline1dcalc(this->surrogate[
+                            2*this->scenario->getCurrentScenario()][
+                            this->scenario->getRun()][ii],iarsTemp(jj));
+                }
+
+                // Plot 5 (Surrogate Model)
+                (*this->surrPlotHandle) << "set title 'Surrogate Model, Species"
+                        << ii+1 << "'\n";
+                (*this->surrPlotHandle) << "unset key\n";
+                (*this->surrPlotHandle) << "set grid\n";
+                (*this->surrPlotHandle) << "set xlabel 'IAR'\n";
+                (*this->surrPlotHandle) << "set ylabel 'End Population'\n";
+                (*this->surrPlotHandle) << "plot '-' with lines, '-' with points pointtype 7 \n";
+                (*this->surrPlotHandle).send1d(surrModel);
+                (*this->surrPlotHandle).send1d(surrData);
+
+                // Plot 6 (Surrogate Model Error)
+                (*this->plothandle) << "set title 'Surrogate Error'\n";
+                (*this->plothandle) << "unset key\n";
+                (*this->plothandle) << "set grid\n";
+                (*this->plothandle) << "set xlabel 'Generation'\n";
+                (*this->plothandle) << "set ylabel 'Model Error'\n";
+                (*this->plothandle) << "set logscale y\n";
+                (*this->plothandle) << xrange;
+                (*this->plothandle) << "plot '-' with points pointtype 7 \n";
+                (*this->plothandle).send1d(surrErrData);
+            }
+        }
+
+        (*this->plothandle) << "unset multiplot\n";
     }
 }
 
@@ -614,7 +921,7 @@ void RoadGA::assignBestRoad() {
             this->populationSizeGA,1);
     costs = this->costs;
 
-    igl::mat_max(costs,1,Y,I);
+    igl::mat_min(costs,1,Y,I);
 
     RoadPtr road(new Road(this->me(),this->currentRoadPopulation.row(I(0))));
 
@@ -624,8 +931,8 @@ void RoadGA::assignBestRoad() {
 
 void RoadGA::output() {
 
-    this->best(this->generation) = this->currentRoadPopulation.minCoeff();
-    this->av(this->generation) = this->currentRoadPopulation.mean();
+    this->best(this->generation) = this->costs.minCoeff();
+    this->av(this->generation) = this->costs.mean();
     this->surrFit(this->generation) = this->surrErr;
     // Include code to plot using gnuplot utilising POSIX pipes to plot the
     // best road
@@ -661,13 +968,13 @@ void RoadGA::computeSurrogate() {
         if (this->generation < this->learnPeriod) {
             pFull = std::max((this->maxLearnNo/this->populationSizeGA)*
                     std::min((this->surrErr - this->surrThresh)*((double)
-                    (this->surrErr > this->surrThresh))*this->maxLearnNo,1.0),
-                    10.0/this->populationSizeGA);
+                    (this->surrErr > this->surrThresh))*this->maxLearnNo,1.0/
+                    this->populationSizeGA),10.0/this->populationSizeGA);
         } else {
             pFull = std::max((this->maxLearnNo/this->populationSizeGA)*
                     std::min((this->surrErr - this->surrThresh)*((double)
-                    (this->surrErr > this->surrThresh))*this->maxLearnNo,1.0),
-                    3.0/this->populationSizeGA);
+                    (this->surrErr > this->surrThresh))*this->maxLearnNo,1.0/
+                    this->populationSizeGA),3.0/this->populationSizeGA);
         }
     }
 
@@ -689,8 +996,8 @@ void RoadGA::computeSurrogate() {
     // POINTS THAT ARE MOST DISSIMILAR FROM THE REST OF THE POPULATION.
     std::random_shuffle(sortedIdx.data()+3,sortedIdx.data() +
             this->populationSizeGA);
-    sampleRoads.segment(3,newSamples-1) = sortedIdx.segment(3,
-            newSamples-1);
+    sampleRoads.segment(3,newSamples-3) = sortedIdx.segment(3,
+            newSamples-3);
 
     // Call the thread pool. The computed function and form of the surrogate
     // models are different under each scenario (MTE vs CONTROLLED). The thread
@@ -713,6 +1020,8 @@ void RoadGA::computeSurrogate() {
             this->pops.row(this->noSamples + ii) = mteResult.row(1);
             this->popsSD.row(this->noSamples + ii) = mteResult.row(2);
         }
+
+        this->noSamples += newSamples;
 
         // Now that we have the results, let's build the surrogate model!!!
         this->buildSurrogateModelMTE();
@@ -737,11 +1046,11 @@ void RoadGA::computeSurrogate() {
             this->useSD(this->noSamples + ii) = rovResult(0,1);
         }
 
+        this->noSamples += newSamples;
+
         // Now that we have the results, let's build the surrogate model!!!
         this->buildSurrogateModelROVCR();
     }
-
-    this->noSamples += newSamples;
 }
 
 void RoadGA::evaluateGeneration() {
@@ -760,13 +1069,13 @@ void RoadGA::evaluateGeneration() {
     // Computes the current population of roads using a surrogate function
     // instead of the full model where necessary
     ThreadManagerPtr threader = this->getThreadManager();
-    unsigned int paths = this->getOtherInputs()->getNoPaths();
+    unsigned long roads = this->getGAPopSize();
 
-    std::vector<std::future<void>> results(paths);
+    std::vector<std::future<void>> results(roads);
 
     if (threader != nullptr) {
         // If multithreading is enabled
-        for (unsigned long ii = 0; ii < paths; ii++) {
+        for (unsigned long ii = 0; ii < roads; ii++) {
             // Push onto the pool with a lambda expression
             results[ii] = threader->push([this,ii](int id){
                 RoadPtr road(new Road(this->me(),
@@ -777,7 +1086,7 @@ void RoadGA::evaluateGeneration() {
                 this->costs(ii) = road->getAttributes()->getTotalValueMean();
                 this->profits(ii) = road->getAttributes()->getVarProfitIC();
 
-                if (this->type != Optimiser::SIMPLEPENALTY) {
+                if (this->type > Optimiser::SIMPLEPENALTY) {
                     for (int jj = 0; jj < this->species.size(); jj++) {
                         this->iarsCurr(ii,jj) = road->getAttributes()->
                                 getIAR()(jj);
@@ -793,22 +1102,23 @@ void RoadGA::evaluateGeneration() {
             });
         }
 
-        for (unsigned long ii = 0; ii < paths; ii++) {
+        for (unsigned long ii = 0; ii < roads; ii++) {
             results[ii].get();
         }
 
     } else {
         // Run serially
-        for (unsigned long ii = 0; ii < paths; ii++) {
+        for (unsigned long ii = 0; ii < roads; ii++) {
             RoadPtr road(new Road(this->me(),
                     this->currentRoadPopulation.row(ii)));
             road->designRoad();
             road->evaluateRoad();
 
             this->costs(ii) = road->getAttributes()->getTotalValueMean();
+
             this->profits(ii) = road->getAttributes()->getVarProfitIC();
 
-            if (this->type != Optimiser::SIMPLEPENALTY) {
+            if (this->type > Optimiser::SIMPLEPENALTY) {
                 for (int jj = 0; jj < this->species.size(); jj++) {
                     this->iarsCurr(ii,jj) = road->getAttributes()->
                             getIAR()(jj);
@@ -834,12 +1144,18 @@ void RoadGA::scaling(RoadGA::Scaling scaleType, Eigen::VectorXi& parents,
     switch (scaleType) {
     case RoadGA::RANK:
     {
-        scaling = 1.0 / (parents.cast<double>().array() + 1);
+        Eigen::VectorXd ranks = Eigen::VectorXd::LinSpaced(parents.size(),
+                1,parents.size());
+        scaling = 1.0 / (ranks.array() + 1);
         break;
     }
     case RoadGA::PROPORTIONAL:
     {
-        // This requires no changes
+        // This requires adding the difference between the best and worst roads
+        // to all costs to make the numbers positive.
+        double diff = this->costs.maxCoeff() - this->costs.minCoeff();
+        scaling.array() += diff;
+        scaling = 1.0 / (scaling.array());
         break;
     }
     case RoadGA::TOP:
@@ -883,7 +1199,7 @@ void RoadGA::scaling(RoadGA::Scaling scaleType, Eigen::VectorXi& parents,
 
     // Adjust the scaling vector so that its sum is equal to the number of
     // elements
-    double factor = this->populationSizeGA*scaling.sum();
+    double factor = this->populationSizeGA/scaling.sum();
     scaling = scaling*factor;
 }
 
@@ -891,7 +1207,7 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
         Eigen::VectorXi& pe, RoadGA::Selection selector) {
 
     // Random number generator for random
-    std::default_random_engine generator;
+    //std::default_random_engine generator;
     std::uniform_real_distribution<double> randomVal(0,1);
     std::uniform_int_distribution<unsigned long> randomParent(0,
             this->populationSizeGA-1);
@@ -904,8 +1220,7 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
     Eigen::VectorXd fitScalings(this->populationSizeGA);
     this->scaling(this->fitScaling, orderedParents, fitScalings);
 
-    unsigned long eliteParents = this->populationSizeGA*(1 - this->mutationRate
-            -this->crossoverFrac);
+    unsigned long eliteParents = pe.rows();
 
     // Elite parents selection is easy
     if (eliteParents > 0) {
@@ -919,12 +1234,12 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
     {
         Eigen::VectorXd wheelBase(this->populationSizeGA);
 
-        igl::cumsum(fitScalings,2,wheelBase);
+        igl::cumsum(fitScalings,1,wheelBase);
 
         // First, crossover
         {
-            Eigen::VectorXd wheel = wheelBase/pc.size();
-            double stepSize = 1/pc.size();
+            Eigen::VectorXd wheel = wheelBase/(wheelBase(wheelBase.size()-1));
+            double stepSize = 1.0/(((double)pc.size()) + 1.0);
 
             std::uniform_real_distribution<double> start(0,stepSize);
             double position = start(generator);
@@ -932,7 +1247,7 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
             unsigned long lowest = 0;
 
             for (unsigned long ii = 0; ii < pc.size(); ii++) {
-                for (unsigned long jj = lowest; jj < pc.size(); jj++) {
+                for (unsigned long jj = lowest; jj < wheelBase.size(); jj++) {
                     if (position < wheel(jj)) {
                         pc(ii) = orderedParents(jj);
                         lowest = jj;
@@ -943,18 +1258,21 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
             }
         }
 
+        // Shuffle the values randomly
+        std::random_shuffle(pc.data(),pc.data()+pc.size());
+
         // Next, mutation
         {
-            Eigen::VectorXd wheel = wheelBase/pm.size();
-            double stepSize = 1/pm.size();
+            Eigen::VectorXd wheel = wheelBase/(wheelBase(wheelBase.size()-1));
+            double stepSize = 1.0/(((double)pm.size()) + 1.0);
 
             std::uniform_real_distribution<double> start(0,stepSize);
             double position = start(generator);
 
             unsigned long lowest = 0;
 
-            for (unsigned long ii = 0; ii < pc.size(); ii++) {
-                for (unsigned long jj = lowest; jj < pm.size(); jj++) {
+            for (unsigned long ii = 0; ii < pm.size(); ii++) {
+                for (unsigned long jj = lowest; jj < wheelBase.size(); jj++) {
                     if (position < wheel(jj)) {
                         pm(ii) = orderedParents(jj);
                         lowest = jj;
@@ -963,6 +1281,9 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
                 }
                 position += stepSize;
             }
+
+            // Shuffle the values randomly
+            std::random_shuffle(pm.data(),pm.data()+pm.size());
         }
         break;
     }
@@ -993,36 +1314,37 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
             }
 
             // If all new scores were integers, we are done
-            if (next >= pc.size()) {
-                break;
-            }
+            if (next < pc.size()) {
+                // Scale the remaining scores to be probabilities
+                Eigen::VectorXd intervals(this->populationSizeGA);
 
-            // Scale the remaining scores to be probabilities
-            Eigen::VectorXd intervals(this->populationSizeGA);
+                igl::cumsum(fitScalings,1,intervals);
+                intervals = intervals / intervals(intervals.size()-1);
 
-            igl::cumsum(fitScalings,2,intervals);
-            intervals = intervals / intervals(intervals.size()-1);
+                // Now use the remainders as probabilities
+                for (unsigned long ii = next; ii < pc.size(); ii++) {
+                    double r = randomVal(generator);
+                    for (unsigned long jj = 0; jj < fitScalings.size(); jj++) {
+                        if (r <= intervals(ii)) {
+                            pc(ii) = orderedParents(jj);
 
-            // Now use the remainders as probabilities
-            for (unsigned long ii = next; ii < pc.size(); ii++) {
-                double r = randomVal(generator);
-                for (unsigned long jj = 0; jj < fitScalings.size(); jj++) {
-                    if (r <= intervals(ii)) {
-                        pc(ii) = orderedParents(jj);
+                            // Make sure this is not picked again
+                            fitScalings(jj) = 0;
+                            igl::cumsum(fitScalings,1,intervals);
 
-                        // Make sure this is not picked again
-                        fitScalings(jj) = 0;
-                        igl::cumsum(fitScalings,2,intervals);
-
-                        if (intervals(intervals.size()-1) != 0.0) {
-                            intervals = intervals / intervals(intervals.size()
-                                    - 1);
+                            if (intervals(intervals.size()-1) != 0.0) {
+                                intervals = intervals / intervals(intervals.size()
+                                        - 1);
+                            }
+                            break;
                         }
-                        break;
                     }
                 }
             }
         }
+
+        // Randomise the order of the parents
+        std::random_shuffle(pc.data(),pc.data()+pc.size());
 
         // Next, mutation
         {
@@ -1047,48 +1369,47 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
             }
 
             // If all new scores were integers, we are done
-            if (next >= pm.size()) {
-                break;
-            }
+            if (next < pm.size()) {
+                // Scale the remaining scores to be probabilities
+                Eigen::VectorXd intervals(this->populationSizeGA);
 
-            // Scale the remaining scores to be probabilities
-            Eigen::VectorXd intervals(this->populationSizeGA);
+                igl::cumsum(fitScalings,1,intervals);
+                intervals = intervals / intervals(intervals.size()-1);
 
-            igl::cumsum(fitScalings,2,intervals);
-            intervals = intervals / intervals(intervals.size()-1);
+                // Now use the remainders as probabilities
+                for (unsigned long ii = next; ii < pc.size(); ii++) {
+                    double r = randomVal(generator);
+                    for (unsigned long jj = 0; jj < fitScalings.size(); jj++) {
+                        if (r <= intervals(ii)) {
+                            pm(ii) = orderedParents(jj);
 
-            // Now use the remainders as probabilities
-            for (unsigned long ii = next; ii < pc.size(); ii++) {
-                double r = randomVal(generator);
-                for (unsigned long jj = 0; jj < fitScalings.size(); jj++) {
-                    if (r <= intervals(ii)) {
-                        pm(ii) = orderedParents(jj);
+                            // Make sure this is not picked again
+                            fitScalings(jj) = 0;
+                            igl::cumsum(fitScalings,1,intervals);
 
-                        // Make sure this is not picked again
-                        fitScalings(jj) = 0;
-                        igl::cumsum(fitScalings,2,intervals);
-
-                        if (intervals(intervals.size()-1) != 0.0) {
-                            intervals = intervals / intervals(intervals.size()
-                                    - 1);
+                            if (intervals(intervals.size()-1) != 0.0) {
+                                intervals = intervals / intervals(intervals.size()
+                                        - 1);
+                            }
+                            break;
                         }
-                        break;
                     }
                 }
             }
         }
+        std::random_shuffle(pm.data(),pm.data()+pm.size());
         break;
     }
     case RoadGA::ROULETTE:
     {
         Eigen::VectorXd wheelBase(this->populationSizeGA);
 
-        igl::cumsum(fitScalings,2,wheelBase);
+        igl::cumsum(fitScalings,1,wheelBase);
 
         // Crossover
         {
             for (unsigned long ii = 0; ii < pc.size(); ii++) {
-                double r = randomVal(generator);
+                double r = randomVal(generator)*this->populationSizeGA;
 
                 for (unsigned long jj = 0; jj < wheelBase.size(); jj++) {
                     if (r < wheelBase(jj)) {
@@ -1101,12 +1422,12 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
 
         // Mutation
         {
-            for (unsigned long ii = 0; ii < pe.size(); ii++) {
-                double r = randomVal(generator);
+            for (unsigned long ii = 0; ii < pm.size(); ii++) {
+                double r = randomVal(generator)*this->populationSizeGA;
 
                 for (unsigned long jj = 0; jj < wheelBase.size(); jj++) {
                     if (r < wheelBase(jj)) {
-                        pe(ii) = orderedParents(jj);
+                        pm(ii) = orderedParents(jj);
                         break;
                     }
                 }
@@ -1124,8 +1445,10 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
         // 20th parent in the current population list.
         //
         // This is fine as the tournament pools of parents are random anyway.
-        for (unsigned long ii = 0; ii < this->populationSizeGA; ii++) {
-            playerList(ii) = this->populationSizeGA*randomVal(generator);
+        for (unsigned long ii = 0; ii < pc.size()+pm.size(); ii++) {
+            for (unsigned int jj = 0; jj < this->tournamentSize; jj++) {
+                playerList(ii,jj) = this->populationSizeGA*randomVal(generator);
+            }
         }
 
         Eigen::MatrixXi players(1,this->tournamentSize);
@@ -1136,31 +1459,31 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
             unsigned long winner = players(0);
             for (int jj = 1; jj < players.size(); jj++) {
                 double score1 = fitScalings(winner);
-                double score2 = fitScalings(jj);
+                double score2 = fitScalings(players(jj));
                 if (score2 > score1) {
                     // The problem is single-objective so we only have one
                     // score per road
-                    winner = orderedParents(jj);
+                    winner = players(jj);
                 }
             }
-            pc(ii) = winner;
+            pc(ii) = orderedParents(winner);
         }
 
         // Mutation parents
         for (unsigned long ii = 0; ii < pm.size(); ii++) {
-            players = playerList.row(ii);
+            players = playerList.row(ii+pc.size());
             // For each tournament
             unsigned long winner = players(0);
             for (int jj = 1; jj < players.size(); jj++) {
                 double score1 = fitScalings(winner);
-                double score2 = fitScalings(jj);
+                double score2 = fitScalings(players(jj));
                 if (score2 > score1) {
                     // The problem is single-objective so we only have one
                     // score per road
-                    winner = orderedParents(jj);
+                    winner = players(jj);
                 }
             }
-            pm(ii) = winner;
+            pm(ii) = orderedParents(winner);
         }
         break;
     }
@@ -1192,27 +1515,48 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
 int RoadGA::stopCheck() {
     if (this->generation >= this->generations) {
         // Adequate convergence not achieved. Generations exceeded
+        std::cout << "Optimisation ended: maximum number of generations reached."
+                  << std::endl;
         return -1;
     }
 
     if (this->stallTest()) {
 
-        this->stallGen++;
-
         if (this->stallGen >= this->stallGenerations) {
             // Number of stall generations exceeded
+            std::cout << "Optimisation ended: maximum number of stall generations reached."
+                    << std::endl;
             return -2;
         }
+
+        this->stallGen++;
+
     } else {
         this->stallGen = 0;
     }
 
     if (this->surrErr < this->surrThresh) {
+        // Also covers the case where we do not need a surrogate
+
+        // If the best road has not changed materially for five generations
         if (this->generation > this->learnPeriod) {
-            if (abs((this->best(this->generation - 1) - this->best(
-                    this->generation - 2))/(this->best(
-                    this->generation - 2))) < this->stoppingTol) {
+            if ((abs((this->best(this->generation) - this->best(
+                    this->generation - 1))/(this->best(
+                    this->generation - 1))) < this->stoppingTol) &&
+                    (abs((this->best(this->generation) - this->best(
+                    this->generation - 2))/(this->best(this->generation - 2)))
+                    < this->stoppingTol) && (abs((this->best(this->generation)
+                    - this->best(this->generation - 3))/(this->best(
+                    this->generation - 3))) < this->stoppingTol) &&
+                    (abs((this->best(this->generation) - this->best(
+                    this->generation - 4))/(this->best(this->generation - 4)))
+                    < this->stoppingTol) && (abs((this->best(this->generation)
+                    - this->best(this->generation - 5))/(this->best(
+                    this->generation - 5))) < this->stoppingTol)) {
                 // Solution successfully found
+                std::cout << "Optimisation ended: stopping tolerance achieved."
+                        << std::endl;
+
                 return 1;
 
             } else {
@@ -1232,20 +1576,24 @@ bool RoadGA::stallTest() {
     // First, apply geometric weightings to all generations PRIOR to the
     // current
 
-    double total = 1.0;
-    double totalWeight = 0.0;
+    if (this->generation > 0) {
+        double total = 1.0;
+        double totalWeight = 0.0;
 
-    for (int ii = this->generation - 1; ii < 0; ii--) {
-        double w = pow(0.5,this->generation - 1 - ii);
-        total = total*pow(this->av(ii),w);
-        totalWeight += w;
-    }
+        for (int ii = this->generation - 1; ii > 0; ii--) {
+            double w = pow(0.5,this->generation - 1 - ii);
+            total = total*pow(this->av(ii),w);
+            totalWeight += w;
+        }
 
-    total = pow(total,1.0/totalWeight);
+        total = pow(total,1.0/totalWeight);
 
-    if (abs(this->av(this->generation - 1) - total)/(total) <
-            this->stoppingTol) {
-        return true;
+        if (abs(this->av(this->generation - 1) - total)/(total) <
+                this->stoppingTol) {
+            return true;
+        } else {
+            return false;
+        }
     } else {
         return false;
     }
@@ -1254,20 +1602,21 @@ bool RoadGA::stallTest() {
 void RoadGA::randomXYOnPlanes(const long &individuals, const long&
         intersectPts, const long& startRow) {
 
-    Eigen::MatrixXd randomMatrixX = Eigen::MatrixXd::Random(individuals,
+    // As the equation is parametrised, the random matrix is the same for the
+    // X and Y coordinates
+    Eigen::MatrixXd randomMatrix = Eigen::MatrixXd::Random(individuals,
             intersectPts);
-    Eigen::MatrixXd randomMatrixY = Eigen::MatrixXd::Random(individuals,
-            intersectPts);
+    randomMatrix = 0.5*(randomMatrix.array() + 1);
     Eigen::MatrixXd xvals = Eigen::MatrixXd::Zero(individuals,intersectPts);
     Eigen::MatrixXd yvals = Eigen::MatrixXd::Zero(individuals,intersectPts);
 
     xvals = ((this->xO.array() + this->dL.array()*cos(this->theta)).rowwise().
-            replicate(individuals).transpose() + (randomMatrixX.array()*
+            replicate(individuals).transpose() + (randomMatrix.array()*
             (((this->dU - this->dL)*cos(theta)).rowwise().replicate(
             individuals).transpose().array()))).matrix();
 
     yvals = ((this->yO.array() + this->dL.array()*sin(this->theta)).rowwise().
-            replicate(individuals).transpose() + (randomMatrixY.array()*
+            replicate(individuals).transpose() + (randomMatrix.array()*
             (((this->dU - this->dL)*sin(theta)).rowwise().replicate(
             individuals).transpose().array()))).matrix();
 
@@ -1277,10 +1626,10 @@ void RoadGA::randomXYOnPlanes(const long &individuals, const long&
     Eigen::RowVectorXi colIdx = Eigen::RowVectorXi::LinSpaced(intersectPts,3,
             3*intersectPts);
 
-    igl::slice_into(xvals,rowIdx.rowwise().replicate(intersectPts),
+    Utility::sliceIntoPairs(xvals,rowIdx.rowwise().replicate(intersectPts),
             colIdx.colwise().replicate(individuals),
             this->currentRoadPopulation);
-    igl::slice_into(yvals,rowIdx.rowwise().replicate(intersectPts),
+    Utility::sliceIntoPairs(yvals,rowIdx.rowwise().replicate(intersectPts),
             (colIdx.array() + 1).colwise().replicate(individuals),
             this->currentRoadPopulation);
 }
@@ -1288,17 +1637,19 @@ void RoadGA::randomXYOnPlanes(const long &individuals, const long&
 void RoadGA::randomXYinRegion(const long &individuals, const long
         &intersectPts, const long &startRow) {
 
-    double minLon = (this->getRegion()->getX())(3,1);
+    double minLon = (this->getRegion()->getX())(2,1);
     double maxLon = (this->getRegion()->getX())(this->getRegion()->getX().
-            rows()-2,1);
-    double minLat = (this->getRegion()->getY())(1,3);
+            rows()-3,1);
+    double minLat = (this->getRegion()->getY())(1,2);
     double maxLat = (this->getRegion()->getY())(1,this->getRegion()->getY().
-            cols()-2);
+            cols()-3);
 
     Eigen::MatrixXd randomMatrixX = Eigen::MatrixXd::Random(individuals,
             intersectPts);
+    randomMatrixX = 0.5*(randomMatrixX.array() + 1);
     Eigen::MatrixXd randomMatrixY = Eigen::MatrixXd::Random(individuals,
             intersectPts);
+    randomMatrixY = 0.5*(randomMatrixY.array() + 1);
     Eigen::MatrixXd xvals = Eigen::MatrixXd::Zero(individuals,intersectPts);
     Eigen::MatrixXd yvals = Eigen::MatrixXd::Zero(individuals,intersectPts);
 
@@ -1306,15 +1657,15 @@ void RoadGA::randomXYinRegion(const long &individuals, const long
     yvals = randomMatrixY.array()*(maxLat - minLat) + minLat;
 
     // Place the genome values in the initial population matrix
-    Eigen::VectorXi rowIdx = Eigen::VectorXi::LinSpaced(intersectPts,
-            startRow,startRow + intersectPts - 1);
+    Eigen::VectorXi rowIdx = Eigen::VectorXi::LinSpaced(individuals,
+            startRow,startRow + individuals - 1);
     Eigen::RowVectorXi colIdx = Eigen::RowVectorXi::LinSpaced(intersectPts,3,
             3*intersectPts);
 
-    igl::slice_into(xvals,rowIdx.rowwise().replicate(intersectPts),
+    Utility::sliceIntoPairs(xvals,rowIdx.rowwise().replicate(intersectPts),
             colIdx.colwise().replicate(individuals),
             this->currentRoadPopulation);
-    igl::slice_into(yvals,rowIdx.rowwise().replicate(intersectPts),
+    Utility::sliceIntoPairs(yvals,rowIdx.rowwise().replicate(intersectPts),
             (colIdx.array() + 1).colwise().replicate(individuals),
             this->currentRoadPopulation);
 }
@@ -1328,41 +1679,43 @@ void RoadGA::randomZWithinRange(const long &individuals, const long&
             intersectPts + 2);
 
     for (long ii = 0; ii < individuals; ii++) {
-        Eigen::VectorXd xtemp(intersectPts + 2);
-        Eigen::VectorXd ytemp(intersectPts + 2);
+        Eigen::RowVectorXd xtemp(intersectPts+2);
+        Eigen::RowVectorXd ytemp(intersectPts+2);
 
-        Eigen::VectorXi row = Eigen::VectorXi::Constant(intersectPts
-                + 2, ii);
-        Eigen::VectorXi colIdx = Eigen::VectorXi::LinSpaced(intersectPts,0,
-                intersectPts - 1);
-        Eigen::VectorXi col = (3*colIdx.array() + 1).transpose();
+        Eigen::VectorXi row = Eigen::VectorXi::Constant(1,ii + startRow);
+        Eigen::VectorXi colIdx = Eigen::VectorXi::LinSpaced(intersectPts+2,0,
+                intersectPts + 1);
+        Eigen::VectorXi col = (3*colIdx.array()).transpose();
 
         igl::slice(population,row,col,xtemp);
+        col = col.array() + 1;
         igl::slice(population,row,col,ytemp);
 
         RoadPtr road(new Road(this->me(),xtemp,ytemp,
-                Eigen::VectorXd::Zero(intersectPts)));
+                Eigen::VectorXd::Zero(intersectPts+2)));
         road->computeAlignment();
 
-        sTemp.row(ii) = road->getVerticalAlignment()->getSDistances();
+        sTemp.row(ii) = road->getVerticalAlignment()->getSDistances().
+                transpose();
     }
 
     for (long ii = 0; ii < intersectPts; ii++) {
         Eigen::VectorXd randVec = Eigen::VectorXd::Random(individuals);
+        randVec = 0.5*(randVec.array() + 1);
 
         Eigen::VectorXd zL = (population.block(startRow,
                 3*ii+2,individuals,1) - (sTemp.col(ii+1) - sTemp.col(ii))*
                 gmax/100).array().max((population.block(
                 startRow,3*(intersectPts + 2) - 1,individuals,1) -
-                (sTemp.col(intersectPts + 2) - sTemp.col(ii+1))*gmax/100).
+                (sTemp.col(intersectPts + 1) - sTemp.col(ii+1))*gmax/100).
                 array()).matrix();
 
         Eigen::VectorXd zU = (population.block(startRow,
-                3*ii+2,individuals,1) - (sTemp.col(ii+1) + sTemp.col(ii))*
+                3*ii+2,individuals,1) + (sTemp.col(ii+1) - sTemp.col(ii))*
                 gmax/100).array().min((population.block(
-                startRow,3*(intersectPts + 2) - 1,individuals,1) - (sTemp.
-                col(intersectPts + 2) + sTemp.col(ii+1))*gmax/100).array()).
-                matrix();
+                startRow,3*(intersectPts + 2) - 1,individuals,1) +
+                (sTemp.col(intersectPts + 1) - sTemp.col(ii+1))*gmax/100).
+                array()).matrix();
 
         population.block(startRow,3*(ii+1)+2,individuals,1) =
                 ((randVec.array())*(zU-zL).array() + zL.array()).matrix();
@@ -1378,41 +1731,40 @@ void RoadGA::zOnTerrain(const long &individuals, const long&
             intersectPts + 2);
 
     for (long ii = 0; ii < individuals; ii++) {
-        Eigen::VectorXd xtemp(intersectPts + 2);
-        Eigen::VectorXd ytemp(intersectPts + 2);
+        Eigen::RowVectorXd xtemp(intersectPts + 2);
+        Eigen::RowVectorXd ytemp(intersectPts + 2);
 
-        Eigen::VectorXi row = Eigen::VectorXi::Constant(intersectPts
-                + 2, ii);
-        Eigen::VectorXi colIdx = Eigen::VectorXi::LinSpaced(intersectPts,0,
-                intersectPts - 1);
-        Eigen::VectorXi col = (3*colIdx.array() + 1).transpose();
+        Eigen::VectorXi row = Eigen::VectorXi::Constant(1, ii + startRow);
+        Eigen::VectorXi colIdx = Eigen::VectorXi::LinSpaced(intersectPts + 2,0,
+                intersectPts + 1);
+        Eigen::VectorXi col = (3*colIdx.array()).transpose();
 
         igl::slice(population,row,col,xtemp);
+        col = col.array() + 1;
         igl::slice(population,row,col,ytemp);
 
         RoadPtr road(new Road(this->me(),xtemp,ytemp,
-                Eigen::VectorXd::Zero(intersectPts)));
+                Eigen::VectorXd::Zero(intersectPts+2)));
         road->computeAlignment();
 
         sTemp.row(ii) = road->getVerticalAlignment()->getSDistances();
     }
 
     for (long ii = 0; ii < intersectPts; ii++) {
-        Eigen::VectorXd randVec = Eigen::VectorXd::Random(individuals);
 
         Eigen::VectorXd zL = (population.block(startRow,
                 3*ii+2,individuals,1) - (sTemp.col(ii+1) - sTemp.col(ii))*
                 gmax/100).array().max((population.block(
                 startRow,3*(intersectPts + 2) - 1,individuals,1) -
-                (sTemp.col(intersectPts + 2) - sTemp.col(ii+1))*gmax/100).
+                (sTemp.col(intersectPts + 1) - sTemp.col(ii+1))*gmax/100).
                 array()).matrix();
 
         Eigen::VectorXd zU = (population.block(startRow,
-                3*ii+2,individuals,1) - (sTemp.col(ii+1) + sTemp.col(ii))*
+                3*ii+2,individuals,1) + (sTemp.col(ii+1) - sTemp.col(ii))*
                 gmax/100).array().min((population.block(
-                startRow,3*(intersectPts + 2) - 1,individuals,1) - (sTemp.
-                col(intersectPts + 2) + sTemp.col(ii+1))*gmax/100).array()).
-                matrix();
+                startRow,3*(intersectPts + 2) - 1,individuals,1) +
+                (sTemp.col(intersectPts + 1) - sTemp.col(ii+1))*gmax/100).
+                array()).matrix();
 
         Eigen::VectorXd zE(individuals);
 
@@ -1426,8 +1778,8 @@ void RoadGA::zOnTerrain(const long &individuals, const long&
         Eigen::VectorXd selectUpper = (zE.array() > zU.array()).cast<double>();
 
         population.block(startRow,3*(ii+1)+2,individuals,1) =
-                (zE.array() * selectGround.array() + zL.array() * selectLower
-                .array() + zU.array() * selectUpper.array()).matrix();
+                ((zE.array()*selectGround.array()) + (zL.array()*selectLower
+                .array()) + (zU.array()*selectUpper.array())).matrix();
     }
 }
 
@@ -1440,7 +1792,7 @@ void RoadGA::replaceInvalidRoads(Eigen::MatrixXd& roads, Eigen::VectorXd&
 
     invalid = (input.unaryExpr([](double v){ return
             std::isfinite(v); }).cast<int>());
-    rows = ((invalid.rowwise().sum()).array() > 0).cast<int>();
+    rows = ((invalid.rowwise().sum()).array() == 0).cast<int>();
     long noBadRows = rows.count();
 
     if (noBadRows > 0) {
@@ -1468,43 +1820,46 @@ void RoadGA::replaceInvalidRoads(Eigen::MatrixXd& roads, Eigen::VectorXd&
 void RoadGA::curveEliminationProcedure(int ii, int jj, int kk, int ll,
         Eigen::MatrixXd& children) {
 
+    // Consider developing a new curve elimination procedure that essentially
+    // removes all intervening points. This will allow larger radii of
+    // curvature that is not artifically restrained by the virtual points
+    // between jj and kk and kk and ll.
     if ((kk - jj) >= 2) {
-        Eigen::VectorXd level = Eigen::VectorXd::LinSpaced(kk-jj,0,
+        Eigen::VectorXd level = Eigen::VectorXd::LinSpaced(kk-jj-1,1,
                 kk-jj-1);
         Eigen::MatrixXd xvals = (children(ii,3*jj) +
                 (level*(children(ii,3*kk) - children(ii,3*jj))/
                 ((double)(kk - jj))).array()).matrix();
-        Eigen::VectorXi xIdxI = Eigen::VectorXi::LinSpaced(kk-jj,3*jj,
+        Eigen::VectorXi xIdxJ = Eigen::VectorXi::LinSpaced(kk-jj-1,3*(jj+1),
                 3*(kk-1));
-        Eigen::VectorXi IdxJ = Eigen::VectorXi::Constant(kk-jj,ii);
-        igl::slice_into(xvals,xIdxI,IdxJ,children);
+        Eigen::VectorXi IdxI = Eigen::VectorXi::Constant(kk-jj-1,ii);
+        Utility::sliceIntoPairs(xvals,IdxI,xIdxJ,children);
 
         Eigen::MatrixXd yvals = (children(ii,3*jj+1) +
                 (level*(children(ii,3*kk+1) - children(ii,3*jj+1))/
                 ((double)(kk - jj))).array()).matrix();
-        Eigen::VectorXi yIdxI = Eigen::VectorXi::LinSpaced(kk-jj,
-                3*jj+1,3*(kk-1)+1);
-        igl::slice_into(yvals,yIdxI,IdxJ,children);
+        Eigen::VectorXi yIdxJ = Eigen::VectorXi::LinSpaced(kk-jj-1,
+                3*(jj+1)+1,3*(kk-1)+1);
+        Utility::sliceIntoPairs(yvals,IdxI,yIdxJ,children);
     }
 
     if ((ll - kk) >= 2) {
-        Eigen::VectorXd level = Eigen::VectorXd::LinSpaced(ll-kk,1,
-                ll-kk);
+        Eigen::VectorXd level = Eigen::VectorXd::LinSpaced(ll-kk-1,1,
+                ll-kk-1);
         Eigen::MatrixXd xvals = (children(ii,3*kk) +
                 (level*(children(ii,3*ll) - children(ii,3*kk))/
                 ((double)(ll - kk))).array()).matrix();
-        Eigen::VectorXi xIdxI = Eigen::VectorXi::LinSpaced(ll-kk,3*(
-                kk+1),3*ll);
-        Eigen::VectorXi xIdxJ = Eigen::VectorXi::Constant(ll-kk,ii);
-        igl::slice_into(xvals,xIdxI,xIdxJ,children);
+        Eigen::VectorXi xIdxJ = Eigen::VectorXi::LinSpaced(ll-kk-1,3*(kk+1),
+                3*(ll-1));
+        Eigen::VectorXi IdxI = Eigen::VectorXi::Constant(ll-kk-1,ii);
+        Utility::sliceIntoPairs(xvals,IdxI,xIdxJ,children);
 
-        Eigen::MatrixXd yvals = (children(ii,3*kk) +
+        Eigen::MatrixXd yvals = (children(ii,3*kk+1) +
                 (level*(children(ii,3*ll+1) - children(ii,3*kk+1))/
-                ((double)(kk - jj))).array()).matrix();
-        Eigen::VectorXi yIdxI = Eigen::VectorXi::LinSpaced(ll-kk,
-                3*(kk+1)+1,3*ll+1);
-        Eigen::VectorXi yIdxJ = Eigen::VectorXi::Constant(kk-jj,ii);
-        igl::slice_into(yvals,yIdxI,yIdxJ,children);
+                ((double)(ll - kk))).array()).matrix();
+        Eigen::VectorXi yIdxJ = Eigen::VectorXi::LinSpaced(ll-kk-1,
+                3*(kk+1)+1,3*(ll-1)+1);
+        Utility::sliceIntoPairs(yvals,IdxI,yIdxJ,children);
     }
 }
 

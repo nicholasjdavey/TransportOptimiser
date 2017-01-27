@@ -52,6 +52,9 @@ typedef std::shared_ptr<ThreadManager> ThreadManagerPtr;
 class Optimiser;
 typedef std::shared_ptr<Optimiser> OptimiserPtr;
 
+class Gnuplot;
+typedef std::shared_ptr<Gnuplot> GnuplotPtr;
+
 /**
  * Class for managing the optimisation process
  */
@@ -60,6 +63,7 @@ class Optimiser : public std::enable_shared_from_this<Optimiser> {
 public:
     // ENUMERATIONS ///////////////////////////////////////////////////////////
     typedef enum {
+        NOPENALTY,      /**< No penalty at all */
         SIMPLEPENALTY,  /**< Penalty when building in certain areas */
         MTE,            /**< Set a minimum population to maintain per species */
         CONTROLLED      /**< Controlled animal population */
@@ -103,11 +107,13 @@ public:
      * @param type as Optimiser::Type
      * @param threader as ThreadManagerPtr
      * @param elite as double
+     * @param msr as double
+     * @param gpu as bool (default = false)
      */
     Optimiser(double mr, double cf, unsigned long gens, unsigned long
             popSize, double stopTol, double confInt, double confLvl, unsigned
             long habGridRes, std::string solScheme, unsigned long noRuns,
-            Optimiser::Type type, unsigned long sg);
+            Optimiser::Type type, unsigned long sg, double msr, bool gpu=false);
     /**
      * Destructor
      */
@@ -660,6 +666,40 @@ public:
         this->maxSampleRate = msr;
     }
 
+    /**
+     * Returns the handle to the output interface for Gnuplot (standard)
+     *
+     * @return Handle as GnuplotPtr
+     */
+    GnuplotPtr getPlotHandle() {
+        return this->plothandle;
+    }
+    /**
+     * Returns the handle to the output interface for Gnuplot (surrogates)
+     *
+     * @return Handle as GnuplotPtr
+     */
+    GnuplotPtr getSurrPlotHandle() {
+        return this->surrPlotHandle;
+    }
+
+    /**
+     * Returns a Boolean of whether we are using a GPU or not
+     *
+     * @return Whether we are using a GPU as bool
+     */
+    bool getGPU() {
+        return this->gpu;
+    }
+    /**
+     * Sets a Boolean of whether we are using a GPU or not
+     *
+     * @param gpu as bool
+     */
+    void setGPU(bool gpu) {
+        this->gpu = gpu;
+    }
+
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -674,9 +714,21 @@ public:
 
     /**
      * Runs the algorithm to optimise the road with the possibility to enter
-     * the animal habitat zones. Results are saved to output files.
+     * the animal habitat zones. Results are saved to output files. If the
+     * argument "true" is passed to the function, the following plots are
+     * generated as the optimisation proceeds. Otherwise, no plots are
+     * generated:
+     * 1. 3D plot of best road on terrain
+     * 2. 2D plot of best road with respect to habitat
+     * 3. Surrogate function
+     * 4. Best results history
+     *
+     * This routine contains code to simply plot the result. The actual
+     * optimisation procedures are contained in derived classes.
+     *
+     * @param plot as bool
      */
-    void optimiseRoad();
+    virtual void optimise(bool plot = false);
 
     /**
      * Computes the habitat map for every species
@@ -768,6 +820,9 @@ protected:
     std::string solutionScheme;                                                     /**< Solution scheme used (i.e. name of experiment) */
     ThreadManagerPtr threader;                                                      /**< Thread manager used for multithreading computations */
     OptimiserPtr me();                                                              /**< Creates a shared pointer from this */
+    GnuplotPtr plothandle;                                                          /**< Pipe for plotting results */
+    GnuplotPtr surrPlotHandle;                                                      /**< Pipe for plotting surrogate model results */
+    bool gpu;                                                                       /**< If we are using GPUs to assist computing */
 };
 
 #endif

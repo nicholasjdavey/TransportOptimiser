@@ -198,12 +198,12 @@ public:
 
 private:
         HabitatTypePtr type;	/**< Type of habitat */
-        double area;			/**< Area of patch */
-        double centroidX;		/**< Longitude/x coord of centroid */
-        double centroidY;		/**< Latitude/y coord of centroid */
-        double capacity;		/**< Max capacity of patch */
-        double growthRate;		/**< Prevailing population growth rate */
-        double population;		/**< Prevailing population */
+        double area;		/**< Area of patch */
+        double centroidX;	/**< Longitude/x coord of centroid */
+        double centroidY;	/**< Latitude/y coord of centroid */
+        double capacity;	/**< Max capacity of patch */
+        double growthRate;	/**< Prevailing population growth rate */
+        double population;      /**< Prevailing population */
         double aar;         	/**< Animals at risk in patch */
         Eigen::MatrixXi cells;  /**< Grid cells occupied by patch */
 };

@@ -28,8 +28,8 @@ void RoadCells::computeRoadCells() {
     Eigen::RowVectorXd yspacing = (Y.block(0,1,1,cy-1)-Y.block(0,0,1,cy-1));
 
     if (((xspacing.block(1,0,rx-2,1)-xspacing.block(0,0,rx-2,1)).sum()
-            > 1e-4) || ((yspacing.block(0,1,1,cy-2)-
-            yspacing.block(0,0,1,cy-2)).sum()) > 1e-4) {
+            > DBL_PREC) || ((yspacing.block(0,1,1,cy-2)-
+            yspacing.block(0,0,1,cy-2)).sum()) > DBL_PREC) {
         std::cerr << "The input terrain must be an evenly-spaced grid."
                 << std::endl;
     }
@@ -290,9 +290,9 @@ void RoadCells::computeRoadCells() {
     // Find the grid references to which the segments belong in x,y pairs
     Eigen::MatrixXd gridrefsdouble(nnew-1,2);
     Eigen::MatrixXi gridRefs;
-    gridrefsdouble.block(0,0,nnew-1,1) = (0.5*(((this->x.segment(0,nnew-1)
+    gridrefsdouble.block(0,0,nnew-1,1) = (((0.5*(this->x.segment(0,nnew-1)
             .array() + (this->x.segment(1,nnew-1)).array()) - xmin)/xspan));
-    gridrefsdouble.block(0,1,nnew-1,1) = (0.5*(((this->y.segment(0,nnew-1)
+    gridrefsdouble.block(0,1,nnew-1,1) = (((0.5*(this->y.segment(0,nnew-1)
             + (this->y.segment(1,nnew-1))).array() - ymin)/yspan));
     igl::ceil(gridrefsdouble,gridRefs);
 
@@ -304,6 +304,22 @@ void RoadCells::computeRoadCells() {
             - (this->y.segment(0,nnew-1)).array()).pow(2)).sqrt());
     this->areas = (this->len).array()*this->w.segment(0,this->len.size())
             .array();
+
+//    std::cout << "Intersection Points:" << std::endl;
+//    std::cout << roadPtrShared->getXCoords().maxCoeff() << std::endl;
+//    std::cout << roadPtrShared->getXCoords().minCoeff() << std::endl;
+//    std::cout << roadPtrShared->getYCoords().maxCoeff() << std::endl;
+//    std::cout << roadPtrShared->getYCoords().minCoeff() << std::endl;
+//    std::cout << "Stations:" << std::endl;
+//    std::cout << roadPtrShared->getRoadSegments()->getX().maxCoeff() << std::endl;
+//    std::cout << roadPtrShared->getRoadSegments()->getX().minCoeff() << std::endl;
+//    std::cout << roadPtrShared->getRoadSegments()->getY().maxCoeff() << std::endl;
+//    std::cout << roadPtrShared->getRoadSegments()->getY().minCoeff() << std::endl;
+//    std::cout << "Grades:" << std::endl;
+//    Eigen::VectorXd sdiff;
+//    sdiff = roadPtrShared->getRoadSegments()->getDists().segment(1,roadPtrShared->getRoadSegments()->getDists().size()-1) -
+//            roadPtrShared->getRoadSegments()->getDists().segment(0,roadPtrShared->getRoadSegments()->getDists().size()-1);
+//    std::cout << sdiff.minCoeff() << std::endl << std::endl;
 
     // Assign the corresponding habitat to each cell reference
     const Eigen::MatrixXi& vegPtr = roadPtrShared->getOptimiser()->getRegion()
@@ -319,4 +335,84 @@ void RoadCells::computeRoadCells() {
     // Finally, determine the unique cells occupied by road. This is the same
     // as this->cellRefs but with unique values removed.
     igl::unique_rows(this->cellRefs,this->uniqueCells,uniqueRows,fullRows);
+
+    // TEMP ///////////////////////////////////////////////////////////////////
+//    GnuplotPtr plothandle = roadPtrShared->getOptimiser()->getPlotHandle();
+
+//    Eigen::MatrixXd Xp = roadPtrShared->getOptimiser()->getRegion()->getX();
+//    Eigen::MatrixXd Yp = roadPtrShared->getOptimiser()->getRegion()->getY();
+//    Eigen::MatrixXd Zp = roadPtrShared->getOptimiser()->getRegion()->getZ();
+
+//    // Prepare vegetation data
+//    std::vector<std::vector<std::vector<double>>> veg;
+//    veg.resize(roadPtrShared->getOptimiser()->getRegion()->getVegetation().
+//            rows()-2);
+
+//    for (int ii = 0; ii < roadPtrShared->getOptimiser()->getRegion()->
+//            getVegetation().rows()-2; ii++) {
+//        veg[ii].resize(roadPtrShared->getOptimiser()->getRegion()->
+//                getVegetation().rows()-2);
+//        for (int jj = 0; jj < roadPtrShared->getOptimiser()->getRegion()->
+//                getVegetation().rows()-2; jj++) {
+//            veg[ii][jj].resize(3);
+//        }
+//    }
+
+//    Eigen::MatrixXi V = roadPtrShared->getOptimiser()->getRegion()->
+//            getVegetation();
+
+//    // Plot the road cells in the image
+//    for (int ii = 0; ii < roadPtrShared->getRoadCells()->getUniqueCells().
+//            size(); ii++) {
+
+//        V.data()[roadPtrShared->getRoadCells()->getUniqueCells()[ii]] = 0;
+//    }
+
+//    for (int ii = 1; ii < roadPtrShared->getOptimiser()->getRegion()->
+//            getVegetation().rows()-1; ii++) {
+//        for (int jj = 1; jj < roadPtrShared->getOptimiser()->getRegion()->
+//                getVegetation().rows()-1; jj++) {
+//            veg[ii-1][jj-1][0] = Xp(ii,jj);
+//            veg[ii-1][jj-1][1] = Yp(ii,jj);
+//            veg[ii-1][jj-1][2] = V(ii,jj);
+//        }
+//    }
+
+//    // Prepare road path data
+//    std::vector<std::vector<double>> elev;
+//    elev.resize(roadPtrShared->getRoadSegments()->getX().size(),
+//            std::vector<double>(2));
+
+//    for (int ii = 0; ii < roadPtrShared->getRoadSegments()->getX().size();
+//            ii++) {
+//        elev[ii][0] = roadPtrShared->getRoadSegments()->getX()(ii);
+//        elev[ii][1] = roadPtrShared->getRoadSegments()->getY()(ii);
+//    }
+
+//    std::vector<std::vector<double>> points;
+//    points.resize(roadPtrShared->getXCoords().size(),std::vector<double>(2));
+
+//    for (int ii = 0; ii < roadPtrShared->getXCoords().size(); ii++) {
+//        points[ii][0] = roadPtrShared->getXCoords()(ii);
+//        points[ii][1] = roadPtrShared->getYCoords()(ii);
+//    }
+
+//    *plothandle << "set multiplot layout 1,2\n";
+//    *plothandle << "set title 'Road Path Through Vegetation'\n";
+//    *plothandle << "unset key\n";
+//    *plothandle << "set pm3d\n";
+//    *plothandle << "set view map\n";
+//    *plothandle << "plot '-' with image\n";
+//    plothandle->send2d(veg);
+//    plothandle->flush();
+//    *plothandle << "set title 'Road Path'\n";
+//    *plothandle << "unset key\n";
+//    *plothandle << "unset pm3d\n";
+//    *plothandle << "set view map\n";
+//    *plothandle << "plot '-' with lines, '-' with line \n";
+//    plothandle->send1d(points);
+//    plothandle->send1d(elev);
+//    plothandle->flush();
+//    *plothandle << "unset multiplot\n";
+    ///////////////////////////////////////////////////////////////////////////
 }

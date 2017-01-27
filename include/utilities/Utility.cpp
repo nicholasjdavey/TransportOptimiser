@@ -144,7 +144,7 @@ void Utility::cuttingPlanes(const double &xMin, const double &xMax, const
     if(theta == 0 || theta == M_PI) {
         dU = xMax - xO.array();
         dL = xMin - xO.array();
-    } else if (0 < theta < M_PI/2) {
+    } else if ((0 < theta) && (theta < M_PI/2)) {
         dU = ((xMax - xO.array())/cos(theta)).min(
                 (yMax - yO.array())/sin(theta));
         dL = ((xMin - xO.array())/cos(theta)).max(
@@ -152,7 +152,7 @@ void Utility::cuttingPlanes(const double &xMin, const double &xMax, const
     } else if (theta == M_PI/2) {
         dU = yMax - yO.array();
         dL = yMin - yO.array();
-    } else if (M_PI/2 < theta < M_PI) {
+    } else if ((M_PI/2 < theta) && (theta < M_PI)) {
         dU = ((xMin - xO.array())/cos(theta)).min(
                 (yMax - yO.array())/sin(theta));
         dL = ((xMax - xO.array())/cos(theta)).max(

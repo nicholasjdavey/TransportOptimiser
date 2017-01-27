@@ -447,7 +447,7 @@ public:
     }
 
     /**
-     * Returns the air pollution cost per km per vehicle
+     * Returns the air pollution cost per m per vehicle
      *
      * @return Cost as double
      */
@@ -455,7 +455,7 @@ public:
         return this->airPollution;
     }
     /**
-     * Sets the air pollution cost per km per vehicle
+     * Sets the air pollution cost per m per vehicle
      *
      * @params air as double
      */
@@ -464,7 +464,7 @@ public:
     }
 
     /**
-     * Returns the noise pollution cost per km per vehicle
+     * Returns the noise pollution cost per m per vehicle
      *
      * @return Cost as double
      */
@@ -472,7 +472,7 @@ public:
         return this->noisePollution;
     }
     /**
-     * Sets the noise pollution cost per km per vehicle
+     * Sets the noise pollution cost per m per vehicle
      *
      * @params noise as double
      */
@@ -481,7 +481,7 @@ public:
     }
 
     /**
-     * Returns the water pollution cost per km per vehicle
+     * Returns the water pollution cost per m per vehicle
      *
      * @return Cost as double
      */
@@ -489,7 +489,7 @@ public:
         return this->waterPollution;
     }
     /**
-     * Sets the water pollution cost per km per vehicle
+     * Sets the water pollution cost per m per vehicle
      *
      * @params water as double
      */
@@ -498,7 +498,7 @@ public:
     }
 
     /**
-     * Returns the oil extraction cost per km per vehicle
+     * Returns the oil extraction cost per m per vehicle
      *
      * @return Cost as double
      */
@@ -506,7 +506,7 @@ public:
         return this->oilExtraction;
     }
     /**
-     * Sets the oil extraction cost per km per vehicle
+     * Sets the oil extraction cost per m per vehicle
      *
      * @params oil as double
      */
@@ -515,7 +515,7 @@ public:
     }
 
     /**
-     * Returns the land use cost per km per vehicle
+     * Returns the land use cost per m per vehicle
      *
      * @return Cost as double
      */
@@ -523,7 +523,7 @@ public:
         return this->landUse;
     }
     /**
-     * Sets the land use cost per km per vehicle
+     * Sets the land use cost per m per vehicle
      *
      * @params land as double
      */
@@ -532,7 +532,7 @@ public:
     }
 
     /**
-     * Returns the solid and chemical waste cost per km per vehicle
+     * Returns the solid and chemical waste cost per m per vehicle
      *
      * @return Cost as double
      */
@@ -540,7 +540,7 @@ public:
         return this->solidChemWaste;
     }
     /**
-     * Sets the soild and chemical waste cost per km per vehicle
+     * Sets the soild and chemical waste cost per m per vehicle
      *
      * @params solidchem as double
      */
@@ -554,7 +554,7 @@ public:
 
 private:
     bool spiral;                    /**< Road design include spiral transitions */
-    double designVel;               /**< Design velocity (km/h) */
+    double designVel;               /**< Design velocity (m/s) */
     double startX;                  /**< X coordinate of start (m) */
     double startY;                  /**< Y coordinate of start (m) */
     double startZ;                  /**< Z coordinate of start (m) */
@@ -577,12 +577,12 @@ private:
     double tunnelWidth;             /**< Component of tunnel cost from width ($/m) */
     double tunnelDepth;             /**< Component of tunnel cost from depth ($/m) */
     double costPerSM;               /**< Cost per square meter (pavement etc.) */
-    double airPollution;            /**< Air pollution cost ($ per km per vehicle */
-    double noisePollution;          /**< Noise pollution cost ($ per km per vehicle */
-    double waterPollution;          /**< Water pollution cost ($ per km per vehicle */
-    double oilExtraction;           /**< Oil extraction etc. cost ($ per km per vehicle */
-    double landUse;                 /**< Land use cost ($ per km per vehicle */
-    double solidChemWaste;          /**< Solid and chemical waste cost ($ per km per vehicle */
+    double airPollution;            /**< Air pollution cost ($ per m per vehicle */
+    double noisePollution;          /**< Noise pollution cost ($ per m per vehicle */
+    double waterPollution;          /**< Water pollution cost ($ per m per vehicle */
+    double oilExtraction;           /**< Oil extraction etc. cost ($ per m per vehicle */
+    double landUse;                 /**< Land use cost ($ per m per vehicle */
+    double solidChemWaste;          /**< Solid and chemical waste cost ($ per m per vehicle */
 };
 
 #endif

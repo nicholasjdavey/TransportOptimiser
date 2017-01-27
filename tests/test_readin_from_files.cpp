@@ -8,7 +8,7 @@ int main(int argc, char **argv) {
 
     RoadGAPtr roadGA(new RoadGA(0.4,0.55,500,400,0.1,0.95,0.95,10,solScheme,5,
             Optimiser::MTE,1.0,50,0.05,50,3,10,RoadGA::TOURNAMENT,
-            RoadGA::RANK,0.4,0.8,5));
+            RoadGA::RANK,0.4,0.8,5,0.1));
 
     // SET THREADER
     ThreadManagerPtr threader(new ThreadManager(8));
@@ -108,19 +108,19 @@ int main(int argc, char **argv) {
     Eigen::VectorXi primaryVegSpec1(1);
     primaryVegSpec1 << 4;
     HabitatTypePtr primary(new HabitatType(HabitatType::PRIMARY,0.0005,
-            primaryVegSpec1,0,0,1e8));
+            primaryVegSpec1,0,0,1e7));
     habTypes[0] = primary;
     // MARGINAL
     Eigen::VectorXi marginalVegSpec1(1);
     marginalVegSpec1 << 3;
     HabitatTypePtr marginal(new HabitatType(HabitatType::MARGINAL,0.00025,
-            marginalVegSpec1,-0.262,0.073,5e7));
+            marginalVegSpec1,-0.262,0.073,5e6));
     habTypes[1] = marginal;
     // OTHER
     Eigen::VectorXi otherVegSpec1(1);
     otherVegSpec1 << 2;
     HabitatTypePtr other(new HabitatType(HabitatType::OTHER,0.0001,
-            otherVegSpec1,-0.396,0.120,5e6));
+            otherVegSpec1,-0.396,0.120,5e5));
     habTypes[2] = other;
     // CLEAR
     Eigen::VectorXi clearVegSpec1(1);
@@ -323,10 +323,13 @@ int main(int argc, char **argv) {
     // ADD A TEST ROAD
     Eigen::RowVectorXd genome(30);
 
-    genome << 0,0,0,2000,0,50,4000,2000,100,4000,6000,0,1000,7000,0,2000,8000,-50,5000,7000,-150,7000,8000,-50,8000,4000,0,8500,3000,0;
+    // Troublesome alignments
+    genome << 0,0,0,194.2119096146,638.2754449212,0,213.6463895736,1888.8669358747,0,5292.6922385314,329.9181667994,0,5696.8855550731,5176.2741092249,0,7474.5066747184,1672.1112282584,0,5793.6953868455,6223.1590654576,0,6667.6276796114,8813.25817004,0,7368.969427384,8445.9031369984,0,9000,9000,0;
+    //genome << 0,0,0,2000,0,50,4000,2000,100,4000,6000,0,1000,7000,0,2000,8000,-50,5000,7000,-150,7000,8000,-50,8000,4000,0,8500,3000,0;
 
     RoadPtr trialRoad(new Road(roadGA,genome));
     std::cout << "Read in test success" << std::endl;
+
 
     trialRoad->designRoad();
     std::cout << "Design success" << std::endl;

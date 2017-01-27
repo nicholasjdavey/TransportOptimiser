@@ -58,8 +58,7 @@ namespace Utility {
             const Eigen::PlainObjectBase<DerivedX>& X,
             const Eigen::PlainObjectBase<DerivedY>& Y,
             Eigen::PlainObjectBase<DerivedR>& R,
-            Eigen::PlainObjectBase<DerivedC>& C
-            ) {
+            Eigen::PlainObjectBase<DerivedC>& C) {
 
         int xm = X.rows();
         int xn = X.cols();
@@ -121,9 +120,9 @@ namespace Utility {
      * Assigns to the corresponding entries at each I,J pair of matrix X and
      * based on an input vectr, Y.
      *
-     * @param X as m by n matrix to read (Eigen)
-     * @param I list of X indices (Eigen)
-     * @param J list of corresponding Y indices (Eigen)
+     * @param X vector of values to read (Eigen)
+     * @param I as corresponding vector of x indices in Y (Eigen)
+     * @param J as coresponding vector of y indices in Y (Eigen)
      * @return Y as m by n matrix to update (Eigen)
      */
     template <typename T>
@@ -136,6 +135,31 @@ namespace Utility {
         // Loop over pairs
         for (int ii = 0; ii < I.size(); ii++) {
             Y(I(ii),J(ii)) = X(ii);
+        }
+    }
+
+    /**
+     * Assigns to the corresponding entries at each I,J pair of matrix X and
+     * based on an input vectr, Y but this time, the inputs are arranged as
+     * matrices instead of vectors.
+     *
+     * @param X as a by c matrix to read (Eigen)
+     * @param I as a by c matrix of corresponding x indices in Y (Eigen)
+     * @param J as a by c matrix of corresponding y indices in Y (Eigen)
+     * @return Y as m by n matrix to update (Eigen)
+     */
+    template <typename T>
+    static void sliceIntoPairs(
+            const Eigen::Matrix<T,Eigen::Dynamic,Eigen::Dynamic>& X,
+            const Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic>& I,
+            const Eigen::Matrix<int,Eigen::Dynamic,Eigen::Dynamic>& J,
+            Eigen::Matrix<T,Eigen::Dynamic,Eigen::Dynamic>& Y) {
+
+        // Loop over pairs
+        for (int ii = 0; ii < I.cols(); ii++) {
+            for (int jj = 0; jj < I.rows(); jj++) {
+                Y(I(jj,ii),J(jj,ii)) = X(jj,ii);
+            }
         }
     }
 

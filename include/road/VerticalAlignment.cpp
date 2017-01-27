@@ -58,17 +58,17 @@ void VerticalAlignment::computeAlignment() {
     zCoords(0) = zFull(0);
 
     for (int ii = 1; ii < xCoords.size(); ii++) {
-            if (!duplicates[ii]) {
-        xCoords(ii) = xFull(ii);
-        yCoords(ii) = yFull(ii);
-        zCoords(ii) = zFull(ii);
+        if (!duplicates[ii]) {
+            xCoords(ii) = xFull(ii);
+            yCoords(ii) = yFull(ii);
+            zCoords(ii) = zFull(ii);
         }
     }
 
     if (xCoords.size() != yCoords.size()) {
         std::cerr << "X and Y vectors must be of the same length" << std::endl;
     } else {
-        // Short names for parameters
+    // Short names for parameters
     double tr = roadPtrShared->getOptimiser()->getDesignParameters()
             ->getReactionTime();
     double acc = roadPtrShared->getOptimiser()->getDesignParameters()
@@ -94,6 +94,7 @@ void VerticalAlignment::computeAlignment() {
     this->s(1) = sqrt((pow(pocx(0)-xCoords(0),2) + pow(pocy(0)-yCoords(0),2)))
             + delta(0)*radii(0)/2;
 
+    // Distances to each major point
     for (unsigned long ii = 2; ii < ip+1; ii++) {
         this->s(ii) = this->s(ii-1) + delta(ii-2)*radii(ii-2)/2
                 + delta(ii-1)*radii(ii-1)/2 + sqrt(pow(pocx(ii-1)
@@ -129,7 +130,7 @@ void VerticalAlignment::computeAlignment() {
             ->getVelocities();
 
     // Using coefficient of friction of 0.2 (rubber on wet asphalt)
-    this->ssd = (vel.array() / 3.6) * tr + ((vel.array() / 3.6).pow(2))/
+    this->ssd = (vel.array()) * tr + ((vel.array()).pow(2))/
             (2 * acc);
     this->v = vel;
 
@@ -141,12 +142,12 @@ void VerticalAlignment::computeAlignment() {
         if (theta(ii) > theta(ii-1)) {
             // Sag curve
             this->Ls(ii-1) = std::max(A*pow(this->ssd(ii-1),2)
-                    /(120+3.5*this->ssd(ii-1)),this->v(ii-1)*2.16);
+                    /(120+3.5*this->ssd(ii-1)),this->v(ii-1)*0.6);
 
         } else if (theta(ii) < theta(ii-1)) {
             // Crest curve
             this->Ls(ii-1) = std::max(A*pow(this->ssd(ii-1),2)/658,
-                    this->v(ii-1)*2.16);
+                    this->v(ii-1)*0.6);
 
         } else {
             // No curve
@@ -214,7 +215,7 @@ void VerticalAlignment::computeAlignment() {
     // Do the same for the start and end curves
 
     // Start curve
-    if (this->Ls(0) < Lreq(1)) {
+    if (this->Ls(0) < Lreq(0)) {
         double tan1 = this->s(1) - this->s(0);
         double tan2 = this->s(2) - this->s(1);
 
@@ -276,8 +277,8 @@ void VerticalAlignment::computeAlignment() {
         }
 
         // Velocities adjustment
-        double v1 = this->Ls(ii)/2.16;
-        double sd = (v1/3.6)*tr + 0.5*pow(v1/3.6,2)/acc;
+        double v1 = this->Ls(ii)/0.6;
+        double sd = (v1)*tr + 0.5*pow(v1,2)/acc;
 
         if (theta2 > theta1) {
             double L1 = A*pow(sd,2)/(120+3.5*sd);
@@ -289,7 +290,7 @@ void VerticalAlignment::computeAlignment() {
                 this->ssd(ii) = (3.5*this->Ls(ii)
                         + sqrt(pow(3.5*this->Ls(ii),2)
                         + 480*A*this->Ls(ii)))/(2*A);
-                this->v(ii) = 3.6*(-tr + sqrt(pow(tr,2)
+                this->v(ii) = (-tr + sqrt(pow(tr,2)
                         + 2*this->ssd(ii)/acc))*acc;
             }
 
@@ -301,7 +302,7 @@ void VerticalAlignment::computeAlignment() {
                     this->v(ii) = v1;
                 } else {
                     this->ssd(ii) = sqrt(this->Ls(ii)*658/A);
-                    this->v(ii) = 3.6*(-tr+sqrt(pow(tr,2)
+                    this->v(ii) = (-tr+sqrt(pow(tr,2)
                             + 2*this->ssd(ii)/acc))*acc;
                 }
 

@@ -16,10 +16,6 @@ Road::Road(OptimiserPtr op,const Eigen::VectorXd &xCoords, const
 
     // Assign optimiser
     this->optimiser = op;
-
-    // Assign an empty Attributes object (always has the same size)
-    AttributesPtr att(new Attributes(this->me()));
-    this->attributes = att;
 }
 
 Road::Road(OptimiserPtr op, const Eigen::RowVectorXd& genome) {
@@ -73,22 +69,55 @@ void Road::designRoad() {
 void Road::evaluateRoad(bool learning) {
     // Compute unit cost and revenue
     // Compute the following line only once
-    this->getAttributes()->setFixedCosts(1.05*(this->getCosts()->getEarthwork()
+    this->attributes->setFixedCosts(1.05*(this->getCosts()->getEarthwork()
             + this->getCosts()->getLengthFixed()
             + this->getCosts()->getLocation())
             + this->getCosts()->getAccidentFixed());
 
+//    if (std::isnan(this->getCosts()->getEarthwork())) {
+//        std::cout << "Invalid earthwork" << std::endl;
+//    }
+
+//    if (std::isnan(this->getCosts()->getLengthFixed())) {
+//        std::cout << "Invalid length fixed" << std::endl;
+//    }
+
+//    if (std::isnan(this->getCosts()->getLocation())) {
+//        std::cout << "Invalid location" << std::endl;
+//    }
+
+//    if (std::isnan(this->getCosts()->getAccidentFixed())) {
+//        std::cout << "Invalid accident fixed" << std::endl;
+//    }
+
     // Sets the unit variable costs (minus fuel for now)
-    this->getAttributes()->setUnitVarCosts(
+    this->attributes->setUnitVarCosts(
             this->getCosts()->getAccidentVariable()
             + this->getCosts()->getLengthVariable());
-    this->getAttributes()->setUnitVarRevenue(this->getCosts()->
+
+//    if (std::isnan(this->getCosts()->getAccidentVariable())) {
+//        std::cout << "Invalid accident variable" << std::endl;
+//    }
+
+//    if (std::isnan(this->getCosts()->getLengthVariable())) {
+//        std::cout << "Invalid length variable" << std::endl;
+//    }
+
+    this->attributes->setUnitVarRevenue(this->getCosts()->
             getUnitRevenue());
+
+//    if (std::isnan(this->getCosts()->getUnitRevenue())) {
+//        std::cout << "Invalid unit var rev" << std::endl;
+//    }
 
     this->computeOperating(learning);
 
-    this->getAttributes()->setTotalValueMean(this->attributes->
+    this->attributes->setTotalValueMean(this->attributes->
             getVarProfitIC() + this->attributes->getFixedCosts());
+
+//    if (std::isnan(this->attributes->getVarProfitIC())) {
+//        std::cout << "Invalid operating" << std::endl;
+//    }
 }
 
 void Road::computeOperating(bool learning) {
@@ -96,71 +125,6 @@ void Road::computeOperating(bool learning) {
     OptimiserPtr optPtrShared = this->optimiser.lock();
 
     switch (optPtrShared->getType()) {
-        case Optimiser::SIMPLEPENALTY:
-            {
-                // The penalty here refers to the road passing through habitat
-                // areas. Therefore, the separate penalty related to the actual.
-                // population number is already accounted for and is not
-                // computed here.
-                this->getCosts()->setPenalty(0.0);
-
-                // If there is no uncertainty in the fuel or commodity prices,
-                // just treat the operating valuation as a simple annuity. if
-                // there is uncertainty, simulate the fuel and commodity prices
-                // first to get expected values of one unit of constant use
-                // over the entire horizon.
-                if ((optPtrShared->getVariableParams()
-                        ->getCommoditySDMultipliers().size() == 1)) {
-                    double r = optPtrShared->getEconomic()->getRRR();
-                    double t = optPtrShared->getEconomic()->getYears();
-                    double g = optPtrShared->getTraffic()->getGR();
-                    const Eigen::VectorXd& Qs = optPtrShared
-                            ->getPrograms()[optPtrShared->getScenario()->
-                            getProgram()]->getFlowRates();
-                    const std::vector<VehiclePtr>& vehicles = optPtrShared
-                            ->getTraffic()->getVehicles();
-                    double Q = Qs(Qs.size());
-
-                    double factor = (1/(r-g) - (1/(r-g))*pow((1+g)/(1+r),t));
-
-                    Eigen::VectorXd fuelPrices;
-
-                    for (int ii = 0; ii < vehicles.size(); ii++) {
-                        fuelPrices(ii) = vehicles[ii]->getFuel()->getMean();
-                    }
-
-                    // Compute the price of a tonne of raw ore
-                    double orePrice = 0.0;
-
-                    const std::vector<CommodityPtr>& commodities = optPtrShared
-                            ->getEconomic()->getCommodities();
-
-                    for (int ii = 0; ii < commodities.size(); ii++) {
-                        orePrice += commodities[ii]->getOreContent()*
-                                commodities[ii]->getMean();
-                    }
-
-                    this->getAttributes()->setVarProfitIC(Q*(this
-                            ->getAttributes()->getUnitVarCosts() + (this
-                            ->getCosts()->getUnitFuelCost()).transpose()*
-                            fuelPrices - this->getCosts()->getUnitRevenue()*
-                            orePrice)*factor);
-
-                    // There is no variability in the final value of the
-                    // operating stage
-                    this->getAttributes()->setTotalValueSD(0.0);
-
-                } else {
-                    // Call the routine to evaluate operating costs
-                    this->computeVarProfitICFixedFlow();
-
-                    // We need to extend this to account for variability. This
-                    // will need to take into account covariances and is left
-                    // as future work. For now, we set the variability to zero
-                    this->getAttributes()->setTotalValueSD(0.0);
-                }
-            }
-            break;
 
         case Optimiser::MTE:
             {
@@ -248,8 +212,8 @@ void Road::computeOperating(bool learning) {
                                 (roadPopXconf*endPopsSD(ii) + endPops(ii)))*
                                 perAnimalPenalty;
                     }
-                    this->getCosts()->setPenalty(penalty);
-                    this->getAttributes()->setTotalValueSD(0.0);
+                    this->costs->setPenalty(penalty);
+                    this->attributes->setTotalValueSD(0.0);
                 }
             }
             break;
@@ -289,11 +253,73 @@ void Road::computeOperating(bool learning) {
                 }
                 // There is no penalty for this road as traffic is controlled
                 // to maintain the populations above critical thresholds.
-                this->getCosts()->setPenalty(0.0);
+                this->costs->setPenalty(0.0);
             }
             break;
         default:
-            {}
+            {
+                // The penalty here refers to the road passing through habitat
+                // areas. Therefore, the separate penalty related to the actual.
+                // population number is already accounted for and is not
+                // computed here. (Only for Optimiser::SIMPLEPENALTY)
+                this->costs->setPenalty(0.0);
+
+                // If there is no uncertainty in the fuel or commodity prices,
+                // just treat the operating valuation as a simple annuity. if
+                // there is uncertainty, simulate the fuel and commodity prices
+                // first to get expected values of one unit of constant use
+                // over the entire horizon.
+                if ((optPtrShared->getVariableParams()
+                        ->getCommoditySDMultipliers().size() == 1)) {
+                    double r = optPtrShared->getEconomic()->getRRR();
+                    double t = optPtrShared->getEconomic()->getYears();
+                    double g = optPtrShared->getTraffic()->getGR();
+                    const Eigen::VectorXd& Qs = optPtrShared
+                            ->getPrograms()[optPtrShared->getScenario()->
+                            getProgram()]->getFlowRates();
+                    const std::vector<VehiclePtr>& vehicles = optPtrShared
+                            ->getTraffic()->getVehicles();
+                    double Q = Qs(Qs.size());
+
+                    double factor = (1/(r-g) - (1/(r-g))*pow((1+g)/(1+r),t));
+
+                    Eigen::VectorXd fuelPrices;
+
+                    for (int ii = 0; ii < vehicles.size(); ii++) {
+                        fuelPrices(ii) = vehicles[ii]->getFuel()->getMean();
+                    }
+
+                    // Compute the price of a tonne of raw ore
+                    double orePrice = 0.0;
+
+                    const std::vector<CommodityPtr>& commodities = optPtrShared
+                            ->getEconomic()->getCommodities();
+
+                    for (int ii = 0; ii < commodities.size(); ii++) {
+                        orePrice += commodities[ii]->getOreContent()*
+                                commodities[ii]->getMean();
+                    }
+
+                    this->attributes->setVarProfitIC(Q*(this
+                            ->getAttributes()->getUnitVarCosts() + (this
+                            ->getCosts()->getUnitFuelCost()).transpose()*
+                            fuelPrices - this->getCosts()->getUnitRevenue()*
+                            orePrice)*factor);
+
+                    // There is no variability in the final value of the
+                    // operating stage
+                    this->attributes->setTotalValueSD(0.0);
+
+                } else {
+                    // Call the routine to evaluate operating costs
+                    this->computeVarProfitICFixedFlow();
+
+                    // We need to extend this to account for variability. This
+                    // will need to take into account covariances and is left
+                    // as future work. For now, we set the variability to zero
+                    this->attributes->setTotalValueSD(0.0);
+                }
+            }
             break;
     }
 }
@@ -403,10 +429,11 @@ void Road::computeVarProfitICFixedFlow() {
     }
 
     // Compute the price of a tonne of raw ore
+    // RRR and growth rates in % p.a.
     double orePrice = 0.0;
-    double r = optPtrShared->getEconomic()->getRRR();
+    double r = optPtrShared->getEconomic()->getRRR()/100;
     double t = optPtrShared->getEconomic()->getYears();
-    double g = optPtrShared->getTraffic()->getGR();
+    double g = optPtrShared->getTraffic()->getGR()/100;
     double factor = (1/(r-g) - (1/(r-g))*pow((1+g)/(1+r),t));
 
     const std::vector<CommodityPtr>& commodities = optPtrShared
@@ -417,8 +444,8 @@ void Road::computeVarProfitICFixedFlow() {
                 commodities[ii]->getExpPV();
     }
 
-    this->getAttributes()->setVarProfitIC(Q*(this
-            ->getAttributes()->getUnitVarCosts()*factor
+    this->attributes->setVarProfitIC(Q*factor*(this
+            ->getAttributes()->getUnitVarCosts()
             + (this->getCosts()->getUnitFuelCost()).transpose()
             *fuelExpPV1UnitTraffic - this->getCosts()
             ->getUnitRevenue()*orePrice));

@@ -8,7 +8,7 @@ int main(int argc, char **argv) {
 
     RoadGAPtr roadGA(new RoadGA(0.4,0.55,500,400,0.1,0.95,0.95,10,solScheme,5,
             Optimiser::MTE,1.0,50,0.05,50,3,10,RoadGA::TOURNAMENT,
-            RoadGA::RANK,0.4,0.8,5));
+            RoadGA::RANK,0.4,0.8,5,0.1));
 
     // Initialise the input classes
     // SPECIES
