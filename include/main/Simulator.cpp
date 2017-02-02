@@ -10,6 +10,10 @@ Simulator::Simulator(RoadPtr road) {
 Simulator::~Simulator() {
 }
 
+SimulatorPtr Simulator::me() {
+    return shared_from_this();
+}
+
 void Simulator::simulateMTE() {
     // This routine computes the animal costs based on mean time to extinction.
     // We use Monte Carlo simulation (if any uncertainty) where we run the road
@@ -110,19 +114,19 @@ void Simulator::simulateMTE() {
         Eigen::MatrixXd endPopulations(noPaths,srp.size());
 
         if (threader != nullptr) {
-            for (unsigned long ii = 0; ii < noPaths; ii++) {
-                // Push onto the thread pool with a lambda expression
-                // If we have access to GPU-enabled computing, we exploit it
-                // here and at the calling function in the GA optimiser, we
-                // implement the standard multi-threading on the host. If not,
-                // we do not implement multi-threading at the higher level and
-                // instead implement it here.
-                if (gpu) {
-                // Call the external, CUDA-compiled code but do not use the
-                // host threading routine.
-
-                } else {
-                    results[ii] = threader->push([this,srp, initPops, capacities]
+            // If we have access to GPU-enabled computing, we exploit it
+            // here and at the calling function in the GA optimiser, we
+            // implement the standard multi-threading on the host. If not,
+            // we do not implement multi-threading at the higher level and
+            // instead implement it here.
+            if (gpu) {
+                // Call the external, CUDA-compiled code
+                SimulateGPU::simulateMTECUDA(this->me(),srp,initPops,
+                        capacities,endPopulations);
+            } else {
+                for (unsigned long ii = 0; ii < noPaths; ii++) {
+                    // Push onto the thread pool with a lambda expression
+                    results[ii] = threader->push([this, srp, initPops, capacities]
                             (int id){
                         Eigen::RowVectorXd endPops(srp.size());
                         std::vector<Eigen::VectorXd> finalPops =
@@ -136,10 +140,10 @@ void Simulator::simulateMTE() {
                         return endPops;
                     });
                 }
-            }
 
-            for (unsigned long ii = 0; ii < noPaths; ii++) {
-                endPopulations.row(ii) = results[ii].get();
+                for (unsigned long ii = 0; ii < noPaths; ii++) {
+                    endPopulations.row(ii) = results[ii].get();
+                }
             }
 
         } else {
@@ -334,9 +338,9 @@ void Simulator::naturalBirthDeath(const SpeciesRoadPatchesPtr species, const
 //    double stepSize = road->getOptimiser()->getEconomic()->getTimeStep();
 
     // Initialise random number generator
-    unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().
-            count();
-    std::mt19937 generator(seed1);
+//    unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().
+//            count();
+//    std::mt19937 generator(seed1);
     std::normal_distribution<double> growth(spec->getGrowthRateMean(),
             spec->getGrowthRateSD());
 
@@ -384,7 +388,7 @@ void Simulator::simulateMTEPath(const std::vector<SpeciesRoadPatchesPtr>&
 
         // Next, compute animal movement and road mortality
         for (int jj = 0; jj < species.size(); jj++) {
-            pops[jj] =reArrMat[jj].transpose()*initPops[jj];
+            pops[jj] =reArrMat[jj].transpose()*pops[jj];
         }
 
         // Finally, account for natural birth and death
@@ -433,7 +437,7 @@ void Simulator::simulateMTEPath(const std::vector<SpeciesRoadPatchesPtr>&
 
         // Next, compute animal movement and road mortality
         for (int kk = 0; kk < species.size(); kk++) {
-            pops[kk] = reArrMat[jj]*initPops[kk];
+            pops[kk] = reArrMat[jj].transpose()*pops[kk];
         }
 
         // Finally, account for natural birth and death
@@ -474,4 +478,3 @@ void Simulator::recomputeForwardPath(const std::vector<SpeciesRoadPatchesPtr>&
             std::vector<Eigen::VectorXd>& endogenousPaths) {
 
 }
-

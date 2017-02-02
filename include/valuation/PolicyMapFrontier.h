@@ -118,7 +118,7 @@ private:
 	unsigned long baseOption;				/**< Prevailing control */
 	unsigned long proposedOption;			/**< Proposed control */
     Eigen::MatrixXd stateLevels;			/**< Populations for frontier */
-	Eigen::VectorXd unitProfit;				/**< Unit profit along frontier */
+        Eigen::VectorXd unitProfit;				/**< Unit profit along frontier */
 };
 
 #endif

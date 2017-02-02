@@ -452,7 +452,7 @@ private:
     /**
      * Creates the simulation patches for each Species in the Region.
      */
-    void computeSimulationPatches();
+    void computeSimulationPatches(bool visualise = false);
 
     /**
      * Computes the initial animals at risk for a particular Species

@@ -81,8 +81,8 @@ public:
 	// CALCULATION ROUTINES //////////////////////////////////////////////////////
 
 private:
-	Eigen::VectorXd cDepths;    /**< Vector of cut depths */
-	Eigen::VectorXd cCosts;	    /**< Corresponding vector of cut costs */
+        Eigen::VectorXd cDepths;    /**< Vector of cut depths */
+        Eigen::VectorXd cCosts;	    /**< Corresponding vector of cut costs */
 	double fCost;		    /**< Fill cost per m^3 */
 };
 

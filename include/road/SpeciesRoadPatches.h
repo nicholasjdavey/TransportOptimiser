@@ -243,7 +243,7 @@ public:
      * Builds the animal movement and mortality model, initialising patches,
      * crossings, distances, transition and survival probabilities.
      */
-    void createSpeciesModel();
+    void createSpeciesModel(bool visualise = false);
 
     /**
      * Computes the AAR and expected population for each control
@@ -283,8 +283,12 @@ private:
     /**
      * Generates the habitat patches relating to this species for the road in
      * question using a basic grid method.
+     *
+     * If we are visualising the results, we pass the argument "true"
+     *
+     * @param visualise as bool
      */
-    void generateHabitatPatchesGrid();
+    void generateHabitatPatchesGrid(bool visualise = false);
 
     /**
      * Generate habitat patches relating to this species using a more advanced

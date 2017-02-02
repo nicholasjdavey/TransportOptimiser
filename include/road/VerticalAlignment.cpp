@@ -19,7 +19,7 @@ VerticalAlignment::VerticalAlignment(RoadPtr road) {
 	this->Ls.resize(ip);
 	this->gr.resize(ip+1);
 	this->ssd.resize(ip);
-	Eigen::VectorXd theta(ip+1);
+        Eigen::VectorXd theta(ip+1);
 }
 
 VerticalAlignment::~VerticalAlignment() {
@@ -207,7 +207,8 @@ void VerticalAlignment::computeAlignment() {
                 // We have room to expand the length of curvature
                 double L1 = 2*(tan1 - this->Ls(ii-1)/2);
                 double L2 = 2*(tan2 - this->Ls(ii+1)/2);
-                this->Ls(ii) = std::min(std::min(L1,L2),Lreq(ii));
+                this->Ls(ii) = std::min(std::min(L1,L2),
+                        Lreq(ii));
             }
         }
     }
@@ -224,7 +225,8 @@ void VerticalAlignment::computeAlignment() {
             // We can expand the length of curvature
             double L1 = tan1*2;
             double L2 = 2*(tan2 - this->Ls(1)/2);
-            this->Ls(0) = std::min(std::min(L1,L2),Lreq(0));
+            this->Ls(0) = std::min(std::min(L1,L2),
+                    Lreq(0));
         }
     }
 
@@ -238,7 +240,8 @@ void VerticalAlignment::computeAlignment() {
             // We can expand the length of curvature
             double L1 = 2*(tan1 - this->Ls(ip-2));
             double L2 = 2*tan2;
-            this->Ls(ip-1) = std::min(std::min(L1,L2),Lreq(ip-1));
+            this->Ls(ip-1) = std::min(std::min(L1,L2),
+                    Lreq(ip-1));
         }
     }
 

@@ -118,7 +118,7 @@ void Species::initialisePopulationMap(OptimiserPtr optimiser) {
 
     // Use the first N entries to assign animals to the population map where N
     // is the number animals in the initial population
-    double* popMapPtr = this->populationMap.data();
+    //double* popMapPtr = this->populationMap.data();
 
     for (int ii = 0; ii < this->initialPop; ii++) {
         this->populationMap(events[ii])++;

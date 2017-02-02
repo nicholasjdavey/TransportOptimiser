@@ -162,6 +162,7 @@ private:
     Eigen::VectorXd endPops;    /**< End populations from all sims */
     double initAAR;             /**< Initial animals at risk */
     double penalty;             /**< Extinction penalty */
+    SimulatorPtr me();          /**< Enables sharing from within Simulator class */
 
     // PRIVATE ROUTINES ///////////////////////////////////////////////////////
 

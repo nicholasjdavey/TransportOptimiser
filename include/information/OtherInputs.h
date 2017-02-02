@@ -142,7 +142,7 @@ public:
      * @param minLon as double
      */
     void setMinLon(double minLon) {
-        this->minLon;
+        this->minLon = minLon;
     }
 
     /**

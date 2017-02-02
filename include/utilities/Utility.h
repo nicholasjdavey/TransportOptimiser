@@ -47,8 +47,8 @@ namespace Utility {
      *
      * @param X as m by n matrix (Eigen)
      * @param Y list of indices (Eigen)
-     * @return R list of row indices (Eigen)
-     * @return C list of column indices (Eigen)
+     * @return R list of row subscript (Eigen)
+     * @return C list of column subscript (Eigen)
      */
     template < typename DerivedX,
             typename DerivedY,

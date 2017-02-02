@@ -19,26 +19,25 @@ SpeciesRoadPatches::SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr
 
 SpeciesRoadPatches::~SpeciesRoadPatches() {}
 
-void SpeciesRoadPatches::createSpeciesModel() {
-    this->generateHabitatPatchesGrid();
+void SpeciesRoadPatches::createSpeciesModel(bool visualise) {
+    this->generateHabitatPatchesGrid(visualise);
     this->habitatPatchDistances();
     this->roadCrossings();
     this->computeTransitionProbabilities();
     this->computeSurvivalProbabilities();
 }
 
-void SpeciesRoadPatches::generateHabitatPatchesGrid() {
+void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
     // First initialise the number of habitat patches. We expect there to be no
     // more than n x y where n is the number of habitat patches and y is the
     // number of grid cells.
 
-    // This is a very computationally-intensive aspect of the code. Need to
-    // find a way to speed it up.
     RoadPtr roadPtrShared = this->road.lock();
     RegionPtr region = roadPtrShared->getOptimiser()->getRegion();
     const Eigen::MatrixXd& X = region->getX();
     const Eigen::MatrixXd& Y = region->getY();
-    const std::vector<HabitatTypePtr>& habTyps = this->species->getHabitatTypes();
+    const std::vector<HabitatTypePtr>& habTyps = this->species->
+            getHabitatTypes();
     int res = roadPtrShared->getOptimiser()->getGridRes();
 
     Eigen::VectorXd xspacing = (X.block(1,0,X.rows()-1,1)
@@ -58,11 +57,11 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
     Eigen::VectorXi tempHabVec = Eigen::VectorXi::Constant(
             roadPtrShared->getRoadCells()->getUniqueCells().size(),
             (int)(HabitatType::ROAD));
-    Utility::sliceIntoIdx(modHab,roadPtrShared->getRoadCells()->getUniqueCells(),
-            tempHabVec);
+    Utility::sliceIntoIdx(modHab,roadPtrShared->getRoadCells()->
+            getUniqueCells(),tempHabVec);
 
-    // We create bins for each habitat type into which we place the patches. We
-    // ignore CLEAR and ROAD habitats, hence -2
+    // We create bins for each habitat type into which we place the
+    // patches. We ignore CLEAR and ROAD habitats, hence -2
     unsigned long W = (X.rows());
     unsigned long H = (Y.cols());
     unsigned long xRes = W % res == 0 ? res : res + 1;
@@ -73,7 +72,8 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
     int skpx = std::floor((W-1)/(double)res);
     int skpy = std::floor((H-1)/(double)res);
 
-    this->habPatch = std::vector<HabitatPatchPtr>((pow(res,2)*habTyps.size()));
+    this->habPatch = std::vector<HabitatPatchPtr>((pow(res,2)*habTyps.
+            size()));
     // Sub patch area
     double subPatchArea = xspacing(0)*yspacing(0);
 
@@ -81,9 +81,11 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
     int patches = 0;
     iterator++;
 
-    // Get number of animals that need to be relocated (animals in road cells)
+    // Get number of animals that need to be relocated (animals in road
+    // cells)
     double relocateAnimals = ((modHab.array() == (int)(HabitatType::ROAD))
-            .cast<double>()*this->species->getPopulationMap().array()).sum();
+            .cast<double>()*this->species->getPopulationMap().array()).
+            sum();
     double totalPop = (this->species->getPopulationMap()).sum();
     // Factor by which to increase each population
     double factor = totalPop/(totalPop - relocateAnimals);
@@ -98,13 +100,20 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
     Eigen::VectorXi yidx =
             Eigen::VectorXi::LinSpaced(H,1,H);
 
+    clock_t begin = clock();
+
+    // We need to pass a matrix of floats rather than doubles to CUDA
+    Eigen::MatrixXf popsFloat = this->species->getPopulationMap().
+            cast<float>();
+
     for (int ii = 0; ii < habTyps.size(); ii++) {
         if (habTyps[ii]->getType() == HabitatType::ROAD ||
                 habTyps[ii]->getType() == HabitatType::CLEAR) {
             continue;
         }
 
-        input = (modHab.array() == (int)(habTyps[ii]->getType())).cast<int>();
+        input = (modHab.array() == (int)(habTyps[ii]->getType())).
+                cast<int>();
         // Map the input array to a plain integer C-array
 //        int* inputData = input.data();
 //        Eigen::Map<Eigen::MatrixXi> cinput(inputData,input.size());
@@ -116,80 +125,99 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid() {
         // LabelImage is found within utilities/labelmethod.cpp
         int regions = LabelImage(W,H,input.data(),output.data());
 
-        // Iterate through every large cell present in the overall region
-        for (int jj = 0; jj < xRes; jj++) {
-            for (int kk = 0; kk < yRes; kk++) {
-                tempGrid = Eigen::MatrixXi::Zero(W,H);
+        if (this->road.lock()->getOptimiser()->getGPU() && !visualise) {
+            // Call the CUDA-enabled code
+            this->initPop += SimulateGPU::buildPatches(W,H,skpx,skpy,xRes,yRes,
+                    regions,xspacing(0),yspacing(0),subPatchArea,habTyps[ii],
+                    output,popsFloat,this->habPatch);
+        } else {
+            // Call the serial code (very slow)
+            // Iterate through every large cell present in the overall region
+            // Create a CUDA routine to speed this up.
+            for (int jj = 0; jj < xRes; jj++) {
+                for (int kk = 0; kk < yRes; kk++) {
+                    tempGrid = Eigen::MatrixXi::Zero(W,H);
 
-                int blockSizeX;
-                int blockSizeY;
-                if ((jj+1)*skpx <= W) {
-                    blockSizeX = skpx;
-                } else {
-                    blockSizeX = W-jj*skpx;
-                }
+                    int blockSizeX;
+                    int blockSizeY;
+                    if ((jj+1)*skpx <= H) {
+                        blockSizeX = skpx;
+                    } else {
+                        blockSizeX = H-jj*skpx;
+                    }
 
-                if ((kk+1)*skpy <= H) {
-                    blockSizeY = skpy;
-                } else {
-                    blockSizeY = H-kk*skpy;
-                }
+                    if ((kk+1)*skpy <= W) {
+                        blockSizeY = skpy;
+                    } else {
+                        blockSizeY = W-kk*skpy;
+                    }
 
-                tempGrid.block(jj*skpx,kk*skpy,blockSizeX,blockSizeY) =
-                        Eigen::MatrixXi::Constant(blockSizeX,blockSizeY,1);
+                    tempGrid.block(jj*skpx,kk*skpy,blockSizeX,blockSizeY) =
+                            Eigen::MatrixXi::Constant(blockSizeX,blockSizeY,1);
 
-                // For every valid habitat type, we must create a new animal
-                // patch. If the patch contains valid habitat, we add it to
-                // our list of patches for use later.
-                for (int ll = 1; ll <= regions; ll++) {
-//                    Eigen::MatrixXi tempGrid3;
-                    tempGrid2 = ((output.array() == ll).cast<int>()
-                            *tempGrid.array()).matrix();
-//                    tempGrid3 = (tempGrid2.array()*(region->getCellIdx().array()+1));
+                    // For every valid habitat type, we must create a new
+                    // animal patch. If the patch contains valid habitat, we
+                    // add it to our list of patches for use later.
+                    for (int ll = 1; ll <= regions; ll++) {
+                        tempGrid2 = ((output.array() == ll).cast<int>()
+                                *tempGrid.array()).matrix();
 
-                    // If the patch contains this habitat, we continue
-                    int noCells = tempGrid2.sum();
-                    if (noCells > 0) {
-                        HabitatPatchPtr hab(new HabitatPatch());
-                        hab->setArea((double)(tempGrid2.sum()*subPatchArea));
+                        // If the patch contains this habitat, we continue
+                        int noCells = tempGrid2.sum();
+                        if (noCells > 0) {
+                            HabitatPatchPtr hab(new HabitatPatch());
+                            hab->setArea((double)(tempGrid2.sum()*
+                                    subPatchArea));
 
-                        hab->setCX((double)(xspacing(0)*((xidx.transpose()*
-                                tempGrid2).sum())/noCells + X(0,0)
-                                - xspacing(0)));
-                        hab->setCY((double)(yspacing(0)*(tempGrid2*yidx).sum()/
-                                noCells + Y(0,0) - yspacing(0)));
+                            hab->setCX((double)(xspacing(0)*((xidx.transpose()*
+                                    tempGrid2).sum())/noCells + X(0,0)
+                                    - xspacing(0)));
+                            hab->setCY((double)(yspacing(0)*(tempGrid2*yidx).
+                                    sum()/noCells + Y(0,0) - yspacing(0)));
 
-                        ///////////////////////////////////////////////////////
-                        // Get a list of cell indices occupied by this patch
-//                        Eigen::VectorXi I;
-//                        Eigen::VectorXi J;
-//                        Eigen::VectorXi V;
+                            if (visualise) {
+                            ///////////////////////////////////////////////////
+                            // Get a list of cell indices occupied by this
+                            // patch. This is used for visualising the patches
+                                Eigen::MatrixXi tempGrid3;
+                                tempGrid3 = (tempGrid2.array()*(region->
+                                        getCellIdx().array()+1));
 
-//                        igl::find(tempGrid3,I,J,V);
+                                Eigen::VectorXi I;
+                                Eigen::VectorXi J;
+                                Eigen::VectorXi V;
 
-//                        V = V.array() - 1;
-//                        hab->setCells(V);
-                        ///////////////////////////////////////////////////////
+                                igl::find(tempGrid3,I,J,V);
 
-                        hab->setType(habTyps[ii]);
-                        double thisPop = ((tempGrid2.cast<double>().array())*
-                                (this->species->getPopulationMap()).array()).sum()*factor;
+                                V = V.array() - 1;
+                                hab->setCells(V);
+                            ///////////////////////////////////////////////////
+                            }
 
-                        hab->setPopulation(thisPop);
-                        hab->setCapacity(habTyps[ii]->getMaxPop()*hab->getArea());
-                        // For now do not store the indices of the points
-                        this->habPatch[patches] = hab;
-                        patches++;
-                        this->initPop += thisPop;
-                        // Find distance to road here?
+                            hab->setType(habTyps[ii]);
+                            double thisPop = ((tempGrid2.cast<double>().
+                                    array())*(this->species->
+                                    getPopulationMap()).array()).sum()*factor;
+
+                            hab->setPopulation(thisPop);
+                            hab->setCapacity(habTyps[ii]->getMaxPop()*hab->
+                                    getArea());
+                            // For now do not store the indices of the points
+                            this->habPatch[patches] = hab;
+                            patches++;
+                            this->initPop += thisPop;
+                            // Find distance to road here?
+                        }
                     }
                 }
             }
+            // Remove excess patches in container
+            this->habPatch.resize(--patches);
         }
     }
-
-    // Remove excess patches in container
-    this->habPatch.resize(--patches);
+    clock_t end = clock();
+    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    std::cout << elapsed_secs << " s" << std::endl;
 }
 
 void SpeciesRoadPatches::generateHabitatPatchesBlob() {

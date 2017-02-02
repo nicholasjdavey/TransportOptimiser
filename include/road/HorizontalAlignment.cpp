@@ -323,8 +323,8 @@ void HorizontalAlignment::computeAlignment() {
                             double R2 = this->radNewPOT(xCoords,
                                     yCoords, this->deltas, ii+1, tan2,
                                     this->pocx(ii+1), this->pocy(ii+1));
-                            this->radii(ii) = std::min(this->radiiReq(ii),
-                                    std::min(R1,R2));
+                            this->radii(ii) = (float)std::min(
+                                    this->radiiReq(ii),std::min(R1,R2));
 
                             // Now adjust all previous values to reflect this
                             // change

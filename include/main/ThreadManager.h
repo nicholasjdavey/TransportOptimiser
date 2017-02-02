@@ -81,8 +81,8 @@ public:
 
 ///////////////////////////////////////////////////////////////////////////////
 private:
-    unsigned long max_threads;  /**< User-defined number of threads */
-    unsigned long noThreads;    /**< Actual number of threads */
-    PoolPtr pool;               /**< Pool for managing threads */
+    unsigned long max_threads;      /**< User-defined number of threads */
+    unsigned long noThreads;        /**< Actual number of threads */
+    PoolPtr pool;                   /**< Pool for managing threads */
 };
 #endif

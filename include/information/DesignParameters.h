@@ -205,7 +205,7 @@ public:
      * @param mse as double
      */
     void setMaxSE(double mse) {
-        this->maxSE;
+        this->maxSE = mse;
     }
 
     /**

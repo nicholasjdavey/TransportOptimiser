@@ -387,7 +387,7 @@ void Road::computeCostElements() {
     this->costs->computeAccidentCosts();
 }
 
-void Road::computeSimulationPatches() {
+void Road::computeSimulationPatches(bool visualise) {
     const std::vector<SpeciesPtr>& species = this->optimiser.lock()
             ->getSpecies();
 
@@ -396,7 +396,7 @@ void Road::computeSimulationPatches() {
     for (int ii = 0; ii < species.size(); ii++) {
         SpeciesRoadPatchesPtr speciesPatches(new SpeciesRoadPatches(
                 this->getOptimiser(),species[ii],this->me()));
-        speciesPatches->createSpeciesModel();
+        speciesPatches->createSpeciesModel(visualise);
         this->srp[ii].reset();
         this->srp[ii] = speciesPatches;
     }

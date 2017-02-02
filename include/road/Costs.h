@@ -141,7 +141,7 @@ public:
      * @param lf as double
      */
     void setLengthFixed(double lf) {
-            this->lengthFixed;
+            this->lengthFixed = lf;
     }
 
     /**

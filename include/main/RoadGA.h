@@ -137,7 +137,7 @@ public:
     }
 
     void setZO(Eigen::VectorXd& zO) {
-        this->zO;
+        this->zO = zO;
     }
 
     Eigen::VectorXd& getdU() {

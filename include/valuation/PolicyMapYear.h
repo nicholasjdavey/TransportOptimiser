@@ -95,7 +95,7 @@ public:
 private:
 	std::vector<PolicyMapFrontierPtr> frontiers;	/**< Frontiers produced */
     Eigen::MatrixXd stateLevels;					/**< State values */
-	Eigen::VectorXd expectedProfit;				/**< Corresponding E(Profit) */
+        Eigen::VectorXd expectedProfit;				/**< Corresponding E(Profit) */
 };
 
 #endif

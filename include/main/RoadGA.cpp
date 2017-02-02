@@ -919,7 +919,7 @@ void RoadGA::assignBestRoad() {
     Eigen::Matrix<int,Eigen::Dynamic,1> I(1);
     Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> costs(
             this->populationSizeGA,1);
-    costs = this->costs;
+    costs = this->costs.cast<double>();
 
     igl::mat_min(costs,1,Y,I);
 
@@ -1985,8 +1985,8 @@ void RoadGA::buildSurrogateModelMTE() {
         alglib::real_1d_array inputX;
         alglib::real_1d_array inputY;
 
-        Eigen::VectorXd abscissa = this->iars.col(ii);
-        Eigen::VectorXd ordinate = this->pops.col(ii);
+        Eigen::VectorXd abscissa = this->iars.col(ii).cast<double>();
+        Eigen::VectorXd ordinate = this->pops.col(ii).cast<double>();
 
         inputX.setcontent(this->noSamples,abscissa.data());
         inputY.setcontent(this->noSamples,ordinate.data());
@@ -2005,7 +2005,7 @@ void RoadGA::buildSurrogateModelMTE() {
                 2*this->scenario->getCurrentScenario()][this->scenario->
                 getRun()][ii],report);
         // Standard deviation
-        ordinate = this->popsSD.col(ii);
+        ordinate = this->popsSD.col(ii).cast<double>();
 
         inputX.setcontent(this->noSamples,abscissa.data());
         inputY.setcontent(this->noSamples,ordinate.data());

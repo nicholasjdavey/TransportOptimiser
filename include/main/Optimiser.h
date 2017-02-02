@@ -52,7 +52,6 @@ typedef std::shared_ptr<ThreadManager> ThreadManagerPtr;
 class Optimiser;
 typedef std::shared_ptr<Optimiser> OptimiserPtr;
 
-class Gnuplot;
 typedef std::shared_ptr<Gnuplot> GnuplotPtr;
 
 /**

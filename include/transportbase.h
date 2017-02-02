@@ -106,6 +106,7 @@
 #include "utilities/Utility.h"
 #include "road/SpeciesRoadPatches.h"
 #include "main/ThreadManager.h"
+#include "gpuCode/SimulateGPU.h"
 #include "main/RoadGA.h"
 
 /*
@@ -131,7 +132,11 @@
 // Random number generator seed for all utilised distributions:
 static std::default_random_engine generator;
 
-// Double precision (Max precision for double numbers)
-static double DBL_PREC = 1e-6;
+// Global variables
+// Max precision for float numbers
+static float DBL_PREC = 1e-6;
+// Max number of CUDA threads per block (default)
+static int maxThreadsPerBlock = 256;
+static int maxMultiProcessors = 6;
 
 #endif
