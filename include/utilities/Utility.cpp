@@ -1,43 +1,94 @@
 #include "../transportbase.h"
 
 Eigen::MatrixXi Utility::lineSegmentIntersect(const Eigen::MatrixXd& XY1,
-        const Eigen::MatrixXd& XY2){
+        const Eigen::MatrixXd& XY2,bool gpu){
 
-    Eigen::MatrixXd X1 = XY1.block(0,0,XY1.rows(),1).replicate(1,XY2.rows());
-    Eigen::MatrixXd X2 = XY1.block(0,2,XY1.rows(),1).replicate(1,XY2.rows());
-    Eigen::MatrixXd Y1 = XY1.block(0,1,XY1.rows(),1).replicate(1,XY2.rows());
-    Eigen::MatrixXd Y2 = XY1.block(0,3,XY1.rows(),1).replicate(1,XY2.rows());
+    if (gpu) {
+        Eigen::VectorXi crossings = Eigen::VectorXi::Zero(XY1.rows());
+        SimulateGPU::lineSegmentIntersect(XY1,XY2,crossings);
+        return crossings;
+    } else {
+        clock_t begin = clock();
 
-    Eigen::MatrixXd XY2T = XY2.transpose();
+        Eigen::MatrixXd X1 = XY1.block(0,0,XY1.rows(),1).replicate(1,XY2.
+                rows());
+        Eigen::MatrixXd X2 = XY1.block(0,2,XY1.rows(),1).replicate(1,XY2.
+                rows());
+        Eigen::MatrixXd Y1 = XY1.block(0,1,XY1.rows(),1).replicate(1,XY2.
+                rows());
+        Eigen::MatrixXd Y2 = XY1.block(0,3,XY1.rows(),1).replicate(1,XY2.
+                rows());
 
-    Eigen::MatrixXd X3 = XY2T.block(0,0,1,XY2T.cols()).replicate(XY1.rows(),1);
-    Eigen::MatrixXd X4 = XY2T.block(2,0,1,XY2T.cols()).replicate(XY1.rows(),1);
-    Eigen::MatrixXd Y3 = XY2T.block(1,0,1,XY2T.cols()).replicate(XY1.rows(),1);
-    Eigen::MatrixXd Y4 = XY2T.block(3,0,1,XY2T.cols()).replicate(XY1.rows(),1);
+        clock_t end = clock();
+        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        std::cout << "\t Block 1: " << elapsed_secs << " s" << std::endl;
 
-    Eigen::MatrixXd X4_X3 = (X4-X3);
-    Eigen::MatrixXd Y1_Y3 = (Y1-Y3);
-    Eigen::MatrixXd Y4_Y3 = (Y4-Y3);
-    Eigen::MatrixXd X1_X3 = (X1-X3);
-    Eigen::MatrixXd X2_X1 = (X2-X1);
-    Eigen::MatrixXd Y2_Y1 = (Y2-Y1);
+        begin = clock();
 
-    Eigen::MatrixXd numerator_a = X4_X3.array() * Y1_Y3.array() -
-            Y4_Y3.array() * X1_X3.array();
-    Eigen::MatrixXd numerator_b = X2_X1.array() * Y1_Y3.array() -
-            Y2_Y1.array() * X1_X3.array();
-    Eigen::MatrixXd denominator = Y4_Y3.array() * X2_X1.array() -
-            X4_X3.array() * Y2_Y1.array();
+        Eigen::MatrixXd XY2T = XY2.transpose();
 
-    Eigen::MatrixXd u_a = numerator_a.array() / denominator.array();
-    Eigen::MatrixXd u_b = numerator_b.array() / denominator.array();
+        Eigen::MatrixXd X3 = XY2T.block(0,0,1,XY2T.cols()).replicate(XY1.
+                rows(),1);
+        Eigen::MatrixXd X4 = XY2T.block(2,0,1,XY2T.cols()).replicate(XY1.
+                rows(),1);
+        Eigen::MatrixXd Y3 = XY2T.block(1,0,1,XY2T.cols()).replicate(XY1.
+                rows(),1);
+        Eigen::MatrixXd Y4 = XY2T.block(3,0,1,XY2T.cols()).replicate(XY1.
+                rows(),1);
 
-    // Find adjacency matrix
-    Eigen::MatrixXi INT_B = ((u_a.array() >= 0) && (u_a.array() <= 1) &&
-            (u_b.array() >= 0) && (u_b.array() <= 1)).cast<int>();
+        end = clock();
+        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        std::cout << "\t Block 2: " << elapsed_secs << " s" << std::endl;
 
-    // Return the number of times each of the input lines intersects the road
-    return INT_B.rowwise().sum();
+        begin = clock();
+
+        Eigen::MatrixXd X4_X3 = (X4-X3);
+        Eigen::MatrixXd Y1_Y3 = (Y1-Y3);
+        Eigen::MatrixXd Y4_Y3 = (Y4-Y3);
+        Eigen::MatrixXd X1_X3 = (X1-X3);
+        Eigen::MatrixXd X2_X1 = (X2-X1);
+        Eigen::MatrixXd Y2_Y1 = (Y2-Y1);
+
+        end = clock();
+        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        std::cout << "\t Block 3: " << elapsed_secs << " s" << std::endl;
+
+        begin = clock();
+
+        Eigen::MatrixXd numerator_a = X4_X3.array() * Y1_Y3.array() -
+                Y4_Y3.array() * X1_X3.array();
+        Eigen::MatrixXd numerator_b = X2_X1.array() * Y1_Y3.array() -
+                Y2_Y1.array() * X1_X3.array();
+        Eigen::MatrixXd denominator = Y4_Y3.array() * X2_X1.array() -
+                X4_X3.array() * Y2_Y1.array();
+
+        end = clock();
+        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        std::cout << "\t Block 4: " << elapsed_secs << " s" << std::endl;
+
+        begin = clock();
+
+        Eigen::MatrixXd u_a = numerator_a.array() / denominator.array();
+        Eigen::MatrixXd u_b = numerator_b.array() / denominator.array();
+
+        end = clock();
+        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        std::cout << "\t Block 5: " << elapsed_secs << " s" << std::endl;
+
+        begin = clock();
+
+        // Find adjacency matrix
+        Eigen::MatrixXi INT_B = ((u_a.array() >= 0) && (u_a.array() <= 1) &&
+                (u_b.array() >= 0) && (u_b.array() <= 1)).cast<int>();
+
+        end = clock();
+        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+        std::cout << "\t Block 6: " << elapsed_secs << " s" << std::endl;
+
+        // Return the number of times each of the input lines intersects the
+        // road
+        return INT_B.rowwise().sum();
+    }
 }
 
 void Utility::lineSegmentIntersect(
@@ -48,12 +99,20 @@ void Utility::lineSegmentIntersect(
         Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>& parAdjMat,
         Eigen::Matrix<bool, Eigen::Dynamic, Eigen::Dynamic>& coincAdjMat) {
 
+    clock_t begin = clock();
+
     Eigen::MatrixXd X1 = XY1.block(0,0,XY1.rows(),1).replicate(1,XY2.rows());
     Eigen::MatrixXd X2 = XY1.block(0,2,XY1.rows(),1).replicate(1,XY2.rows());
     Eigen::MatrixXd Y1 = XY1.block(0,1,XY1.rows(),1).replicate(1,XY2.rows());
     Eigen::MatrixXd Y2 = XY1.block(0,3,XY1.rows(),1).replicate(1,XY2.rows());
 
     Eigen::MatrixXd XY2T = XY2.transpose();
+
+    clock_t end = clock();
+    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    std::cout << "\t Block 1: " << elapsed_secs << " s" << std::endl;
+
+    begin = clock();
 
     Eigen::MatrixXd X3 = XY2T.block(0,0,1,XY2T.cols()).replicate(XY1.rows(),1);
     Eigen::MatrixXd X4 = XY2T.block(2,0,1,XY2T.cols()).replicate(XY1.rows(),1);
@@ -66,6 +125,12 @@ void Utility::lineSegmentIntersect(
     Eigen::MatrixXd X1_X3 = (X1-X3);
     Eigen::MatrixXd X2_X1 = (X2-X1);
     Eigen::MatrixXd Y2_Y1 = (Y2-Y1);
+
+    end = clock();
+    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    std::cout << "\t Block 2: " << elapsed_secs << " s" << std::endl;
+
+    begin = clock();
 
     Eigen::MatrixXd numerator_a = X4_X3.array() * Y1_Y3.array() -
             Y4_Y3.array() * X1_X3.array();
@@ -90,6 +155,9 @@ void Utility::lineSegmentIntersect(
     parAdjMat = (denominator.array() == 0);
     coincAdjMat = ((numerator_a.array() == 0) && (numerator_b.array() == 0)
             && (parAdjMat.array()));
+
+    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    std::cout << "\t Block 3: " << elapsed_secs << " s" << std::endl;
 }
 
 // The below function is a fast alternative to the Boost libraries, which are

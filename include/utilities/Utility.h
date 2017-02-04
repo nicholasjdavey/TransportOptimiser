@@ -193,10 +193,12 @@ namespace Utility {
      * columns have the same meaning as in XY1. This is the curve that the
      * individual lines in XY1 may intersect.
      *
+     * @param gpu as bool. Default = false
+     *
      * @return Number of intersections as Eigen::MatrixXi
      */
     Eigen::MatrixXi lineSegmentIntersect(const Eigen::MatrixXd& XY1,
-            const Eigen::MatrixXd& XY2);
+            const Eigen::MatrixXd& XY2, bool gpu = false);
 
     /**
      * Same as lineSegmentIntersect but with extra information:

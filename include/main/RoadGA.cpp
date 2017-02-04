@@ -1111,8 +1111,12 @@ void RoadGA::evaluateGeneration() {
         for (unsigned long ii = 0; ii < roads; ii++) {
             RoadPtr road(new Road(this->me(),
                     this->currentRoadPopulation.row(ii)));
+            clock_t begin = clock();
             road->designRoad();
             road->evaluateRoad();
+            clock_t end = clock();
+            double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+            std::cout << "Road Design & Evaluation Time " << ii << ": " << elapsed_secs << " s" << std::endl << std::endl;
 
             this->costs(ii) = road->getAttributes()->getTotalValueMean();
 

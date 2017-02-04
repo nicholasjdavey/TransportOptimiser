@@ -20,11 +20,35 @@ SpeciesRoadPatches::SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr
 SpeciesRoadPatches::~SpeciesRoadPatches() {}
 
 void SpeciesRoadPatches::createSpeciesModel(bool visualise) {
+    clock_t begin = clock();
     this->generateHabitatPatchesGrid(visualise);
+    clock_t end = clock();
+    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    std::cout << "Patch Build Time: " << elapsed_secs << " s" << std::endl;
+
+    begin = clock();
     this->habitatPatchDistances();
+    end = clock();
+    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    std::cout << "Patch Distances Time: " << elapsed_secs << " s" << std::endl;
+
+    begin = clock();
     this->roadCrossings();
+    end = clock();
+    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    std::cout << "Road Crossings Time: " << elapsed_secs << " s" << std::endl;
+
+    begin = clock();
     this->computeTransitionProbabilities();
+    end = clock();
+    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    std::cout << "Transition Probabilities Time: " << elapsed_secs << " s" << std::endl;
+
+    begin = clock();
     this->computeSurvivalProbabilities();
+    end = clock();
+    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    std::cout << "Survival Probabilities Time: " << elapsed_secs << " s" << std::endl;
 }
 
 void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
@@ -100,11 +124,7 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
     Eigen::VectorXi yidx =
             Eigen::VectorXi::LinSpaced(H,1,H);
 
-    clock_t begin = clock();
-
-    // We need to pass a matrix of floats rather than doubles to CUDA
-    Eigen::MatrixXf popsFloat = this->species->getPopulationMap().
-            cast<float>();
+    this->initPop = 0.0;
 
     for (int ii = 0; ii < habTyps.size(); ii++) {
         if (habTyps[ii]->getType() == HabitatType::ROAD ||
@@ -125,99 +145,106 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
         // LabelImage is found within utilities/labelmethod.cpp
         int regions = LabelImage(W,H,input.data(),output.data());
 
-        if (this->road.lock()->getOptimiser()->getGPU() && !visualise) {
-            // Call the CUDA-enabled code
-            this->initPop += SimulateGPU::buildPatches(W,H,skpx,skpy,xRes,yRes,
-                    regions,xspacing(0),yspacing(0),subPatchArea,habTyps[ii],
-                    output,popsFloat,this->habPatch);
-        } else {
-            // Call the serial code (very slow)
-            // Iterate through every large cell present in the overall region
-            // Create a CUDA routine to speed this up.
-            for (int jj = 0; jj < xRes; jj++) {
-                for (int kk = 0; kk < yRes; kk++) {
-                    tempGrid = Eigen::MatrixXi::Zero(W,H);
+        if (regions > 0) {
+            if (this->road.lock()->getOptimiser()->getGPU() && !visualise) {
+                // Call the CUDA-enabled code
 
-                    int blockSizeX;
-                    int blockSizeY;
-                    if ((jj+1)*skpx <= H) {
-                        blockSizeX = skpx;
-                    } else {
-                        blockSizeX = H-jj*skpx;
-                    }
+                SimulateGPU::buildPatches(W,H,skpx,skpy,xRes,yRes,regions,
+                        xspacing(0),yspacing(0),subPatchArea,habTyps[ii],
+                        output,this->species->getPopulationMap(),
+                        this->habPatch,this->initPop,patches);
+            } else {
+                // Call the serial code (very slow)
+                // Iterate through every large cell present in the overall
+                // region
+                // Create a CUDA routine to speed this up.
+                for (int jj = 0; jj < xRes; jj++) {
+                    for (int kk = 0; kk < yRes; kk++) {
+                        tempGrid = Eigen::MatrixXi::Zero(W,H);
 
-                    if ((kk+1)*skpy <= W) {
-                        blockSizeY = skpy;
-                    } else {
-                        blockSizeY = W-kk*skpy;
-                    }
+                        int blockSizeX;
+                        int blockSizeY;
+                        if ((jj+1)*skpx <= H) {
+                            blockSizeX = skpx;
+                        } else {
+                            blockSizeX = H-jj*skpx;
+                        }
 
-                    tempGrid.block(jj*skpx,kk*skpy,blockSizeX,blockSizeY) =
-                            Eigen::MatrixXi::Constant(blockSizeX,blockSizeY,1);
+                        if ((kk+1)*skpy <= W) {
+                            blockSizeY = skpy;
+                        } else {
+                            blockSizeY = W-kk*skpy;
+                        }
 
-                    // For every valid habitat type, we must create a new
-                    // animal patch. If the patch contains valid habitat, we
-                    // add it to our list of patches for use later.
-                    for (int ll = 1; ll <= regions; ll++) {
-                        tempGrid2 = ((output.array() == ll).cast<int>()
-                                *tempGrid.array()).matrix();
+                        tempGrid.block(jj*skpx,kk*skpy,blockSizeX,blockSizeY) =
+                                Eigen::MatrixXi::Constant(blockSizeX,
+                                blockSizeY,1);
 
-                        // If the patch contains this habitat, we continue
-                        int noCells = tempGrid2.sum();
-                        if (noCells > 0) {
-                            HabitatPatchPtr hab(new HabitatPatch());
-                            hab->setArea((double)(tempGrid2.sum()*
-                                    subPatchArea));
+                        // For every valid habitat type, we must create a new
+                        // animal patch. If the patch contains valid habitat,
+                        // we add it to our list of patches for use later.
+                        for (int ll = 1; ll <= regions; ll++) {
+                            tempGrid2 = ((output.array() == ll).cast<int>()
+                                    *tempGrid.array()).matrix();
 
-                            hab->setCX((double)(xspacing(0)*((xidx.transpose()*
-                                    tempGrid2).sum())/noCells + X(0,0)
-                                    - xspacing(0)));
-                            hab->setCY((double)(yspacing(0)*(tempGrid2*yidx).
-                                    sum()/noCells + Y(0,0) - yspacing(0)));
+                            // If the patch contains this habitat, we continue
+                            int noCells = tempGrid2.sum();
+                            if (noCells > 0) {
+                                HabitatPatchPtr hab(new HabitatPatch());
+                                hab->setArea((double)(tempGrid2.sum()*
+                                        subPatchArea));
 
-                            if (visualise) {
-                            ///////////////////////////////////////////////////
-                            // Get a list of cell indices occupied by this
-                            // patch. This is used for visualising the patches
-                                Eigen::MatrixXi tempGrid3;
-                                tempGrid3 = (tempGrid2.array()*(region->
-                                        getCellIdx().array()+1));
+                                hab->setCX((double)(xspacing(0)*((xidx.
+                                        transpose()*tempGrid2).sum())/noCells +
+                                        X(0,0) - xspacing(0)));
+                                hab->setCY((double)(yspacing(0)*(tempGrid2*
+                                        yidx).sum()/noCells + Y(0,0) -
+                                        yspacing(0)));
 
-                                Eigen::VectorXi I;
-                                Eigen::VectorXi J;
-                                Eigen::VectorXi V;
+                                if (visualise) {
+                                ///////////////////////////////////////////////
+                                // Get a list of cell indices occupied by this
+                                // patch. This is used for visualising the
+                                // patches
+                                    Eigen::MatrixXi tempGrid3;
+                                    tempGrid3 = (tempGrid2.array()*(region->
+                                            getCellIdx().array()+1));
 
-                                igl::find(tempGrid3,I,J,V);
+                                    Eigen::VectorXi I;
+                                    Eigen::VectorXi J;
+                                    Eigen::VectorXi V;
 
-                                V = V.array() - 1;
-                                hab->setCells(V);
-                            ///////////////////////////////////////////////////
+                                    igl::find(tempGrid3,I,J,V);
+
+                                    V = V.array() - 1;
+                                    hab->setCells(V);
+                                ///////////////////////////////////////////////
+                                }
+
+                                hab->setType(habTyps[ii]);
+                                double thisPop = ((tempGrid2.cast<double>().
+                                        array())*(this->species->
+                                        getPopulationMap()).array()).sum()*
+                                        factor;
+
+                                hab->setPopulation(thisPop);
+                                hab->setCapacity(habTyps[ii]->getMaxPop()*hab->
+                                        getArea());
+                                // For now do not store the indices of the
+                                // points
+                                this->habPatch[patches] = hab;
+                                patches++;
+                                this->initPop += thisPop;
+                                // Find distance to road here?
                             }
-
-                            hab->setType(habTyps[ii]);
-                            double thisPop = ((tempGrid2.cast<double>().
-                                    array())*(this->species->
-                                    getPopulationMap()).array()).sum()*factor;
-
-                            hab->setPopulation(thisPop);
-                            hab->setCapacity(habTyps[ii]->getMaxPop()*hab->
-                                    getArea());
-                            // For now do not store the indices of the points
-                            this->habPatch[patches] = hab;
-                            patches++;
-                            this->initPop += thisPop;
-                            // Find distance to road here?
                         }
                     }
                 }
             }
-            // Remove excess patches in container
-            this->habPatch.resize(--patches);
         }
     }
-    clock_t end = clock();
-    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-    std::cout << elapsed_secs << " s" << std::endl;
+    // Remove excess patches in container
+    this->habPatch.resize(--patches);
 }
 
 void SpeciesRoadPatches::generateHabitatPatchesBlob() {
@@ -328,8 +355,12 @@ void SpeciesRoadPatches::roadCrossings() {
     Eigen::MatrixXi dests = indices.block(0,1,validCrossings,1);
     lines.resize(validCrossings,4);
 
+    clock_t begin = clock();
     Eigen::VectorXi crossings = Utility::lineSegmentIntersect(lines,
-            roadSegsVisible);
+            roadSegsVisible,roadPtrShared->getOptimiser()->getGPU());
+    clock_t end = clock();
+    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    std::cout << "Line Segment Intersect Time: " << elapsed_secs << " s" << std::endl;
 
     this->crossings = Eigen::MatrixXi::Zero(this->habPatch.size(),
             this->habPatch.size());

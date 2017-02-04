@@ -52,8 +52,8 @@ __global__ void set_random_number_from_kernels(float* _ptr, curandState*
 
 // The matrix multiplication kernel parallelises the multiplication of Eigen
 // matrices
-__global__ void matrixMultiplicationKernel(float* A, float* B, float* C, int a,
-        int b, int c, int d) {
+__global__ void matrixMultiplicationKernelNaive(const float* A, const float* B,
+        float* C, int a, int b, int c, int d) {
 
     int ROW = blockIdx.y*blockDim.y+threadIdx.y;
     int COL = blockIdx.x*blockDim.x+threadIdx.x;
@@ -69,73 +69,277 @@ __global__ void matrixMultiplicationKernel(float* A, float* B, float* C, int a,
     C[ROW * a + COL] = tmpSum;
 }
 
+// The matrix element-wise multiplication kernel parallelises the element-wise
+// multiplication of Eigen matrices
+
+__global__ void matrixElementWiseMultiplicationKernelNaive(const float* A,
+        const float* B, float* C, int a, int b) {
+
+    int ROW = blockIdx.y*blockDim.y+threadIdx.y;
+    int COL = blockIdx.x*blockDim.x+threadIdx.x;
+
+    if (ROW < a && COL < b) {
+        C[ROW * a + COL] = A[ROW * b + COL]*B[ROW * b + COL];
+    }
+}
+
+// The optimised matrix multiplication kernel that relies on efficient memory
+// management
+__global__ void matrixMultiplicationKernel(float *A, float* B, float* C, int a,
+        int b, int d) {
+
+    // Block index
+    int bx = blockIdx.x;
+    int by = blockIdx.y;
+
+    // Thread index
+    int tx = threadIdx.x;
+    int ty = threadIdx.y;
+
+    int ROW = by*blockDim.y+ty;
+    int COL = bx*blockDim.x+tx;
+
+    // First check if the thread exceeds the matrix dimensions
+    if (ROW < a && COL < d) {
+
+        // Declaration of the shared memory array As used to store the sub-
+        // matrix of A
+        __shared__ float As[BLOCK_SIZE * BLOCK_SIZE];
+        __shared__ float As2[BLOCK_SIZE * BLOCK_SIZE];
+
+        float *prefetch = As;
+        float *prefetch2 = As2;
+
+        // Declaration of the shared memory array Bs used to
+        // store the sub-matrix of B
+        // __shared__ float Bs[BLOCK_SIZE][BLOCK_SIZE];
+
+        float cv[BLOCK_SIZE];
+
+        for (int ii = 0; ii < BLOCK_SIZE; ii++) {
+             cv[ii] = 0;
+        }
+
+        // Index of the first sub-matrix of A processed by the block
+        int aBegin = a * BLOCK_SIZE * by;
+
+        // Index of the last sub-matrix of A processed by the block
+        int aEnd   = aBegin + a - 1;
+
+        // Step size used to iterate through the sub-matrices of A
+        int aStep  = BLOCK_SIZE;
+
+        // Index of the first sub-matrix of B processed by the block
+        int bBegin = BLOCK_SIZE * VECTOR_SIZE * bx;
+
+        // Step size used to iterate through the sub-matrices of B
+        int bStep  = BLOCK_SIZE * d;
+
+        int cBegin = d * BLOCK_SIZE * by + VECTOR_SIZE * BLOCK_SIZE * bx;
+
+        // Csub is used to store the element of the block sub-matrix
+        // that is computed by the thread
+        // float Csub = 0;
+        float *Ap = &A[aBegin + a * ty +tx];
+        float *ap = &prefetch[ty + BLOCK_SIZE * tx];
+#pragma unroll
+        for(int ii = 0; ii < BLOCK_SIZE; ii+=4){
+          ap[ii] = Ap[a * ii];
+        }
+        __syncthreads();
+
+        // Loop over all the sub-matrices of A and B
+        // required to compute the block sub-matrix
+        for (int a = aBegin, b = bBegin;
+             a <= aEnd;
+             a += aStep, b += bStep) {
+
+            // Load the matrices from device memory
+            // to shared memory; each thread loads
+            // one element of each matrix
+            Ap = &A[a + aStep + a * ty +tx];
+            float *ap2 = &prefetch2[ty + BLOCK_SIZE * tx];
+#pragma unroll
+            for(int ii = 0; ii < BLOCK_SIZE; ii+=4){
+                ap2[ii] = Ap[b * ii];
+            }
+
+            ap = &prefetch[0];
+            float *bp = &B[b + BLOCK_SIZE * ty + tx];
+
+#pragma unroll
+            for (int ii = 0; ii < BLOCK_SIZE; ii++) {
+                float bv = bp[0];
+                for (int jj = 0; jj < BLOCK_SIZE; jj++) {
+                    cv[jj] += ap[jj]*bv;
+                    ap += BLOCK_SIZE;
+                    bp += d;
+                }
+            }
+
+            // Synchronize to make sure the matrices are loaded
+            __syncthreads();
+
+            // swap As and As2
+            float *prefetch_temp = prefetch;
+            prefetch = prefetch2;
+            prefetch2 = prefetch_temp;
+        }
+
+        // Write the block sub-matrix to device memory;
+        // each thread writes one element
+        float *Cp = &C[cBegin];
+        Cp += BLOCK_SIZE * ty + tx;
+        int cStep = d;
+#pragma unroll
+        for(int ii=0; ii<BLOCK_SIZE; ii++){
+          Cp[0] = cv[ii]; Cp += cStep;
+        }
+    }
+}
+
+// Element-wise matrix multiplication kernel
+__global__ void matrixMultiplicationKernelEW(const float* A, const float*
+        B, float* C, int a, int b) {
+
+    int ROW = blockIdx.y*blockDim.y+threadIdx.y;
+    int COL = blockIdx.x*blockDim.x+threadIdx.x;
+
+    if (ROW < a && COL < b) {
+        C[ROW * a + COL] = A[ROW * b + COL]*B[ROW * b + COL];
+    }
+}
+
+// Element-wise matrix division kernel
+__global__ void matrixDivisionKernelEW(const float* A, const float* B,
+        float* C, int a, int b) {
+
+    int ROW = blockIdx.y*blockDim.y+threadIdx.y;
+    int COL = blockIdx.x*blockDim.x+threadIdx.x;
+
+    if (ROW < a && COL < b) {
+        C[ROW * a + COL] = A[ROW * b + COL]/B[ROW * b + COL];
+    }
+}
+
+// Computes whether there is an intersection between line segements or not
+__global__ void pathAdjacencyKernel(int noTransitions, int noSegments,
+        float* XY1, float* XY2, float* X4_X3, float* Y4_Y3, float* X2_X1,
+        float* Y2_Y1, int* adjacency) {
+
+    int blockId = blockIdx.y * gridDim.x + blockIdx.x;
+    int idx = blockId * blockDim.x + threadIdx.x;
+
+    if (idx < noTransitions*noSegments) {
+        int seg1 = idx/noSegments;
+        int seg2 = idx - seg1*noSegments;
+
+        float Y1_Y3 = XY1[seg1 + noTransitions] - XY2[seg2 + noSegments];
+        float X1_X3 = XY1[seg1] - XY2[seg2];
+
+        float numa = X4_X3[seg2]*Y1_Y3 - Y4_Y3[seg2]*X1_X3;
+        float numb = X2_X1[seg1]*Y1_Y3 - Y2_Y1[seg1]*X1_X3;
+        float deno = Y4_Y3[seg2]*X2_X1[seg1] - X4_X3[seg2]*Y2_Y1[seg1];
+
+        float u_a = numa/deno;
+        float u_b = numb/deno;
+
+        adjacency[idx] = (int)((u_a >= 0.0) && (u_a <= 1.0) && (u_b >= 0.0)
+                && (u_b <= 1.0));
+    }
+}
+
+// Sums the line segments intersection values along the each row
+__global__ void roadCrossingsKernel(int rows, int segs, int* adjacency,
+        int* cross) {
+
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+    if (idx < rows) {
+        cross[idx] = 0;
+
+        for (int ii = 0; ii < segs; ii++) {
+            cross[idx] += adjacency[idx*segs + ii];
+        }
+    }
+}
+
 // The patch kernel represents a single cell for generating habitat patches
 // The results matrix contains the following:
 //
-__global__ void patchComputation(int W, int H, int skpx, int skpy, int xres,
-        int yres, float subPatchArea, float xspacing, float yspacing, float
-        capacity, int uniqueRegions, int* labelledImage, float* pops,
-        float* results) {
+__global__ void patchComputation(int noCandidates, int W, int H, int skpx, int
+        skpy, int xres, int yres, float subPatchArea, float xspacing, float
+        yspacing, float capacity, int uniqueRegions, const int* labelledImage,
+        const float* pops, float* results) {
 
     // Get global index of thread
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
 
-    // Get large grid cell subscripts of thread
-    int blockIdxY = (int)(((int)(idx/uniqueRegions))/xres);
-    int blockIdxX = (int)(idx/uniqueRegions) - blockIdxY*xres;
-    int regionNo = idx - blockIdxY*xres*yres -blockIdxX*yres;
+    if (idx < noCandidates) {
+        // Get large grid cell subscripts of thread
+        int blockIdxY = (int)(((int)(idx/uniqueRegions))/xres);
+        int blockIdxX = (int)(idx/uniqueRegions) - blockIdxY*xres;
+        // Valid region numbering starts at 1, not 0
+        int regionNo = idx - blockIdxY*xres*uniqueRegions - blockIdxX*
+                uniqueRegions + 1;
 
-    int blockSizeX;
-    int blockSizeY;
+        int blockSizeX;
+        int blockSizeY;
 
-    if ((blockIdxX+1)*skpx <= H) {
-        blockSizeX = skpx;
-    } else {
-        blockSizeX = H-blockIdx.x*skpx;
-    }
-
-    if ((blockIdxY+1)*skpy <= W) {
-        blockSizeY = skpy;
-    } else {
-        blockSizeY = W-blockIdx.y*skpy;
-    }
-
-    // Iterate through each region for this large grid cell
-    float area = 0.0f;
-    float cap = 0.0f;
-    float pop = 0.0f;
-    float cx = 0.0f;
-    float cy = 0.0f;
-
-    for (int ii = 0; ii < blockSizeX; ii++) {
-        for (int jj = 0; jj < blockSizeY; jj++) {
-            int subIdx = blockIdxY*xres*skpx*skpy + blockIdxX*skpx*skpy
-                    + jj*(H - blockIdxX*skpx) + ii;
-            area += (float)(labelledImage[subIdx] == regionNo);
+        if ((blockIdxX+1)*skpx <= H) {
+            blockSizeX = skpx;
+        } else {
+            blockSizeX = H-blockIdxX*skpx;
         }
-    }
 
-    if (area > 0) {
+        if ((blockIdxY+1)*skpy <= W) {
+            blockSizeY = skpy;
+        } else {
+            blockSizeY = W-blockIdxY*skpy;
+        }
+
+        // Iterate through each sub patch for this large grid cell
+        float area = 0.0f;
+        float cap = 0.0f;
+        float pop = 0.0f;
+        float cx = 0.0f;
+        float cy = 0.0f;
+
         for (int ii = 0; ii < blockSizeX; ii++) {
             for (int jj = 0; jj < blockSizeY; jj++) {
-                int subIdx = blockIdxY*xres*skpx*skpy + blockIdxX*skpx*skpy
-                        + jj*(H - blockIdxX*skpx) + ii;
-                pop += pops[subIdx];
-                cx += jj*(float)(labelledImage[subIdx] == regionNo);
-                cy += ii*(float)(labelledImage[subIdx] == regionNo);
+                int subIdx = blockIdxY*xres*skpx*skpy + blockIdxX*skpx
+                        + jj*H + ii;
+                area += (float)(labelledImage[subIdx] == regionNo);
             }
         }
+
+        if (area > 0) {
+            for (int ii = 0; ii < blockSizeX; ii++) {
+                for (int jj = 0; jj < blockSizeY; jj++) {
+                    int subIdx = blockIdxY*xres*skpx*skpy + blockIdxX*skpx
+                            + jj*H + ii;
+                    pop += pops[subIdx];
+                    cx += ii*(float)(labelledImage[subIdx] == regionNo);
+                    cy += jj*(float)(labelledImage[subIdx] == regionNo);
+                }
+            }
+            cx = xspacing*(cx/area + blockIdxX*skpx);
+            cy = yspacing*(cy/area + blockIdxY*skpy);
+            area = area*subPatchArea;
+            cap = area*capacity;
+        }
+
+        // Store results to output matrix
+        results[5*idx] = area;
+        results[5*idx+1] = cap;
+        results[5*idx+2] = pop;
+        results[5*idx+3] = cx;
+        results[5*idx+4] = cy;
+
+//        printf("%4d, %5d, %8.0f, %5.0f, %5.0f, %5.0f, %5.0f\n",idx,blockSizeX,
+//                results[5*idx],results[5*idx+1],results[5*idx+2],
+//                results[5*idx+3],results[5*idx+4]);
     }
-
-    // Store results to output matrix
-    results[5*idx+2] = pop;
-    results[5*idx+3] = xspacing*(cx/area + blockIdxX*skpx);
-    results[5*idx+4] = yspacing*(cy/area + blockIdxY*skpy);
-
-    cap = area*capacity;
-    area = area*subPatchArea;
-    results[5*idx] = area;
-    results[5*idx+1] = cap;
 }
 
 // The mte kernel represents a single path for mte
@@ -195,8 +399,65 @@ __global__ void rovKernel() {
 
 // WRAPPERS ///////////////////////////////////////////////////////////////////
 
-void SimulateGPU::eigenMatrixMult(const Eigen::MatrixXf& A, const
-        Eigen::MatrixXf& B, Eigen::MatrixXf& C) {
+void SimulateGPU::eMMN(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
+        Eigen::MatrixXd& C) {
+
+    int device = 0;
+    struct cudaDeviceProp properties;
+    cudaGetDeviceProperties(&properties, device);
+    maxMultiProcessors = properties.multiProcessorCount;
+    maxThreadsPerBlock = properties.maxThreadsPerBlock;
+
+    if (A.cols() != B.rows()) {
+        throw "SimulateGPU: matrixMultiplication: Inner dimensions do not match!";
+    }
+
+    float *Af, *Bf, *Cf, *d_A, *d_B, *d_C;
+
+    int a = A.rows();
+    int b = A.cols();
+    int c = B.rows();
+    int d = B.cols();
+
+    Af = (float*)malloc(a*b*sizeof(float));
+    Bf = (float*)malloc(c*d*sizeof(float));
+    Cf = (float*)malloc(a*d*sizeof(float));
+
+    cudaMalloc(&d_A,a*b*sizeof(float));
+    cudaMemcpy(d_A,Af,a*b*sizeof(float),cudaMemcpyHostToDevice);
+
+    cudaMalloc(&d_B,c*d*sizeof(float));
+    cudaMemcpy(d_B,Bf,c*d*sizeof(float),cudaMemcpyHostToDevice);
+
+    cudaMalloc(&d_C,a*d*sizeof(float));
+
+    // declare the number of blocks per grid and the number of threads per block
+    dim3 threadsPerBlock(a, d);
+    dim3 blocksPerGrid(1, 1);
+        if (a*d > maxThreadsPerBlock){
+            threadsPerBlock.x = maxThreadsPerBlock;
+            threadsPerBlock.y = maxThreadsPerBlock;
+            blocksPerGrid.x = ceil(double(a)/double(threadsPerBlock.x));
+            blocksPerGrid.y = ceil(double(d)/double(threadsPerBlock.y));
+        }
+
+    matrixMultiplicationKernelNaive<<<blocksPerGrid,threadsPerBlock>>>(d_A,d_B,
+            d_C,a,b,c,d);
+
+    // Retrieve result and free data
+    cudaMemcpy(C.data(),d_C,a*d*sizeof(float),cudaMemcpyDeviceToHost);
+
+    cudaDeviceSynchronize();
+    free(Af);
+    free(Bf);
+    free(Cf);
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
+}
+
+void SimulateGPU::eMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
+        Eigen::MatrixXd& C) {
 
     int device = 0;
     struct cudaDeviceProp properties;
@@ -215,30 +476,77 @@ void SimulateGPU::eigenMatrixMult(const Eigen::MatrixXf& A, const
     int c = B.rows();
     int d = B.cols();
 
+    Eigen::MatrixXf Af = A.cast<float>();
+    Eigen::MatrixXf Bf = B.cast<float>();
+    Eigen::MatrixXf Cf = C.cast<float>();
+
     cudaMalloc(&d_A,a*b*sizeof(float));
-    cudaMemcpy(d_A,A.data(),a*b*sizeof(float),cudaMemcpyHostToDevice);
+    cudaMemcpy(d_A,Af.data(),a*b*sizeof(float),cudaMemcpyHostToDevice);
 
     cudaMalloc(&d_B,c*d*sizeof(float));
-    cudaMemcpy(d_B,B.data(),c*d*sizeof(float),cudaMemcpyHostToDevice);
+    cudaMemcpy(d_B,Bf.data(),c*d*sizeof(float),cudaMemcpyHostToDevice);
 
     cudaMalloc(&d_C,a*d*sizeof(float));
-    cudaMemcpy(d_C,C.data(),a*d*sizeof(float),cudaMemcpyHostToDevice);
 
     // declare the number of blocks per grid and the number of threads per block
-    dim3 threadsPerBlock(a, d);
-    dim3 blocksPerGrid(1, 1);
-        if (a*d > maxThreadsPerBlock){
-            threadsPerBlock.x = maxThreadsPerBlock;
-            threadsPerBlock.y = maxThreadsPerBlock;
-            blocksPerGrid.x = ceil(double(a)/double(threadsPerBlock.x));
-            blocksPerGrid.y = ceil(double(d)/double(threadsPerBlock.y));
-        }
+    dim3 threads(BLOCK_SIZE,VECTOR_SIZE);
+    dim3 grid(d/(BLOCK_SIZE*VECTOR_SIZE), a/BLOCK_SIZE);
 
-    matrixMultiplicationKernel<<<blocksPerGrid,threadsPerBlock>>>(d_A,d_B,d_C,
-            a,b,c,d);
+    matrixMultiplicationKernel<<<grid,threads>>>(d_A,d_B,d_C,a,b,d);
 
     // Retrieve result and free data
-    cudaMemcpy(C.data(),d_C,a*d*sizeof(float),cudaMemcpyDeviceToHost);
+    cudaMemcpy(Cf.data(),d_C,a*d*sizeof(float),cudaMemcpyDeviceToHost);
+
+    C = Cf.cast<double>();
+
+    cudaDeviceSynchronize();
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
+
+}
+
+void SimulateGPU::ewMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd &B,
+        Eigen::MatrixXd &C) {
+
+    int device = 0;
+    struct cudaDeviceProp properties;
+    cudaGetDeviceProperties(&properties, device);
+    maxMultiProcessors = properties.multiProcessorCount;
+    maxThreadsPerBlock = properties.maxThreadsPerBlock;
+
+    if ((A.cols() != B.cols()) || (A.rows() != B.rows())) {
+        throw "SimulateGPU: matrixMultiplication: Matrix dimensions do not match!";
+    }
+
+    float *d_A, *d_B, *d_C;
+
+    int a = A.rows();
+    int b = A.cols();
+
+    Eigen::MatrixXf Af = A.cast<float>();
+    Eigen::MatrixXf Bf = B.cast<float>();
+    Eigen::MatrixXf Cf = C.cast<float>();
+
+    cudaMalloc(&d_A,a*b*sizeof(float));
+    cudaMemcpy(d_A,Af.data(),a*b*sizeof(float),cudaMemcpyHostToDevice);
+
+    cudaMalloc(&d_B,a*b*sizeof(float));
+    cudaMemcpy(d_B,Bf.data(),a*b*sizeof(float),cudaMemcpyHostToDevice);
+
+    cudaMalloc(&d_C,a*b*sizeof(float));
+
+    // declare the number of blocks per grid and the number of threads per
+    // block
+    dim3 dimBlock(32,32);
+    dim3 dimGrid(b/dimBlock.x,a/dimBlock.y);
+
+    matrixMultiplicationKernelEW<<<dimGrid,dimBlock>>>(d_A,d_B,d_C,a,b);
+
+    // Retrieve result and free data
+    cudaMemcpy(Cf.data(),d_C,a*b*sizeof(float),cudaMemcpyDeviceToHost);
+
+    C = Cf.cast<double>();
 
     cudaDeviceSynchronize();
     cudaFree(d_A);
@@ -246,54 +554,203 @@ void SimulateGPU::eigenMatrixMult(const Eigen::MatrixXf& A, const
     cudaFree(d_C);
 }
 
-double SimulateGPU::buildPatches(int W, int H, int skpx, int skpy, int xres,
-        int yres, int noRegions, double xspacing, double yspacing, double
-        subPatchArea, HabitatTypePtr habTyp, Eigen::MatrixXi& labelledImage,
-        Eigen::MatrixXf& populations, std::vector<HabitatPatchPtr>& patches) {
+void SimulateGPU::ewMD(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
+        Eigen::MatrixXd& C) {
 
-    float *results, *d_results;
-    results = (float*)malloc(xres*yres*noRegions*sizeof(float));
-    cudaMalloc(&d_results,xres*yres*noRegions*sizeof(float));
+    int device = 0;
+    struct cudaDeviceProp properties;
+    cudaGetDeviceProperties(&properties, device);
+    maxMultiProcessors = properties.multiProcessorCount;
+    maxThreadsPerBlock = properties.maxThreadsPerBlock;
 
-    patchComputation<<<xres*yres*noRegions/maxThreadsPerBlock+1,
-            maxThreadsPerBlock>>>(W, H, skpx, skpy, xres, yres,
-            (float)subPatchArea,(float)xspacing,(float)yspacing,
-            (float)habTyp->getMaxPop(),noRegions,
-            labelledImage.data(),populations.data(),d_results);
+    if ((A.cols() != B.cols()) || (A.rows() != B.rows())) {
+        throw "SimulateGPU: matrixMultiplication: Matrix dimensions do not match!";
+    }
+
+    float *d_A, *d_B, *d_C;
+
+    int a = A.rows();
+    int b = A.cols();
+
+    Eigen::MatrixXf Af = A.cast<float>();
+    Eigen::MatrixXf Bf = B.cast<float>();
+    Eigen::MatrixXf Cf = C.cast<float>();
+
+    cudaMalloc(&d_A,a*b*sizeof(float));
+    cudaMemcpy(d_A,Af.data(),a*b*sizeof(float),cudaMemcpyHostToDevice);
+
+    cudaMalloc(&d_B,a*b*sizeof(float));
+    cudaMemcpy(d_B,Bf.data(),a*b*sizeof(float),cudaMemcpyHostToDevice);
+
+    cudaMalloc(&d_C,a*b*sizeof(float));
+
+    // declare the number of blocks per grid and the number of threads per
+    // block
+    dim3 dimBlock(32,32);
+    dim3 dimGrid(b/dimBlock.x,a/dimBlock.y);
+
+    matrixDivisionKernelEW<<<dimGrid,dimBlock>>>(d_A,d_B,d_C,a,b);
+
+    // Retrieve result and free data
+    cudaMemcpy(Cf.data(),d_C,a*b*sizeof(float),cudaMemcpyDeviceToHost);
+
+    C = Cf.cast<double>();
+
+    cudaDeviceSynchronize();
+    cudaFree(d_A);
+    cudaFree(d_B);
+    cudaFree(d_C);
+}
+
+void SimulateGPU::lineSegmentIntersect(const Eigen::MatrixXd& XY1, const
+        Eigen::MatrixXd& XY2, Eigen::VectorXi& crossings) {
+
+    int device = 0;
+    struct cudaDeviceProp properties;
+    cudaGetDeviceProperties(&properties, device);
+    int maxThreadsPerBlock = properties.maxThreadsPerBlock;
+    int maxBlocksPerGrid = 65536;
+
+    // Precompute necessary vectors to be shared across threads
+    Eigen::VectorXf X4_X3 = (XY2.block(0,2,XY2.rows(),1) -
+            XY2.block(0,0,XY2.rows(),1)).cast<float>();
+    Eigen::VectorXf Y4_Y3 = (XY2.block(0,3,XY2.rows(),1) -
+            XY2.block(0,1,XY2.rows(),1)).cast<float>();
+    Eigen::VectorXf X2_X1 = (XY1.block(0,2,XY1.rows(),1) -
+            XY1.block(0,0,XY1.rows(),1)).cast<float>();
+    Eigen::VectorXf Y2_Y1 = (XY1.block(0,3,XY1.rows(),1) -
+            XY1.block(0,1,XY1.rows(),1)).cast<float>();
+
+    Eigen::MatrixXf XY1f = XY1.cast<float>();
+    Eigen::MatrixXf XY2f = XY2.cast<float>();
+
+    // Allocate space on the GPU
+    float *d_XY1, *d_XY2, *d_X4_X3, *d_Y4_Y3, *d_X2_X1, *d_Y2_Y1;
+    int *d_adjacency, *d_cross;
+
+    cudaMalloc(&d_XY1,XY1.rows()*XY1.cols()*sizeof(float));
+    cudaMemcpy(d_XY1,XY1f.data(),XY1.rows()*XY1.cols()*sizeof(float),
+            cudaMemcpyHostToDevice);
+    cudaMalloc(&d_XY2,XY2.rows()*XY2.cols()*sizeof(float));
+    cudaMemcpy(d_XY2,XY2f.data(),XY2.rows()*XY2.cols()*sizeof(float),
+            cudaMemcpyHostToDevice);
+
+    cudaMalloc(&d_X4_X3,XY2.rows()*sizeof(float));
+    cudaMemcpy(d_X4_X3,X4_X3.data(),XY2.rows()*sizeof(float),
+            cudaMemcpyHostToDevice);
+    cudaMalloc(&d_Y4_Y3,XY2.rows()*sizeof(float));
+    cudaMemcpy(d_Y4_Y3,Y4_Y3.data(),XY2.rows()*sizeof(float),
+            cudaMemcpyHostToDevice);
+    cudaMalloc(&d_X2_X1,XY1.rows()*sizeof(float));
+    cudaMemcpy(d_X2_X1,X2_X1.data(),XY1.rows()*sizeof(float),
+            cudaMemcpyHostToDevice);
+    cudaMalloc(&d_Y2_Y1,XY1.rows()*sizeof(float));
+    cudaMemcpy(d_Y2_Y1,Y2_Y1.data(),XY1.rows()*sizeof(float),
+            cudaMemcpyHostToDevice);
+    cudaMalloc(&d_adjacency,XY1.rows()*XY2.rows()*sizeof(int));
+    cudaMalloc(&d_cross,XY1.rows()*sizeof(int));
+
+    // Compute the road crossings for each transition
+    int noCombos = XY1.rows()*XY2.rows();
+    int noBlocks = (noCombos % maxThreadsPerBlock) ?
+            (noCombos/maxThreadsPerBlock + 1) : (noCombos/maxThreadsPerBlock);
+    double number = (double)(noBlocks)/(((double)maxBlocksPerGrid)*
+            ((double)maxBlocksPerGrid));
+    int blockYDim = ((number - floor(number)) > 0 ) ? (int)number + 1 :
+            (int)number;
+    int blockXDim = (int)min(maxBlocksPerGrid,noBlocks);
+
+    dim3 dimGrid(blockXDim,blockYDim);
+    pathAdjacencyKernel<<<dimGrid,maxThreadsPerBlock>>>(XY1.rows(),XY2.rows(),
+            d_XY1,d_XY2,d_X4_X3,d_Y4_Y3,d_X2_X1,d_Y2_Y1,d_adjacency);
     cudaDeviceSynchronize();
 
-    std::cout << xres*yres*noRegions/maxThreadsPerBlock+1 << std::endl;
     cudaError_t error = cudaGetLastError();
     if (error != cudaSuccess) {
       fprintf(stderr, "ERROR: %s \n", cudaGetErrorString(error));
     }
 
-    cudaMemcpy(results,d_results,xres*yres*noRegions*sizeof(float),
+    // Sum the number
+    noBlocks = (XY1.rows() % maxThreadsPerBlock)? (int)(XY1.rows()/
+            maxThreadsPerBlock + 1) : (int)(XY1.rows()/maxThreadsPerBlock);
+    roadCrossingsKernel<<<noBlocks,maxThreadsPerBlock>>>(XY1.rows(),
+            XY2.rows(),d_adjacency,d_cross);
+    cudaDeviceSynchronize();
+
+    // Retrieve results
+    cudaMemcpy(crossings.data(),d_cross,XY1.rows()*sizeof(int),
+            cudaMemcpyDeviceToHost);
+
+    cudaDeviceSynchronize();
+    // Free memory
+    cudaFree(d_X4_X3);
+    cudaFree(d_Y4_Y3);
+    cudaFree(d_X2_X1);
+    cudaFree(d_Y2_Y1);
+    cudaFree(d_cross);
+}
+
+void SimulateGPU::buildPatches(int W, int H, int skpx, int skpy, int xres,
+        int yres, int noRegions, double xspacing, double yspacing, double
+        subPatchArea, HabitatTypePtr habTyp, const Eigen::MatrixXi&
+        labelledImage, const Eigen::MatrixXd& populations,
+        std::vector<HabitatPatchPtr>& patches, double& initPop, int&
+        noPatches) {
+
+    Eigen::MatrixXf popsFloat = populations.cast<float>();
+
+    float *results, *d_results, *d_populations;
+    int *d_labelledImage;
+
+    results = (float*)malloc(xres*yres*noRegions*5*sizeof(float));
+    cudaMalloc((void **)&d_results,xres*yres*noRegions*5*sizeof(float));
+
+    cudaMalloc((void **)&d_labelledImage,H*W*sizeof(int));
+    cudaMemcpy(d_labelledImage,labelledImage.data(),H*W*sizeof(int),
+            cudaMemcpyHostToDevice);
+
+    cudaMalloc((void **)&d_populations,H*W*sizeof(float));
+    cudaMemcpy(d_populations,popsFloat.data(),H*W*sizeof(float),
+            cudaMemcpyHostToDevice);
+
+    int noBlocks = (xres*yres*noRegions % maxThreadsPerBlock)? (int)(xres*yres*
+            noRegions/maxThreadsPerBlock +1) : (int)(xres*yres*noRegions/
+            maxThreadsPerBlock);
+    int noThreadsPerBlock = min(maxThreadsPerBlock,xres*yres*noRegions);
+
+    patchComputation<<<noBlocks,noThreadsPerBlock>>>(xres*yres*noRegions,
+            W, H, skpx, skpy, xres,yres,(float)subPatchArea,(float)xspacing,
+            (float)yspacing,(float)habTyp->getMaxPop(),noRegions,
+            d_labelledImage,d_populations,d_results);
+    cudaDeviceSynchronize();
+
+    cudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess) {
+      fprintf(stderr, "ERROR: %s \n", cudaGetErrorString(error));
+    }
+
+    cudaMemcpy(results,d_results,xres*yres*noRegions*5*sizeof(float),
                cudaMemcpyDeviceToHost);
 
     // Now turn the results into patches
-    int counter = 0;
-    double initPop = 0.0;
     for (int ii = 0; ii < xres*yres*noRegions; ii++) {
-        if (results[xres*yres*noRegions*ii] > 0) {
+        if (results[5*ii] > 0) {
             // Create new patch to add to patches vector
             HabitatPatchPtr hab(new HabitatPatch());
-            hab->setArea((double)results[xres*yres*noRegions*ii]);
-            hab->setCX((double)results[xres*yres*noRegions*ii+3]);
-            hab->setCY((double)results[xres*yres*noRegions*ii+4]);
-            hab->setPopulation((double)results[xres*yres*noRegions*ii+2]);
-            hab->setCapacity((double)results[xres*yres*noRegions*ii+1]);
-            initPop += (double)results[xres*yres*noRegions*ii];
-            patches[counter++] = hab;
+            hab->setArea((double)results[5*ii]);
+            hab->setCX((double)results[ii+3]);
+            hab->setCY((double)results[ii+4]);
+            hab->setPopulation((double)results[5*ii+2]);
+            hab->setCapacity((double)results[5*ii+1]);
+            initPop += (double)results[5*ii];
+            patches[noPatches++] = hab;
         }
     }
 
+    cudaFree(d_populations);
+    cudaFree(d_labelledImage);
     cudaFree(d_results);
     free(results);
-
-    patches.resize(--counter);
-
-    return initPop;
 }
 
 void SimulateGPU::simulateMTECUDA(SimulatorPtr sim,
@@ -383,7 +840,12 @@ void SimulateGPU::simulateMTECUDA(SimulatorPtr sim,
         // Perform N simulation paths. Currently, there is no species
         // interaction, so we run each kernel separately and do not need to use
         // the Thrust library.
-        mteKernel<<<(int)ceil(noPaths/maxThreadsPerBlock),maxThreadsPerBlock>>>
+        int noBlocks = (int)(noPaths % maxThreadsPerBlock)?
+                (noPaths/maxThreadsPerBlock + 1) :
+                (noPaths/maxThreadsPerBlock);
+        int noThreadsPerBlock = min(noPaths,maxThreadsPerBlock);
+
+        mteKernel<<<noBlocks,noThreadsPerBlock>>>
                 (noPaths,nYears,capacities[ii].size(),grm,grsd,d_initPops,
                 d_caps,d_mmm,d_eps,d_random_floats);
         cudaDeviceSynchronize();
