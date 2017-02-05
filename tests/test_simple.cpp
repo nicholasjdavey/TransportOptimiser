@@ -25,8 +25,8 @@ int main(int argc, char **argv) {
             RoadGA::RANK,0.4,0.65,5,0.1,true));
 
     // SET THREADER
-//    ThreadManagerPtr threader(new ThreadManager(8));
-//    roadGA->setThreadManager(threader);
+    ThreadManagerPtr threader(new ThreadManager(8));
+    roadGA->setThreadManager(threader);
 
     // Initialise the input classes
     // REGION
