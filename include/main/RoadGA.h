@@ -87,7 +87,8 @@ public:
             learnPeriod, double surrThresh, unsigned long maxLearnNo, unsigned
             long minLearnNo, unsigned long sg, RoadGA::Selection selector,
             RoadGA::Scaling fitscale, double topProp, double
-            maxSurvivalRate, int ts, double msr, bool gpu = false);
+            maxSurvivalRate, int ts, double msr, bool gpu = false,
+            Optimiser::ROVType rovType = Optimiser::ALGO5);
 
     // ACCESSORS //////////////////////////////////////////////////////////////
 

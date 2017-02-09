@@ -19,9 +19,9 @@ RoadGA::RoadGA(double mr, double cf, unsigned long gens, unsigned long popSize,
     scale, unsigned long learnPeriod, double surrThresh, unsigned long
     maxLearnNo, unsigned long minLearnNo, unsigned long sg, RoadGA::Selection
     selector, RoadGA::Scaling fitscale, double topProp, double
-    maxSurvivalRate, int ts, double msr, bool gpu) :
+    maxSurvivalRate, int ts, double msr, bool gpu, Optimiser::ROVType rovType):
     Optimiser(mr, cf, gens, popSize, stopTol, confInt, confLvl, habGridRes,
-            solScheme, noRuns, type, sg, msr, gpu) {
+            solScheme, noRuns, type, sg, msr, gpu, rovType) {
 
     this->theta = 0;
     this->generation = 0;

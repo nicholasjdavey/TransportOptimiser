@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
 
     RoadGAPtr roadGA(new RoadGA(0.6,0.375,500,50,1e-4,0.95,0.95,10,solScheme,5,
             Optimiser::MTE,1.0,15,0.05,10,3,10,RoadGA::TOURNAMENT,
-            RoadGA::RANK,0.4,0.65,5,0.1,true));
+            RoadGA::RANK,0.4,0.65,5,0.1,true,Optimiser::ALGO1));
 
     // SET THREADER
     ThreadManagerPtr threader(new ThreadManager(8));

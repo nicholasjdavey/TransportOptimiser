@@ -868,11 +868,25 @@ void SimulateGPU::simulateMTECUDA(SimulatorPtr sim,
     }
 }
 
-void SimulateGPU::simulateROVCUDA() {
+void SimulateGPU::simulateROVCUDA(SimulatorPtr sim, Optimiser::ROVType method,
+        std::vector<SpeciesRoadPatchesPtr>& srp, std::vector<Eigen::VectorXd>&
+        initPops, std::vector<Eigen::VectorXd>& capacities,
+        std::vector<std::vector<Eigen::MatrixXd> > &aars,
+        std::vector<Eigen::MatrixXd> &totalPops, Eigen::MatrixXd& condExp,
+        Eigen::MatrixXi& optCont) {
+
     // Get device properties
     int device = 0;
     struct cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties, device);
     maxMultiProcessors = properties.multiProcessorCount;
     maxThreadsPerBlock = properties.maxThreadsPerBlock;
+
+    // Get important values for computation
+    int nYears = sim->getRoad()->getOptimiser()->getEconomic()->getYears();
+    int noPaths = sim->getRoad()->getOptimiser()->getOtherInputs()->
+            getNoPaths();
+
+    // Get the important values for the road first and convert them to formats
+    // that the kernel can use
 }

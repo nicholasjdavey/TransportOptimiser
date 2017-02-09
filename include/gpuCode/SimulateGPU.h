@@ -114,14 +114,27 @@ namespace SimulateGPU {
             Eigen::MatrixXd &endPops);
 
     /**
-     * Runs the simulation for the controlled traffic flow model in CUDA
+     * Runs the simulation for the controlled traffic flow model in CUDA.
+     *
+     * @brief simulateROVCUDA
      * @param sim as SimulatorPtr
+     * @param method as Optimiser::ROVType
      * @param srp as std::vector<SpeciesRoadPatchesPtr>&
      * @param initPops as std::vector<Eigen::VectorXd>&
-     * @param capacities as std::vector<Eigen::VectorXd>&
-     * @param endPops as Eigen::MatrixXd&
+     * @param capacities std::vector<Eigen::VectorXd>&
+     * @param aars Eigen::MatrixXd&
+     * @param totalPops as Eigen::MatrixXd&
+     * @param condExp as Eigen::MatrixXd&
+     * @param optCont as Eigen::MatrixXi&
      */
-    void simulateROVCUDA();
+    void simulateROVCUDA(SimulatorPtr sim, Optimiser::ROVType method,
+            std::vector<SpeciesRoadPatchesPtr>& srp,
+            std::vector<Eigen::VectorXd>& initPops,
+            std::vector<Eigen::VectorXd>& capacities,
+            std::vector<std::vector<Eigen::MatrixXd>>& aars,
+            std::vector<Eigen::MatrixXd>& totalPops,
+            Eigen::MatrixXd& condExp, Eigen::MatrixXi& optCont);
+
 }
 
 #endif

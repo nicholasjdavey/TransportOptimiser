@@ -106,9 +106,6 @@ void Simulator::simulateMTE() {
         }
 
     } else {
-        // We evaluate the actual road using Monte Carlo simulation
-        std::vector<std::future<Eigen::RowVectorXd>> results(noPaths);
-
         // Create a matrix to store the end populations of each species
         // in each run
         Eigen::MatrixXd endPopulations(noPaths,srp.size());
@@ -123,7 +120,11 @@ void Simulator::simulateMTE() {
                 // Call the external, CUDA-compiled code
                 SimulateGPU::simulateMTECUDA(this->me(),srp,initPops,
                         capacities,endPopulations);
+
             } else {
+                // We evaluate the actual road using Monte Carlo simulation
+                std::vector<std::future<Eigen::RowVectorXd>> results(noPaths);
+
                 for (unsigned long ii = 0; ii < noPaths; ii++) {
                     // Push onto the thread pool with a lambda expression
                     results[ii] = threader->push([this, srp, initPops, capacities]
@@ -147,23 +148,31 @@ void Simulator::simulateMTE() {
             }
 
         } else {
-            // Compute serially. We cal also use GPU computing here but the
+
+            // Compute serially. We can also use GPU computing here but the
             // earlier calling function does not use multi-threading on the
             // host.
-            for (unsigned long ii = 0; ii < noPaths; ii++) {
+            if (gpu) {
+                // Call the external, CUDA-compiled code
+                SimulateGPU::simulateMTECUDA(this->me(),srp,initPops,
+                        capacities,endPopulations);
+            } else {
 
-                for (int jj = 0; jj < srp.size(); jj++) {
-                    Eigen::RowVectorXd endPops(srp.size());
-                    std::vector<Eigen::VectorXd> finalPops =
-                            initPops;
-                    this->simulateMTEPath(srp,initPops,capacities,
-                            finalPops);
+                for (unsigned long ii = 0; ii < noPaths; ii++) {
 
-                    for (int kk = 0; kk < srp.size(); kk++) {
-                        endPops(jj) = finalPops[jj].sum();
+                    for (int jj = 0; jj < srp.size(); jj++) {
+                        Eigen::RowVectorXd endPops(srp.size());
+                        std::vector<Eigen::VectorXd> finalPops =
+                                initPops;
+                        this->simulateMTEPath(srp,initPops,capacities,
+                                finalPops);
+
+                        for (int kk = 0; kk < srp.size(); kk++) {
+                            endPops(jj) = finalPops[jj].sum();
+                        }
+
+                        endPopulations.row(ii) = endPops;
                     }
-
-                    endPopulations.row(ii) = endPops;
                 }
             }
         }
@@ -251,7 +260,9 @@ void Simulator::simulateMTE(std::vector<Eigen::MatrixXd>& visualiseResults) {
 }
 
 void Simulator::simulateROVCR() {
-    // SIM ROVCR (we cannot use the base monte carlo routine for this method)
+    // For now, this method only considers a single species
+
+    // SIM ROVCR (we cannot use the base Monte Carlo routine for this method)
 
     // Simulate forward paths
     // Save all paths:
@@ -259,9 +270,23 @@ void Simulator::simulateROVCR() {
     //  2. Control taken
     //  3. Adjusted populations
 
+    // Save optimal control map produced:
+    //  1. Optimal values
+    //  2. Optimal controls
+
     RoadPtr road = this->road.lock();
     OptimiserPtr optimiser = road->getOptimiser();
     ThreadManagerPtr threader = optimiser->getThreadManager();
+    bool gpu = optimiser->getGPU();
+    ExperimentalScenarioPtr scenario = optimiser->getScenario();
+    VariableParametersPtr varParams = optimiser->getVariableParams();
+    Optimiser::ROVType method = optimiser->getROVMethod();
+
+    TrafficProgramPtr program = (road->getOptimiser()->getPrograms())[
+            scenario->getProgram()];
+    int controls = program->getFlowRates().size();
+    int noPaths = optimiser->getOtherInputs()->getNoPaths();
+    int nYears = optimiser->getEconomic()->getYears();
 
     std::vector<SpeciesRoadPatchesPtr> srp = road->getSpeciesRoadPatches();
     Eigen::VectorXd iar(srp.size());
@@ -306,6 +331,82 @@ void Simulator::simulateROVCR() {
         for (int jj = 0; jj < srp.size(); jj++) {
             initPops[ii](jj) = srp[ii]->getHabPatches()[jj]->getPopulation();
             capacities[ii](jj) = srp[ii]->getHabPatches()[jj]->getCapacity();
+        }
+    }
+
+    // VALUATION //////////////////////////////////////////////////////////////
+    // Next, perform the valuation. If there is no growth rate uncertainty, we
+    // only need one path.
+
+//    std::vector<std::vector<Eigen::MatrixXd>> mcPops(srp.size());
+
+//    for (int ii = 0; ii < srp.size(); ii++) {
+//        mcPops[ii].resize(nYears);
+//        for (int jj = 0; jj < nYears; jj++) {
+//            mcPops[ii][jj].resize(noPaths,srp->getHabPatches().size());
+//        }
+//    }
+
+
+    // We save the following information so that we can create the policy maps
+    // 1. AAR maps for each path for each control at each time step
+    // 2. Total population on each path for each time step
+    // 3. Optimal profit-to-go matrix (along each path)
+    // 4. Optimal control matrix (along each path)
+
+    // 1.
+    std::vector<std::vector<Eigen::MatrixXd>> aars(srp.size());
+
+    for (int ii = 0; ii < srp.size(); ii++) {
+        aars[ii].resize(nYears);
+        for (int jj = 0; jj < nYears; jj++) {
+            aars[ii][jj].resize(noPaths,controls);
+        }
+    }
+
+    // 2.
+    std::vector<Eigen::MatrixXd> totalPops(srp.size());
+
+    for (int ii = 0; ii < srp.size(); ii++) {
+        totalPops[ii].resize(noPaths,nYears);
+    }
+
+    // 3.
+    Eigen::MatrixXd condExp(noPaths,nYears);
+
+    // 4.
+    Eigen::MatrixXi optCont(noPaths,nYears);
+
+    if (varParams->getGrowthRateSDMultipliers()(scenario->getPopGRSD()) == 0) {
+
+        Eigen::RowVectorXd endPopulations(srp.size());
+
+        // Fill in code here
+
+    } else {
+        // Create
+        // We have to use Monte Carlo simulation
+
+        // Create a matrix to store the results
+        if (threader != nullptr) {
+            // If we have access to GPU-enabled computing, we exploit it
+            // here and at the calling function in the GA optimiser, we
+            // implement the standard multi-threading on the host. If not,
+            // we do not implement multi-threading at the higher level and
+            // instead implement it here.
+            if (gpu) {
+                // Call the external, CUDA-compiled code
+                SimulateGPU::simulateROVCUDA(this->me(),method,srp,initPops,
+                        capacities,aars,totalPops,condExp,optCont);
+
+            } else {
+                // Put multi-threaded code without the GPU here
+            }
+
+        } else {
+            // We will always use multiple threads otherwise it is too slow
+
+            // For completeness, add single-threaded code here
         }
     }
 }

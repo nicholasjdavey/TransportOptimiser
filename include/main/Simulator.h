@@ -153,6 +153,9 @@ public:
      *
      * @param (output) visualisePops as std::vector<Eigen::MatrixXd>&
      * @param (output) visualiseFlows as std::vector<int>&
+     * @note This method automatically useds ALGO6, which is the most
+     * comprehensive method, to visualise a single Monte Carlo chain and the
+     * optimal actions taken over time.
      */
     void simulateROVCR(std::vector<Eigen::MatrixXd>& visualisePops,
             std::vector<int>& visualiseFlows);

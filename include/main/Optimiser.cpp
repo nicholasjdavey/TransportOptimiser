@@ -7,7 +7,8 @@ Optimiser::Optimiser() {
 Optimiser::Optimiser(double mr, double cf, unsigned long gens, unsigned
         long popSize, double stopTol, double confInt, double confLvl, unsigned
         long habGridRes, std::string solScheme, unsigned long noRuns,
-        Optimiser::Type type, unsigned long sg, double msr, bool gpu) {
+        Optimiser::Type type, unsigned long sg, double msr, bool gpu,
+        Optimiser::ROVType method) {
 
 //	std::vector<ProgramPtr>* programs(new std::vector<ProgramPtr>());
     unsigned long const hardware_threads = std::thread::hardware_concurrency();
@@ -28,6 +29,7 @@ Optimiser::Optimiser(double mr, double cf, unsigned long gens, unsigned
     this->type = type;
     this->maxSampleRate = msr;
     this->gpu = gpu;
+    this->method = method;
 }
 
 Optimiser::~Optimiser() {

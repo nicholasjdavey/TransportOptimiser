@@ -52,6 +52,9 @@ typedef std::shared_ptr<ThreadManager> ThreadManagerPtr;
 class Optimiser;
 typedef std::shared_ptr<Optimiser> OptimiserPtr;
 
+class MonteCarloROV;
+typedef std::shared_ptr<MonteCarloROV> MonteCarloROVPtr;
+
 typedef std::shared_ptr<Gnuplot> GnuplotPtr;
 
 /**
@@ -67,6 +70,16 @@ public:
         MTE,            /**< Set a minimum population to maintain per species */
         CONTROLLED      /**< Controlled animal population */
     } Type;
+
+    typedef enum {
+        ALGO1, /**< Regression Monte Carlo (Tsitsiklis and Van Roy) */
+        ALGO2, /**< Regression Monte Carlo (Longstaff and Schwartz) */
+        ALGO3, /**< Parametric Control (Guyon and Henry-Labordere) */
+        ALGO4, /**< Regression Monte Carlo, State & Control (Kharroubi et al.) */
+        ALGO5, /**< Regression Monte Carlo, State, Control & Recomputation */
+        ALGO6, /**< Regression Monte Carlo, State, Control, Recomputation & Switching (Langrene et al.) */
+        ALGO7  /**< Regression Monte Carlo with targeted end population (Zhang et al.) */
+    } ROVType;
 
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
@@ -108,11 +121,13 @@ public:
      * @param elite as double
      * @param msr as double
      * @param gpu as bool (default = false)
+     * @param method as Optimiser:: (default = Optimiser::ALGO5)
      */
     Optimiser(double mr, double cf, unsigned long gens, unsigned long
             popSize, double stopTol, double confInt, double confLvl, unsigned
             long habGridRes, std::string solScheme, unsigned long noRuns,
-            Optimiser::Type type, unsigned long sg, double msr, bool gpu=false);
+            Optimiser::Type type, unsigned long sg, double msr, bool gpu=false,
+            Optimiser::ROVType method = Optimiser::ALGO5);
     /**
      * Destructor
      */
@@ -699,6 +714,23 @@ public:
         this->gpu = gpu;
     }
 
+    /**
+     * Returns the ROV method used in the optimisation
+     *
+     * @return Method as Optimiser::ROVType
+     */
+    Optimiser::ROVType getROVMethod() {
+        return this->method;
+    }
+    /**
+     * Sets the ROV method used in the optimisation
+     *
+     * @param method as Optimiser::ROVType
+     */
+    void setROVMethod(Optimiser::ROVType method) {
+        this->method = method;
+    }
+
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -822,6 +854,7 @@ protected:
     GnuplotPtr plothandle;                                                          /**< Pipe for plotting results */
     GnuplotPtr surrPlotHandle;                                                      /**< Pipe for plotting surrogate model results */
     bool gpu;                                                                       /**< If we are using GPUs to assist computing */
+    Optimiser::ROVType method;                                                      /**< ROV algorithm */
 };
 
 #endif
