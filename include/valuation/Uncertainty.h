@@ -27,7 +27,7 @@ typedef std::shared_ptr<Uncertainty> UncertaintyPtr;
  * See: http://marcoagd.usuarios.rdc.puc-rio.br/sim_stoc_proc.html
  * Langrenet et al. 2015
  */
-class Uncertainty {
+class Uncertainty : public std::enable_shared_from_this<Uncertainty> {
 
 public:
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
@@ -279,6 +279,7 @@ private:
 
     // Private functions //////////////////////////////////////////////////////
     double singlePathValue();
+    UncertaintyPtr me();          /**< Enables sharing from here */
 };
 
 #endif

@@ -101,6 +101,39 @@ void Optimiser::optimise(bool plot) {
     // FOR MTE AND ROV ////////////////////////////////////////////////////////
     // Compute using surrogate function, which we learn at each iteration.
     // Perform sampling to ensure a good distribution of AARs.
+
+    switch (this->type) {
+    case Optimiser::CONTROLLED:
+        {
+            // We cannot compute expected present values beforehand as usage
+            // is not uniform due to the control aspect.
+        }
+        break;
+
+    default:
+        {
+            int commSD = this->getScenario()->getCommoditySD();
+
+            if ((this->getVariableParams()
+                    ->getCommoditySDMultipliers()(commSD) != 0.0)) {
+                // Find the expected present value of each commodity
+                std::vector<CommodityPtr> commodities = this->economic->
+                        getCommodities();
+                std::vector<CommodityPtr> fuels = this->economic->getFuels();
+
+                for (int ii = 0; ii < commodities.size(); ii++) {
+                    commodities[ii]->computeExpPV();
+                }
+
+                for (int ii = 0; ii < fuels.size(); ii++) {
+                    fuels[ii]->computeExpPV();
+                }
+            }
+
+            Costs::computeUnitRevenue(this->me());
+        }
+        break;
+    }
 }
 
 void Optimiser::evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd

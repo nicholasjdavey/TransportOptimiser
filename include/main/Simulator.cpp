@@ -446,9 +446,11 @@ void Simulator::naturalBirthDeath(const SpeciesRoadPatchesPtr species, const
             spec->getGrowthRateSD());
 
     Eigen::VectorXd gr(pops.size());
+    double stepSize = species->getRoad()->getOptimiser()->getEconomic()->
+            getTimeStep();
 
     for (int ii = 0; ii < pops.size(); ii++) {
-        gr(ii) = growth(generator)*0.01;
+        gr(ii) = stepSize*growth(generator)*0.01;
     }
 
     gr = (gr.array()*(capacities.array() - pops.array())).array()/

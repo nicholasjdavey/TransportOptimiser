@@ -259,7 +259,7 @@ void Road::computeOperating(bool learning) {
         default:
             {
                 // The penalty here refers to the road passing through habitat
-                // areas. Therefore, the separate penalty related to the actual.
+                // areas. Therefore, the separate penalty related to the actual
                 // population number is already accounted for and is not
                 // computed here. (Only for Optimiser::SIMPLEPENALTY)
                 this->costs->setPenalty(0.0);
@@ -268,9 +268,14 @@ void Road::computeOperating(bool learning) {
                 // just treat the operating valuation as a simple annuity. if
                 // there is uncertainty, simulate the fuel and commodity prices
                 // first to get expected values of one unit of constant use
-                // over the entire horizon.
+                // over the entire horizon. We cannot perform this expected
+                // value computation a priori for ROV due to the control
+                // affecting the usage at each time step.
+
+                int commSD = optPtrShared->getScenario()->getCommoditySD();
+
                 if ((optPtrShared->getVariableParams()
-                        ->getCommoditySDMultipliers().size() == 1)) {
+                        ->getCommoditySDMultipliers()(commSD) == 0.0)) {
                     double r = optPtrShared->getEconomic()->getRRR();
                     double t = optPtrShared->getEconomic()->getYears();
                     double g = optPtrShared->getTraffic()->getGR();

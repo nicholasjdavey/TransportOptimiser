@@ -50,6 +50,32 @@ __global__ void set_random_number_from_kernels(float* _ptr, curandState*
 
 // MAIN KERNELS ///////////////////////////////////////////////////////////////
 
+// Kernel for computing a single path of an uncertain variable
+__global__ void expPVPath(const int noPaths, const float gr, const int nYears,
+        const float meanP, const float timeStep, const float rrr, float
+        current, float reversion, float jumpProb, const float* brownian, const
+        float* jumpSize, const float* jump, float* result) {
+
+    // Get the global index for the matrix
+    unsigned int idx = blockIdx.x*blockDim.x+threadIdx.x;
+
+    if (idx < noPaths) {
+        // Simulate a forward path
+        float value = 0;
+        float curr = current;
+
+        for (int ii = 0; ii < nYears; ii++) {
+            float jumped = (jump[idx+ii] < jumpProb)? 1.0f : 0.0f;
+
+            curr += reversion*(meanP - curr)*timeStep + curr*brownian[idx+ii] +
+                    exp(jumpSize[idx+ii] - 1)*curr*jumped;
+            value += pow(1 + gr,ii)*curr/pow((1 + rrr),ii);
+        }
+
+        result[idx] = value;
+    }
+}
+
 // The matrix multiplication kernel parallelises the multiplication of Eigen
 // matrices
 __global__ void matrixMultiplicationKernelNaive(const float* A, const float* B,
@@ -399,6 +425,83 @@ __global__ void rovKernel() {
 
 // WRAPPERS ///////////////////////////////////////////////////////////////////
 
+void SimulateGPU::expPV(UncertaintyPtr uncertainty) {
+    // Get device properties
+    int device = 0;
+    struct cudaDeviceProp properties;
+    cudaGetDeviceProperties(&properties, device);
+    maxMultiProcessors = properties.multiProcessorCount;
+    maxThreadsPerBlock = properties.maxThreadsPerBlock;
+
+    OptimiserPtr optimiser = uncertainty->getOptimiser();
+    EconomicPtr economic = optimiser->getEconomic();
+    unsigned int nYears = economic->getYears();
+    double timeStep = economic->getTimeStep();
+    unsigned int noPaths = optimiser->getOtherInputs()->getNoPaths();
+    double total = 0.0;
+    double gr = optimiser->getTraffic()->getGR()*economic->getTimeStep();
+
+    // Uncertain components of Brownian motion
+    float *d_brownian, *d_jumpSizes, *d_jumps, *d_results, *results;
+    curandGenerator_t gen;
+    srand(time(NULL));
+    int _seed = rand();
+
+    results = (float*)malloc(noPaths*sizeof(float));
+    cudaMalloc((void **)&d_brownian, sizeof(float)*nYears*noPaths);
+    cudaMalloc((void **)&d_jumpSizes, sizeof(float)*nYears*noPaths);
+    cudaMalloc((void **)&d_jumps, sizeof(float)*nYears*noPaths);
+    cudaMalloc((void **)&d_results, sizeof(float)*nYears*noPaths);
+
+    curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
+    curandSetPseudoRandomGeneratorSeed(gen, _seed);
+
+    curandGenerateNormal(gen, d_brownian, nYears*noPaths, 0.0f, uncertainty->
+            getNoiseSD()*timeStep);
+    curandGenerateNormal(gen, d_jumpSizes, nYears*noPaths,
+            -pow(uncertainty->getPoissonJump(),2)/2,pow(uncertainty->
+            getPoissonJump(),2));
+    curandGenerateUniform(gen, d_jumps, nYears*noPaths);
+
+    curandDestroyGenerator(gen);
+    cudaDeviceSynchronize();
+
+    // Compute path values
+    int noBlocks = (noPaths % maxThreadsPerBlock) ? (int)(
+            noPaths/maxThreadsPerBlock + 1) : (int)
+            (noPaths/maxThreadsPerBlock);
+    int noThreadsPerBlock = min(maxThreadsPerBlock,nYears*noPaths);
+
+    expPVPath<<<noBlocks,noThreadsPerBlock>>>(noPaths, gr, nYears,
+            uncertainty->getMean(), timeStep, economic->getRRR(),
+            uncertainty->getCurrent(), uncertainty->getMRStrength(),
+            uncertainty->getJumpProb(), d_brownian, d_jumpSizes, d_jumps,
+            d_results);
+
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(results,d_results,noPaths*sizeof(float),cudaMemcpyDeviceToHost);
+
+    for (int ii = 0; ii < noPaths; ii++) {
+        total += results[ii];
+    }
+
+    uncertainty->setExpPV((double)total/((double)noPaths));
+
+    total = 0.0;
+    for (int ii = 0; ii < noPaths; ii++) {
+        total += pow(results[ii] - uncertainty->getExpPV(),2);
+    }
+
+    uncertainty->setExpPVSD(sqrt(total));
+
+    cudaFree(d_brownian);
+    cudaFree(d_jumpSizes);
+    cudaFree(d_jumps);
+    cudaFree(d_results);
+    free(results);
+}
+
 void SimulateGPU::eMMN(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
         Eigen::MatrixXd& C) {
 
@@ -694,8 +797,15 @@ void SimulateGPU::buildPatches(int W, int H, int skpx, int skpy, int xres,
         int yres, int noRegions, double xspacing, double yspacing, double
         subPatchArea, HabitatTypePtr habTyp, const Eigen::MatrixXi&
         labelledImage, const Eigen::MatrixXd& populations,
-        std::vector<HabitatPatchPtr>& patches, double& initPop, int&
-        noPatches) {
+        std::vector<HabitatPatchPtr>& patches, double& initPop,
+        Eigen::VectorXd& initPops, int& noPatches) {
+
+    // Get device properties
+    int device = 0;
+    struct cudaDeviceProp properties;
+    cudaGetDeviceProperties(&properties, device);
+    maxMultiProcessors = properties.multiProcessorCount;
+    maxThreadsPerBlock = properties.maxThreadsPerBlock;
 
     Eigen::MatrixXf popsFloat = populations.cast<float>();
 
@@ -713,8 +823,8 @@ void SimulateGPU::buildPatches(int W, int H, int skpx, int skpy, int xres,
     cudaMemcpy(d_populations,popsFloat.data(),H*W*sizeof(float),
             cudaMemcpyHostToDevice);
 
-    int noBlocks = (xres*yres*noRegions % maxThreadsPerBlock)? (int)(xres*yres*
-            noRegions/maxThreadsPerBlock +1) : (int)(xres*yres*noRegions/
+    int noBlocks = ((xres*yres*noRegions) % maxThreadsPerBlock)? (int)(xres*
+            yres*noRegions/maxThreadsPerBlock + 1) : (int)(xres*yres*noRegions/
             maxThreadsPerBlock);
     int noThreadsPerBlock = min(maxThreadsPerBlock,xres*yres*noRegions);
 
@@ -743,6 +853,7 @@ void SimulateGPU::buildPatches(int W, int H, int skpx, int skpy, int xres,
             hab->setPopulation((double)results[5*ii+2]);
             hab->setCapacity((double)results[5*ii+1]);
             initPop += (double)results[5*ii];
+            initPops(noPatches) = (double)results[5*ii];
             patches[noPatches++] = hab;
         }
     }
@@ -780,8 +891,12 @@ void SimulateGPU::simulateMTECUDA(SimulatorPtr sim,
     for (int ii = 0; ii < srp.size(); ii++) {
 
         // Species parameters
-        float grm = (float)srp[ii]->getSpecies()->getGrowthRateMean();
-        float grsd = (float)srp[ii]->getSpecies()->getGrowthRateSD();
+        double stepSize = sim->getRoad()->getOptimiser()->getEconomic()->
+                getTimeStep();
+        float grm = (float)(srp[ii]->getSpecies()->getGrowthRateMean()*
+                stepSize);
+        float grsd = (float)(srp[ii]->getSpecies()->getGrowthRateSD()*
+                stepSize);
         int nPatches = capacities[ii].size();
 
         float *eps, *d_initPops, *d_eps, *d_caps, *d_mmm;
@@ -841,8 +956,8 @@ void SimulateGPU::simulateMTECUDA(SimulatorPtr sim,
         // interaction, so we run each kernel separately and do not need to use
         // the Thrust library.
         int noBlocks = (int)(noPaths % maxThreadsPerBlock)?
-                (noPaths/maxThreadsPerBlock + 1) :
-                (noPaths/maxThreadsPerBlock);
+                (int)(noPaths/maxThreadsPerBlock + 1) :
+                (int)(noPaths/maxThreadsPerBlock);
         int noThreadsPerBlock = min(noPaths,maxThreadsPerBlock);
 
         mteKernel<<<noBlocks,noThreadsPerBlock>>>
@@ -868,12 +983,14 @@ void SimulateGPU::simulateMTECUDA(SimulatorPtr sim,
     }
 }
 
-void SimulateGPU::simulateROVCUDA(SimulatorPtr sim, Optimiser::ROVType method,
-        std::vector<SpeciesRoadPatchesPtr>& srp, std::vector<Eigen::VectorXd>&
-        initPops, std::vector<Eigen::VectorXd>& capacities,
+void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
+        std::vector<SpeciesRoadPatchesPtr>& srp,
         std::vector<std::vector<Eigen::MatrixXd> > &aars,
         std::vector<Eigen::MatrixXd> &totalPops, Eigen::MatrixXd& condExp,
         Eigen::MatrixXi& optCont) {
+    // Currently there is no species interaction. This can be a future question
+    // and would be an interesting extension on how it can be implemented,
+    // what the surrogate looks like and how the patches are formed.
 
     // Get device properties
     int device = 0;
@@ -882,11 +999,196 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim, Optimiser::ROVType method,
     maxMultiProcessors = properties.multiProcessorCount;
     maxThreadsPerBlock = properties.maxThreadsPerBlock;
 
+    // Get general properties
+    OptimiserPtr optimiser = sim->getRoad()->getOptimiser();
+    ExperimentalScenarioPtr scenario = optimiser->getScenario();
+    VariableParametersPtr varParams = optimiser->getVariableParams();
+    int sc = scenario->getProgram();
+    TrafficProgramPtr program = optimiser->getPrograms()[sc];
+    std::vector<CommodityPtr> commodities = optimiser->getEconomic()->
+            getCommodities();
+    std::vector<CommodityPtr> fuels = optimiser->getEconomic()->
+            getFuels();
+
     // Get important values for computation
     int nYears = sim->getRoad()->getOptimiser()->getEconomic()->getYears();
     int noPaths = sim->getRoad()->getOptimiser()->getOtherInputs()->
             getNoPaths();
+    int noControls = program->getFlowRates().size();
+    int noUncertainties = commodities.size() + fuels.size();
+
+    double unitProfit = sim->getRoad()->getAttributes()->getUnitVarRevenue();
+    double unitCost = sim->getRoad()->getAttributes()->getUnitVarCosts();
+    double stepSize = optimiser->getEconomic()->getTimeStep();
 
     // Get the important values for the road first and convert them to formats
     // that the kernel can use
+
+    // Initialise CUDA memory /////////////////////////////////////////////////
+
+    // 1. Transition and survival matrices for each species and each control
+    float *transitions, *survival, *initPops, *capacities, *speciesParams,
+            *uncertParams, *d_transitions, *d_survival, *d_initPops,
+            *d_capacities, *d_speciesParams, *d_uncertParams;
+
+    int patches = 0;
+    int transition = 0;
+
+    for (int ii = 0; ii < srp.size(); ii++) {
+        patches += srp[ii]->getHabPatches().size();
+        transition += pow(patches,2);
+    }
+
+    initPops = (float*)malloc(patches*sizeof(float));
+    capacities = (float*)malloc(patches*sizeof(float));
+    transitions = (float*)malloc(transition*sizeof(float));
+    survival = (float*)malloc(transition*noControls*sizeof(float));
+    speciesParams = (float*)malloc(srp.size()*2*sizeof(float));
+    uncertParams = (float*)malloc(noUncertainties*6*sizeof(float));
+
+    cudaMalloc((void**)&d_initPops,patches*sizeof(float));
+    cudaMalloc((void**)&d_capacities,patches*sizeof(float));
+    cudaMalloc((void**)&d_transitions,transition*sizeof(float));
+    cudaMalloc((void**)&d_survival,transition*noControls*sizeof(float));
+    cudaMalloc((void**)&d_speciesParams,srp.size()*2*sizeof(float));
+    cudaMalloc((void**)&d_uncertParams,(noUncertainties*6*sizeof(float));
+
+    int counter1 = 0;
+    int counter2 = 0;
+    int counter3 = 0;
+
+    // Read in the information into the correct format
+    for (int ii = 0; ii < srp.size(); ii++) {
+        memcpy(initPops+counter1,srp[ii]->getInitPops().data(),
+                srp[ii]->getHabPatches().size());
+        memcpy(capacities+counter1,srp[ii]->getCapacities().data(),
+                srp[ii]->getHabPatches().size());
+
+        speciesParams[counter1] = srp[ii]->getSpecies()->getGrowthRateMean()*
+                varParams->getGrowthRatesMultipliers()(scenario->getPopGR());
+        speciesParams[counter1+1] = srp[ii]->getSpecies()->getGrowthRateSD()*
+                varParams->getGrowthRateSDMultipliers()(scenario->getPopGRSD());
+
+        counter1 += srp[ii]->getHabPatches().size();
+
+        memcpy(transitions+counter2,srp[ii]->getTransProbs().data(),
+                pow(srp[ii]->getHabPatches().size(),2));
+        counter2 += pow(srp[ii]->getHabPatches().size(),2);
+
+        for (int jj = 0; jj < noControls; jj++) {
+            memcpy(survival+counter3,srp[ii]->getSurvivalProbs()[jj].data(),
+                pow(srp[ii]->getHabPatches().size(),2));
+            counter3 += pow(srp[ii]->getHabPatches().size(),2);
+        }
+    }
+
+    for (int ii = 0; ii < fuels.size()); ii++) {
+        uncertParams[noUncertainties*ii] = fuels[ii]->getCurrent();
+        uncertParams[noUncertainties*ii+1] = fuels[ii]->getMean();
+        uncertParams[noUncertainties*ii+2] = fuels[ii]->getNoiseSD();
+        uncertParams[noUncertainties*ii+3] = fuels[ii]->getMRStrength();
+        uncertParams[noUncertainties*ii+4] = fuels[ii]->getPoissonJump();
+        uncertParams[noUncertainties*ii+5] = fuels[ii]->getJumpProb();
+    }
+
+    for (int ii = 0; ii < commodities.size()); ii++) {
+        uncertParams[fuels.size()*6 + noUncertainties*ii] =
+                commodities[ii]->getCurrent();
+        uncertParams[fuels.size()*6 + noUncertainties*ii+1] =
+                commodities[ii]->getMean();
+        uncertParams[fuels.size()*6 + noUncertainties*ii+2] =
+                commodities[ii]->getNoiseSD();
+        uncertParams[fuels.size()*6 + noUncertainties*ii+3] =
+                commodities[ii]->getMRStrength();
+        uncertParams[fuels.size()*6 + noUncertainties*ii+4] =
+                commodities[ii]->getPoissonJump();
+        uncertParams[fuels.size()*6 + noUncertainties*ii+5] =
+                commodities[ii]->getJumpProb();
+    }
+
+    // Transfer the data to the device
+    cudaMemcpy(d_initPops,initPops,patches*sizeof(float),
+            cudaMemcpyHostToDevice);
+    cudaMemcpy(d_transitions,transitions,transition*sizeof(float),
+            cudaMemcpyHostToDevice);
+    cudaMemcpy(d_survival,survival,transition*sizeof(float),
+            cudaMemcpyHostToDevice);
+    cudaMemcpy(d_speciesParams,speciesParams,srp.size()*2*sizeof(float));
+    cudaMemcpy(d_uncertParams,uncertParams,noUncertainties*6*sizeof(float));
+
+    float *d_randCont, *d_growthRate, *d_uBrownian, *d_uJumpSizes,
+            *d_uJumps, *d_uResults;
+    curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
+    curandSetPseudoRandomGeneratorSeed(gen, _seed);
+
+    // 2. Random matrices for randomised control
+    curandGenerateUniform(gen, d_randCont, nYears*noPaths);
+
+    // 3. Random matrices for growth rate parameter for species
+    curandGenerateNormal(gen, d_growthRate, nYears*noPaths*patches*srp.size(),
+            0.0f,1.0f);
+
+    // 4. Random matrices for other uncertainties
+    curandGenerateNormal(gen, d_uBrownian, nYears*noPaths*noUncertainties,0.0f,
+            1.0f);
+
+    curandGenerateNormal(gen, d_uJumpSizes, nYears*noPaths*noUncertainties,
+            0.0f,1.0f);
+
+    curandGenerateUniform(gen, d_uJumps, nYears*noPaths*noUncertainties);
+
+    // Destroy generator
+    curandDestroyGenerator(gen);
+    cudaDeviceSynchronize();
+
+    // Compute forward paths (CUDA kernel)
+    int noBlocks = (int)(noPaths % maxThreadsPerBlock) ?
+            (int)(noPaths/maxThreadsPerBlock + 1) :
+            (int)(noPaths/maxThreadsPerBlock);
+    int noThreadsPerBlock = min(noPaths,maxThreadsPerBlock);
+
+    // Choose the appropriate method
+    switch (optimiser->getROVMethod()) {
+
+        case Optimiser::ALGO1:
+        {
+        }
+        break;
+
+        case Optimiser::ALGO2:
+        {
+        }
+        break;
+
+        case Optimiser::ALGO3:
+        {
+        }
+        break;
+
+        case Optimiser::ALGO4:
+        {
+        }
+        break;
+
+        case Optimiser::ALGO5:
+        {
+        }
+        break;
+
+        case Optimiser::ALGO6:
+        {
+
+        }
+        break;
+
+        case Optimiser::ALGO7:
+        {
+        }
+        break;
+
+        default:
+        {
+        }
+        break;
+    }
 }

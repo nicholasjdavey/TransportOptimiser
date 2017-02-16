@@ -168,7 +168,7 @@ int main(int argc, char **argv) {
     commodities[0] = ore;
 
     // ECONOMIC
-    EconomicPtr economic(new Economic(commodities,fuels,7,50));
+    EconomicPtr economic(new Economic(commodities,fuels,7,50,1));
 
     // VEHICLES
     std::string smallCarName = "small";

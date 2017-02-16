@@ -26,6 +26,10 @@ Uncertainty::Uncertainty(OptimiserPtr optimiser, std::string nm, double mp,
 Uncertainty::~Uncertainty() {
 }
 
+UncertaintyPtr Uncertainty::me() {
+    return shared_from_this();
+}
+
 void Uncertainty::computeExpPV() {
     // Ornstein-Uhlenbeck process dx = N(m - x)dt + sdW
     OptimiserPtr optimiser = this->optimiser.lock();
@@ -38,17 +42,18 @@ void Uncertainty::computeExpPV() {
 
     //std::chrono::steady_clock::time_point beginTime = std::chrono::steady_clock::now();
 
-    if (true/*threader != nullptr*/) {
-        ctpl::thread_pool p(8);
-
-        std::vector< std::future<double> > results(paths);
+    if (optimiser->getGPU()) {
+        SimulateGPU::expPV(this->me());
+    } else if (threader != nullptr) {
+        // If multithreading is enabled
+        std::vector<std::future<double>> results(paths);
 
         for (unsigned long ii = 0; ii < paths; ii++)  {
             // Push onto the pool with a lambda expression
-            results[ii] = p.push([this](int) {return
+//            results[ii] = p.push([this](int) {return
+//                    this->singlePathValue();});
+            results[ii] = threader->push([this](int){return
                     this->singlePathValue();});
-            //results[ii] = threader->push([this](int){return
-            //        this->singlePathValue();});
         }
 
         for (unsigned long ii = 0; ii < paths; ii++) {
@@ -76,7 +81,8 @@ double Uncertainty::singlePathValue() {
     double curr = this->current;
     double value = 0;
     OptimiserPtr optimiser = this->optimiser.lock();
-    double gr = optimiser->getTraffic()->getGR();
+    EconomicPtr economic = this->getOptimiser()->getEconomic();
+    double gr = optimiser->getTraffic()->getGR()*economic->getTimeStep();
     // Instantiate the default C++11 Mersenne twiser pseudo random number
     // generator
 //    unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().
@@ -90,8 +96,6 @@ double Uncertainty::singlePathValue() {
     // One Binomial distribution (one draw, probaility lambda) for a jump
     // occurring at any time step
     std::binomial_distribution<int> jump(1,this->jumpProb);
-
-    EconomicPtr economic = this->getOptimiser()->getEconomic();
 
     for (int ii = 0; ii < economic->getYears(); ii++) {
         curr += this->reversion*(this->meanP - curr)*economic->getTimeStep()

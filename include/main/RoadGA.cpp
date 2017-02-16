@@ -548,6 +548,10 @@ void RoadGA::elite(const Eigen::VectorXi& parentsIdx,
 }
 
 void RoadGA::optimise(bool plot) {
+
+    // Run parent-level initial commands
+    Optimiser::optimise(plot);
+
     if (plot) {
         GnuplotPtr plotPtr(new Gnuplot);
 

@@ -27,7 +27,8 @@ public:
      * Constructs an %Economic object with assigned values
      */
     Economic(const std::vector<CommodityPtr>& commodities,
-            const std::vector<CommodityPtr>& fuels, double rr, double ny);
+            const std::vector<CommodityPtr>& fuels, double rr, double ny,
+            double ss);
 
     /**
      * Destructor

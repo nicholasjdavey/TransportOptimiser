@@ -98,6 +98,7 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
 
     this->habPatch = std::vector<HabitatPatchPtr>((pow(res,2)*habTyps.
             size()));
+    this->initPops = Eigen::VectorXd(pow(res,2)*habTyps.size());
     // Sub patch area
     double subPatchArea = xspacing(0)*yspacing(0);
 
@@ -152,7 +153,7 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
                 SimulateGPU::buildPatches(W,H,skpx,skpy,xRes,yRes,regions,
                         xspacing(0),yspacing(0),subPatchArea,habTyps[ii],
                         output,this->species->getPopulationMap(),
-                        this->habPatch,this->initPop,patches);
+                        this->habPatch,this->initPop,this->initPops,patches);
             } else {
                 // Call the serial code (very slow)
                 // Iterate through every large cell present in the overall
@@ -233,6 +234,7 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
                                 // For now do not store the indices of the
                                 // points
                                 this->habPatch[patches] = hab;
+                                this->initPops(patches) = thisPop;
                                 patches++;
                                 this->initPop += thisPop;
                                 // Find distance to road here?
@@ -245,6 +247,7 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
     }
     // Remove excess patches in container
     this->habPatch.resize(--patches);
+    this->initPops.resize(patches);
 }
 
 void SpeciesRoadPatches::generateHabitatPatchesBlob() {

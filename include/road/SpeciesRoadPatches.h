@@ -19,8 +19,7 @@ typedef std::shared_ptr<HabitatPatch> HabitatPatchPtr;
 /**
  * Class for managing %SpeciesRoadPatches objects
  */
-class SpeciesRoadPatches : public Uncertainty,
-        public std::enable_shared_from_this<SpeciesRoadPatches> {
+class SpeciesRoadPatches : public Uncertainty {
 
 public:
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
@@ -115,6 +114,23 @@ public:
      */
     void setHabPatches(const std::vector<HabitatPatchPtr>& habp) {
         this->habPatch = habp;
+    }
+
+    /**
+     * Returns the initial populations in each patch
+     *
+     * @return Initial populations as Eigen::VectorXd&
+     */
+    const Eigen::VectorXd& getInitPops() {
+        return this->initPops;
+    }
+    /**
+     * Sets the initial populations in each patch
+     *
+     * @param ip as Eigen::VectorXd&
+     */
+    void setInitPops(Eigen::VectorXd& ip) {
+        this->initPops = ip;
     }
 
     /**
@@ -270,6 +286,7 @@ private:
     double initPop;                         /**< Initial species population */
     std::weak_ptr<Road> road;               /**< Corresponding road */
     std::vector<HabitatPatchPtr> habPatch;  /**< Corresponding habitat patches */
+    Eigen::VectorXd initPops;               /**< Initial patch populations */
     Eigen::MatrixXd dists;                  /**< Distances between patches */
     Eigen::MatrixXi crossings;              /**< Number of crossings for each journey */
     Eigen::MatrixXd transProbs;             /**< Transition probabilities. Rows sum to 1 */

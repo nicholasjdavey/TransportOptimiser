@@ -20,6 +20,14 @@
 namespace SimulateGPU {
 
     /**
+     * Computes the expected present value for an uncertain parameter (e.g.
+     * a commodity) given fixed usage over time.
+     *
+     * @param uncertainty as UncertaintyPtr
+     */
+    void expPV(UncertaintyPtr uncertainty);
+
+    /**
      * Multiplication of two floating point matrices (naive)
      * @param (input) A as Eigen::MatrixXd&
      * @param (input) B as Eigen::MatrixXd&
@@ -96,8 +104,8 @@ namespace SimulateGPU {
             int noRegions, double xspacing, double yspacing, double
             subPatchArea, HabitatTypePtr habTyp, const Eigen::MatrixXi&
             labelledImage, const Eigen::MatrixXd &populations,
-            std::vector<HabitatPatchPtr>& patches, double& initPop, int&
-            noPatches);
+            std::vector<HabitatPatchPtr>& patches, double& initPop,
+            Eigen::VectorXd &initPops, int& noPatches);
 
     /**
      * Runs the simulation for the fixed traffic flow model in CUDA
@@ -118,19 +126,14 @@ namespace SimulateGPU {
      *
      * @brief simulateROVCUDA
      * @param sim as SimulatorPtr
-     * @param method as Optimiser::ROVType
      * @param srp as std::vector<SpeciesRoadPatchesPtr>&
-     * @param initPops as std::vector<Eigen::VectorXd>&
-     * @param capacities std::vector<Eigen::VectorXd>&
      * @param aars Eigen::MatrixXd&
      * @param totalPops as Eigen::MatrixXd&
      * @param condExp as Eigen::MatrixXd&
      * @param optCont as Eigen::MatrixXi&
      */
-    void simulateROVCUDA(SimulatorPtr sim, Optimiser::ROVType method,
+    void simulateROVCUDA(SimulatorPtr sim,
             std::vector<SpeciesRoadPatchesPtr>& srp,
-            std::vector<Eigen::VectorXd>& initPops,
-            std::vector<Eigen::VectorXd>& capacities,
             std::vector<std::vector<Eigen::MatrixXd>>& aars,
             std::vector<Eigen::MatrixXd>& totalPops,
             Eigen::MatrixXd& condExp, Eigen::MatrixXi& optCont);

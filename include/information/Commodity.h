@@ -16,8 +16,7 @@ typedef std::shared_ptr<CommodityCovariance> CommodityCovariancePtr;
 /**
  * Class for managing %Commodity objects (including fuels)
  */
-class Commodity : public Uncertainty, 
-        public std::enable_shared_from_this<Commodity> {
+class Commodity : public Uncertainty {
 
 public:
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////

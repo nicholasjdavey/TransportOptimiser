@@ -182,7 +182,7 @@ int main(int argc, char **argv) {
     commodities[0] = ore;
 
     // ECONOMIC
-    EconomicPtr economic(new Economic(commodities,fuels,7,50));
+    EconomicPtr economic(new Economic(commodities,fuels,7,50,1));
 
     // VEHICLES
     std::string smallCarName = "small";
@@ -217,7 +217,7 @@ int main(int argc, char **argv) {
     std::string itf = "Input Data/input_terrain_file.csv";
     std::string erf = "Input Data/existing_roads_file.csv";
     OtherInputsPtr otherInputs(new OtherInputs(idf,orf,itf,erf,0,1,0,1,1000,
-            1000,20,5000));
+            1000,20,20000));
 
     // EARTHWORK COSTS
     Eigen::VectorXd cd(6);
@@ -327,12 +327,6 @@ int main(int argc, char **argv) {
         }
     }
     initPopFile.close();
-
-    // Find the expected present value of each commodity
-    petrol->computeExpPV();
-    diesel->computeExpPV();
-    ore->computeExpPV();
-    Costs::computeUnitRevenue(roadGA);
 
     roadGA->optimise(true);
 

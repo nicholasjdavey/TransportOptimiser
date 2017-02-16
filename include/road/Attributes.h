@@ -52,8 +52,8 @@ public:
      * @param road as RoadPtr
      */
     void setRoad(RoadPtr road) {
-    this->road.reset();
-            this->road = road;
+        this->road.reset();
+        this->road = road;
     }
 
     /**
@@ -62,7 +62,7 @@ public:
      * @return IAR as Eigen::VectorXd&
      */
     Eigen::VectorXd& getIAR() {
-            return this->initAAR;
+        return this->initAAR;
     }
     /**
      * Sets the initial animals at risk
@@ -70,7 +70,7 @@ public:
      * @param iar as Eigen::VectorXd&
      */
     void setIAR(Eigen::VectorXd& iar) {
-            this->initAAR = iar;
+        this->initAAR = iar;
     }
 
     /**
@@ -79,7 +79,7 @@ public:
      * @return End population as Eigen::VectorXd&
      */
     Eigen::VectorXd& getEndPopMTE() {
-            return this->endPopMTE;
+        return this->endPopMTE;
     }
     /**
      * Sets the end population at full traffic flow
@@ -87,7 +87,7 @@ public:
      * @param endpop as Eigen::VectorXd&
      */
     void setEndPopMTE(Eigen::VectorXd& endpop) {
-            this->endPopMTE = endpop;
+        this->endPopMTE = endpop;
     }
 
     /**
@@ -130,7 +130,7 @@ public:
      * @return Unit variable costs as double
      */
     double getUnitVarCosts() {
-            return this->unitVarCosts;
+        return this->unitVarCosts;
     }
     /**
      * Sets the unit variable costs
@@ -139,7 +139,7 @@ public:
      * @note This does not include fuel, which is stochastic
      */
     void setUnitVarCosts(double uvc) {
-            this->unitVarCosts = uvc;
+        this->unitVarCosts = uvc;
     }
 
     /**
@@ -149,7 +149,7 @@ public:
      * @note Currently unused as revenue can be stochastic
      */
     double getUnitVarRevenue() {
-            return this->unitVarRevenue;
+        return this->unitVarRevenue;
     }
     /**
      * Sets the unit variable revenue
@@ -157,7 +157,7 @@ public:
      * @param uvr as double
      */
     void setUnitVarRevenue(double uvr) {
-            this->unitVarRevenue = uvr;
+        this->unitVarRevenue = uvr;
     }
 
     /**
@@ -166,7 +166,7 @@ public:
      * @return Length as double
      */
     double getLength() {
-            return this->length;
+        return this->length;
     }
     /**
      * Sets the road length
@@ -174,7 +174,7 @@ public:
      * @param len as double
      */
     void setLength(double len) {
-            this->length = len;
+        this->length = len;
     }
 
     /**
@@ -183,7 +183,7 @@ public:
      * @return ROV profit as double
      */
     double getVarProfitIC() {
-            return this->varProfitIC;
+        return this->varProfitIC;
     }
     /**
      * Sets the variable profit using ROV
@@ -191,7 +191,7 @@ public:
      * @param vpic as double
      */
     void setVarProfitIC(double vpic) {
-            this->varProfitIC = vpic;
+        this->varProfitIC = vpic;
     }
 
     /**
@@ -200,7 +200,7 @@ public:
      * @return Total value as double
      */
     double getTotalValueMean() {
-            return this->totalValueMean;
+        return this->totalValueMean;
     }
     /**
      * Sets the total value
@@ -208,7 +208,7 @@ public:
      * @param tvm as double
      */
     void setTotalValueMean(double tvm) {
-            this->totalValueMean = tvm;
+        this->totalValueMean = tvm;
     }
 
     /**
@@ -236,7 +236,7 @@ public:
      * @return Total utilisation as double
      */
     double getTotalUtilisationROV() {
-            return this->totalUtilisationROV;
+        return this->totalUtilisationROV;
     }
     /**
      * Sets the total utilisation with ROV
@@ -244,7 +244,7 @@ public:
      * @param turov as double
      */
     void setTotalUtilisationROV(double turov) {
-            this->totalUtilisationROV = turov;
+        this->totalUtilisationROV = turov;
     }
 
     /**
