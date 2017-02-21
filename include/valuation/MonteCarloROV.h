@@ -221,14 +221,16 @@ public:
     void simulateForwardPaths();
 
 private:
-        StatePtr state;                         /**< State object used in simulation */
-        PolicyMapPtr policyMap;                 /**< Generated policy map */
-        std::string randGenerator;              /**< Random number generator used */
-        std::vector<double> seedsControl;       /**< Seeds for control randomisation */
-        std::vector<double> seedsExogenous;     /**< Seeds for exogenous uncertainty */
-        std::vector<double> seedsEndogenous;    /**< Seeds for endogenous uncertainty */
-        double value;                           /**< Computed value */
-        Eigen::VectorXd values;                 /**< Values of all paths (controlled) generated */
+    StatePtr state;                         /**< State object used in simulation */
+    PolicyMapPtr policyMap;                 /**< Generated policy map */
+    std::string randGenerator;              /**< Random number generator used */
+    std::vector<double> seedsControl;       /**< Seeds for control randomisation */
+    std::vector<double> seedsExogenous;     /**< Seeds for exogenous uncertainty */
+    std::vector<double> seedsEndogenous;    /**< Seeds for endogenous uncertainty */
+    double value;                           /**< Computed value */
+    Eigen::VectorXd values;                 /**< Values of all paths (controlled) generated */
+    double paths;                           /**< Path values */
+    int controls;                           /**< Number of controls */
 };
 
 #endif

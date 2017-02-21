@@ -577,12 +577,12 @@ private:
     double tunnelWidth;             /**< Component of tunnel cost from width ($/m) */
     double tunnelDepth;             /**< Component of tunnel cost from depth ($/m) */
     double costPerSM;               /**< Cost per square meter (pavement etc.) */
-    double airPollution;            /**< Air pollution cost ($ per m per vehicle */
-    double noisePollution;          /**< Noise pollution cost ($ per m per vehicle */
-    double waterPollution;          /**< Water pollution cost ($ per m per vehicle */
-    double oilExtraction;           /**< Oil extraction etc. cost ($ per m per vehicle */
-    double landUse;                 /**< Land use cost ($ per m per vehicle */
-    double solidChemWaste;          /**< Solid and chemical waste cost ($ per m per vehicle */
+    double airPollution;            /**< Air pollution cost ($ per m per vehicle (TO REMOVE) */
+    double noisePollution;          /**< Noise pollution cost ($ per m per vehicle (TO REMOVE) */
+    double waterPollution;          /**< Water pollution cost ($ per m per vehicle (TO REMOVE) */
+    double oilExtraction;           /**< Oil extraction etc. cost ($ per m per vehicle (TO REMOVE) */
+    double landUse;                 /**< Land use cost ($ per m per vehicle (TO REMOVE) */
+    double solidChemWaste;          /**< Solid and chemical waste cost ($ per m per vehicle (TO REMOVE) */
 };
 
 #endif

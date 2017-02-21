@@ -418,6 +418,78 @@ __global__ void mteKernel(int noPaths, int nYears, int noPatches, float grm,
     }
 }
 
+// The kernel for computing forward paths in ROV. This routine does not
+// consider
+__global__ void forwardPathKernel() {
+    // Global thread index
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+    // Only perform matrix multiplication sequentially for now. Later, if so
+    // desired, we can use dynamic parallelism because the card in the
+    // machine has CUDA compute compatability 3.5
+
+    if (idx < nopaths) {
+        // Initialise the temporary population vectors
+        float *pops;
+        pops = (float*)malloc(noPatches*sizeof(float));
+        float *popsOld;
+        popsOld = (float*)malloc(noPatches*sizeof(float));
+
+        // Initialise the prevailing population vector
+        int counter = 0;
+        int counter2 = 0;
+
+        for (int ii = 0; ii < noSpecies; ii++) {
+            for (int jj = 0; jj < noPatches[ii]; jj++) {
+                popsOld[jj + counter] = initPops[jj + counter];
+                counter++;
+            }
+        }
+
+        for (int ii = 0; ii < nYears; ii++) {
+            counter = 0;
+            counter2 = 0;
+
+            for (int jj = 0; jj < noSpecies; jj++) {
+                for (int kk = 0; kk < noPatches[jj]; jj++) {
+                    for (int ll = 0; ll < noPatches[jj]; ll++) {
+                        // Movement and mortality
+                        pops[kk + counter] = popsOld[ll]*transitions[counter2
+                                + kk*noPatches[jj] + ll]*survival[counter2
+                                + kk*noPatches[jj] + ll];
+                        counter2++;
+                    }
+                    float gr = grsd[jj]*drf[idx*totalPatches*nYears +
+                            ii*totalPatches + kk] + grm[jj];
+                    popsOld[kk + counter] = pops[kk + counter]*(1.0f + gr*
+                            (caps[kk + counter] - pops[kk + counter])/
+                            caps[kk + counter]/100.0);
+                    counter++;
+                }
+            }
+        }
+
+
+        for (int ii = 0; ii < nYears; ii++) {
+            counter = 0;
+
+            // Populations
+            for (int jj = 0; jj < noSpecies; jj++) {
+                for (int kk = 0; kk < noPatches[jj]; kk++) {
+                    tempPops[] = 0;
+
+                    for (int ll = 0; ll < noPatches[jj]; ll++) {
+                        pop +=
+                    }
+                }
+            }
+
+            // Other uncertainties
+
+        }
+    }
+}
+
 // The rov kernel represents a single path for rov
 __global__ void rovKernel() {
       printf("Hello from mykernel\n");
@@ -1029,13 +1101,18 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     // 1. Transition and survival matrices for each species and each control
     float *transitions, *survival, *initPops, *capacities, *speciesParams,
             *uncertParams, *d_transitions, *d_survival, *d_initPops,
-            *d_capacities, *d_speciesParams, *d_uncertParams;
+            *d_tempPops, *d_capacities, *d_speciesParams, *d_uncertParams;
+
+    int *noPatches, *d_noPatches;
+
+    noPatches = (int*)malloc(srp.size()*sizeof(int));
 
     int patches = 0;
     int transition = 0;
 
     for (int ii = 0; ii < srp.size(); ii++) {
-        patches += srp[ii]->getHabPatches().size();
+        noPatches[ii] = srp[ii]->getHabPatches().size();
+        patches += noPatches[ii];
         transition += pow(patches,2);
     }
 
@@ -1046,6 +1123,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     speciesParams = (float*)malloc(srp.size()*2*sizeof(float));
     uncertParams = (float*)malloc(noUncertainties*6*sizeof(float));
 
+    cudaMalloc((void**)&d_noPatches,srp.size*sizeof(int));
     cudaMalloc((void**)&d_initPops,patches*sizeof(float));
     cudaMalloc((void**)&d_capacities,patches*sizeof(float));
     cudaMalloc((void**)&d_transitions,transition*sizeof(float));
@@ -1107,6 +1185,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     }
 
     // Transfer the data to the device
+    cudaMemcpy(d_noPatches,noPatches,srp.size()*sizeof(int));
     cudaMemcpy(d_initPops,initPops,patches*sizeof(float),
             cudaMemcpyHostToDevice);
     cudaMemcpy(d_transitions,transitions,transition*sizeof(float),
@@ -1141,11 +1220,21 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     curandDestroyGenerator(gen);
     cudaDeviceSynchronize();
 
+    // Finally, allocate space on the device for the path results. This is what
+    // we use in our policy map.
+    float *d_totalPops, *d_aars, *d_mcPops;
+    cudaMalloc(&d_totalPops,(nYears+1)*noPaths*sizeof(float));
+    cudaMalloc(&d_aars,(nYears+1)*noPaths*noControls*sizeof(float));
+    cudaMalloc(&d_mcPops,(nYears+1)*noPaths*patches*sizeof(float));
+
     // Compute forward paths (CUDA kernel)
     int noBlocks = (int)(noPaths % maxThreadsPerBlock) ?
             (int)(noPaths/maxThreadsPerBlock + 1) :
             (int)(noPaths/maxThreadsPerBlock);
     int noThreadsPerBlock = min(noPaths,maxThreadsPerBlock);
+
+    forwardPathKernel<<<noBlocks,noThreadsPerBlock>>>();
+    cudaDeviceSynchronize();
 
     // Choose the appropriate method
     switch (optimiser->getROVMethod()) {

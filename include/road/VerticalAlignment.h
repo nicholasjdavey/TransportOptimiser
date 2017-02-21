@@ -237,16 +237,16 @@ public:
 
 private:
     std::weak_ptr<Road> road;   /**< Road */
-    Eigen::VectorXd s;			/**< Distance of intersection points along HA */
-    Eigen::VectorXd pvc;		/**< S points of vertical curvature */
-    Eigen::VectorXd pvt;		/**< S points of vertical tangency */
-    Eigen::VectorXd epvc;		/**< Elevations of PVCs */
-    Eigen::VectorXd epvt;		/**< Elevations of PVTs */
-    Eigen::MatrixXd a;			/**< Polynomial coefficients */
-    Eigen::VectorXd v;			/**< Velocities */
-    Eigen::VectorXd Ls;			/**< Curvature lengths */
-    Eigen::VectorXd gr;			/**< Segment grades */
-    Eigen::VectorXd ssd;		/**< Stopping sight distances */
+    Eigen::VectorXd s;          /**< Distance of intersection points along HA */
+    Eigen::VectorXd pvc;	/**< S points of vertical curvature */
+    Eigen::VectorXd pvt;	/**< S points of vertical tangency */
+    Eigen::VectorXd epvc;	/**< Elevations of PVCs */
+    Eigen::VectorXd epvt;	/**< Elevations of PVTs */
+    Eigen::MatrixXd a;		/**< Polynomial coefficients */
+    Eigen::VectorXd v;		/**< Velocities */
+    Eigen::VectorXd Ls;		/**< Curvature lengths */
+    Eigen::VectorXd gr;		/**< Segment grades */
+    Eigen::VectorXd ssd;	/**< Stopping sight distances */
 
     // PRIVATE ROUTINES ///////////////////////////////////////////////////////
 };
