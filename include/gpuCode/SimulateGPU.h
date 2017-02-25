@@ -138,6 +138,25 @@ namespace SimulateGPU {
             std::vector<Eigen::MatrixXd>& totalPops,
             Eigen::MatrixXd& condExp, Eigen::MatrixXi& optCont);
 
+    /**
+     * Performs MTE simulations for all sample roads used to build the
+     * surrogate.
+     *
+     * @note This routine should be faster than simulateMTECUDA as the random
+     * variables are generated once at the beginning and used across all
+     * sample roads
+     */
+    void surrogateMTECUDA();
+
+    /**
+     * Performs ROV simulations for all sample roads used to build the
+     * surrogate.
+     *
+     * @note This routine should be faster than simulateMTECUDA as the random
+     * variables are generated once at the beginning and used across all
+     * sample roads
+     */
+    void surrogateROVCUDA();
 }
 
 #endif
