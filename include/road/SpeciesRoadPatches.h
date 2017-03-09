@@ -134,6 +134,23 @@ public:
     }
 
     /**
+     * Returns the corresponding capacities
+     *
+     * @return Capacities as Eigen::VectorXd&
+     */
+    const Eigen::VectorXd& getCapacities() {
+        return this->capacities;
+    }
+    /**
+     * Sets the capacities for each patch
+     *
+     * @param caps as Eigen::VectorXd&
+     */
+    void setCapacities(Eigen::VectorXd& caps) {
+        this->capacities = caps;
+    }
+
+    /**
      * Returns the distance from every patch to every other
      *
      * @return Distance matrix as const Eigen::MatrixXd&
@@ -287,6 +304,7 @@ private:
     std::weak_ptr<Road> road;               /**< Corresponding road */
     std::vector<HabitatPatchPtr> habPatch;  /**< Corresponding habitat patches */
     Eigen::VectorXd initPops;               /**< Initial patch populations */
+    Eigen::VectorXd capacities;             /**< Corresponding patch capacities */
     Eigen::MatrixXd dists;                  /**< Distances between patches */
     Eigen::MatrixXi crossings;              /**< Number of crossings for each journey */
     Eigen::MatrixXd transProbs;             /**< Transition probabilities. Rows sum to 1 */

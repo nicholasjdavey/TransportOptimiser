@@ -235,6 +235,7 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
                                 // points
                                 this->habPatch[patches] = hab;
                                 this->initPops(patches) = thisPop;
+                                this->capacities(patches) = hab->getCapacity();
                                 patches++;
                                 this->initPop += thisPop;
                                 // Find distance to road here?

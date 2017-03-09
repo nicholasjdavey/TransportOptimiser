@@ -347,14 +347,9 @@ void Simulator::simulateROVCR() {
 //        }
 //    }
 
-
     // We save the following information so that we can create the policy maps
-    // 1. AAR maps for each path for each control at each time step
-    // 2. Total population on each path for each time step
-    // 3. Optimal profit-to-go matrix (along each path)
-    // 4. Optimal control matrix (along each path)
 
-    // 1.
+    // 1. AAR maps for each path for each control at each time step
     std::vector<std::vector<Eigen::MatrixXd>> aars(srp.size());
 
     for (int ii = 0; ii < srp.size(); ii++) {
@@ -364,17 +359,17 @@ void Simulator::simulateROVCR() {
         }
     }
 
-    // 2.
+    // 2. Total population on each path for each time step
     std::vector<Eigen::MatrixXd> totalPops(srp.size());
 
     for (int ii = 0; ii < srp.size(); ii++) {
         totalPops[ii].resize(noPaths,nYears);
     }
 
-    // 3.
+    // 3. Optimal profit-to-go matrix (along each path)
     Eigen::MatrixXd condExp(noPaths,nYears);
 
-    // 4.
+    // 4. Optimal control matrix (along each path)
     Eigen::MatrixXi optCont(noPaths,nYears);
 
     if (varParams->getGrowthRateSDMultipliers()(scenario->getPopGRSD()) == 0) {
@@ -396,17 +391,19 @@ void Simulator::simulateROVCR() {
             // instead implement it here.
             if (gpu) {
                 // Call the external, CUDA-compiled code
-                SimulateGPU::simulateROVCUDA(this->me(),method,srp,initPops,
-                        capacities,aars,totalPops,condExp,optCont);
+                SimulateGPU::simulateROVCUDA(this->me(),srp,aars,totalPops,
+                        condExp,optCont);
 
             } else {
                 // Put multi-threaded code without the GPU here
+                // Don't bother for now
             }
 
         } else {
             // We will always use multiple threads otherwise it is too slow
 
             // For completeness, add single-threaded code here
+            // Don't bother for now
         }
     }
 }

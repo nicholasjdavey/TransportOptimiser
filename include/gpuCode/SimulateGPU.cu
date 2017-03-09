@@ -68,7 +68,7 @@ __global__ void expPVPath(const int noPaths, const float gr, const int nYears,
             float jumped = (jump[idx+ii] < jumpProb)? 1.0f : 0.0f;
 
             curr += reversion*(meanP - curr)*timeStep + curr*brownian[idx+ii] +
-                    exp(jumpSize[idx+ii] - 1)*curr*jumped;
+                    (exp(jumpSize[idx+ii]) - 1)*curr*jumped;
             value += pow(1 + gr,ii)*curr/pow((1 + rrr),ii);
         }
 
@@ -418,75 +418,145 @@ __global__ void mteKernel(int noPaths, int nYears, int noPatches, float grm,
     }
 }
 
-// The kernel for computing forward paths in ROV. This routine does not
-// consider
-__global__ void forwardPathKernel() {
+// The kernel for converting random floats to corresponding controls
+__global__ void randControls(int noPaths, int noControls, float* randCont,
+        int* control) {
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+    if (idx < noPaths) {
+        control[idx] = (int)((randCont[idx])/(float)noControls);
+    }
+}
+
+// The kernel for computing forward paths in ROV. This routine considers
+// each patch as containing a certain number of each species.
+__global__ void forwardPathKernel(int start, int noPaths, int nYears, int
+        noSpecies, int noPatches, int noControls, int noUncertainties, float
+        timeStep, float* pops, float* transitions, float* survival, float*
+        speciesParams, float* rgr, float* caps, float* aars, float*
+        uncertParams, int* controls, float* uJumps, float* uBrownian, float*
+        uJumpSizes, float* uResults) {
+
     // Global thread index
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+    // Carry over the initial value for all uncertainties
+    for (int ii = 0; ii < noUncertainties; ii++) {
+        uResults[idx*noUncertainties*nYears + ii] = uncertParams[ii*6];
+    }
 
     // Only perform matrix multiplication sequentially for now. Later, if so
     // desired, we can use dynamic parallelism because the card in the
     // machine has CUDA compute compatability 3.5
 
-    if (idx < nopaths) {
-        // Initialise the temporary population vectors
-        float *pops;
-        pops = (float*)malloc(noPatches*sizeof(float));
-        float *popsOld;
-        popsOld = (float*)malloc(noPatches*sizeof(float));
+    if (idx < noPaths) {
 
-        // Initialise the prevailing population vector
-        int counter = 0;
-        int counter2 = 0;
+        for (int ii = start; ii <= nYears; ii++) {
 
-        for (int ii = 0; ii < noSpecies; ii++) {
-            for (int jj = 0; jj < noPatches[ii]; jj++) {
-                popsOld[jj + counter] = initPops[jj + counter];
-                counter++;
-            }
-        }
-
-        for (int ii = 0; ii < nYears; ii++) {
-            counter = 0;
-            counter2 = 0;
+            // Control to pick
+            int control = controls[idx*nYears + ii];
 
             for (int jj = 0; jj < noSpecies; jj++) {
-                for (int kk = 0; kk < noPatches[jj]; jj++) {
-                    for (int ll = 0; ll < noPatches[jj]; ll++) {
-                        // Movement and mortality
-                        pops[kk + counter] = popsOld[ll]*transitions[counter2
-                                + kk*noPatches[jj] + ll]*survival[counter2
-                                + kk*noPatches[jj] + ll];
-                        counter2++;
-                    }
-                    float gr = grsd[jj]*drf[idx*totalPatches*nYears +
-                            ii*totalPatches + kk] + grm[jj];
-                    popsOld[kk + counter] = pops[kk + counter]*(1.0f + gr*
-                            (caps[kk + counter] - pops[kk + counter])/
-                            caps[kk + counter]/100.0);
-                    counter++;
+// I think this code is unnecessary
+//                // Determine the aar under each control
+//                float* tempPops;
+//                tempPops = malloc(noControls*sizeof(float));
+
+//                for (int kk = 0; kk < noControls; kk++) {
+//                    tempPop[kk] = 0;
+
+//                    for (int ll = 0; ll < noPatches; ll++) {
+//                        for (int mm = 0; mm < noPatches; mm++) {
+//                            tempPop[kk] += pops[idx*nYears*noSpecies*
+//                                    noPatches + (ii-1)*noSpecies*noPatches +
+//                                    jj*noPatches + mm]*transitions[jj*noPatches
+//                                    *noPatches + ll*noPatches + mm]*survival[
+//                                    jj*noPatches*noPatches*noControls +
+//                                    kk*noPatches*noPatches + ll*noPatches +mm];
+//                        }
+//                    }
+//                }
+
+                for (int kk = 0; kk < noControls; kk++) {
+                    aars[jj*nYears*noPaths*noControls + ii*noPaths*
+                            noControls + idx*noControls + kk] = 0;
                 }
-            }
-        }
 
+                for (int kk = 0; kk < noPatches; kk++) {
+                    for (int ll = 0; ll < noPatches; ll++) {
+                        for (int mm = 0; mm < noControls; mm++) {
+                            double value = pops[idx*nYears*noSpecies*
+                                    noPatches + (ii-1)*noSpecies*noPatches
+                                    + jj*noPatches + ll]*transitions[jj*
+                                    noPatches*noPatches + kk*noPatches +
+                                    ll]*survival[jj*noPatches*noPatches*
+                                    noControls + kk*noPatches*noPatches*
+                                    control + kk*noPatches + ll];
 
-        for (int ii = 0; ii < nYears; ii++) {
-            counter = 0;
-
-            // Populations
-            for (int jj = 0; jj < noSpecies; jj++) {
-                for (int kk = 0; kk < noPatches[jj]; kk++) {
-                    tempPops[] = 0;
-
-                    for (int ll = 0; ll < noPatches[jj]; ll++) {
-                        pop +=
+                            if (mm == control) {
+                                // Movement and mortality
+                                pops[idx*nYears*noSpecies*noPatches
+                                        + ii*noSpecies*noPatches + jj*noPatches
+                                        + kk] += value;
+                            } else {
+                                aars[jj*nYears*noPaths*noControls + ii*noPaths*
+                                        noControls + idx*noControls + mm] +=
+                                        value;
+                            }
+                        }
                     }
+                    // Population growth
+                    float gr = speciesParams[jj*3]*rgr[idx*noSpecies*noPatches*
+                            nYears + ii*noSpecies*noPatches + jj*noPatches +
+                            kk] + speciesParams[jj*3+1];
+                    pops[idx*nYears*noSpecies*noPatches +
+                            ii*noSpecies*noPatches + jj*noPatches + kk] =
+                            pops[idx*nYears*noSpecies*noPatches
+                            + ii*noSpecies*noPatches + jj*noPatches + kk]*(1.0f
+                            + gr*(caps[jj*noPatches + kk] - pops[idx*nYears*
+                            noSpecies*noPatches + ii*noSpecies*noPatches +
+                            jj*noPatches + kk])/caps[jj*noPatches + kk]/100.0);
                 }
             }
 
             // Other uncertainties
 
+            for (int jj = 0; jj < noUncertainties; jj++) {
+                float jump = (uJumps[idx*noUncertainties*nYears +
+                        ii*noUncertainties + jj] < uncertParams[jj*6 + 5]) ?
+                        1.0f : 0.0f;
+
+                float curr = uResults[idx*noUncertainties*nYears +
+                        ii*noUncertainties + jj];
+                float meanP = uncertParams[jj*6 + 1];
+                float reversion = uncertParams[jj*6 + 3];
+
+                float brownian = uBrownian[idx*noUncertainties*nYears +
+                        ii*noUncertainties + jj]*uncertParams[jj*6 + 2];
+                float jumpSize = uJumpSizes[idx*noUncertainties*nYears +
+                        ii*noUncertainties + jj]*pow(uncertParams[jj*6 + 4],2)
+                        - pow(uncertParams[jj*6 + 4],2)/2;
+
+                uResults[idx*noUncertainties*nYears+(ii+1)*noUncertainties+jj]
+                        = curr + reversion*(meanP - curr)*timeStep +
+                        curr*brownian + (exp(jumpSize) - 1)*curr*jump;
+            }
         }
+    }
+}
+
+__global__ void recompPathKernel(int start, int noPaths, int nYears, int
+        noSpecies, int noPatches, int noControls, int noUncertainties, float
+        timeStep, float* pops, float* transitions, float* survival, float*
+        speciesParams, float* rgr, float* caps, float* aars, float*
+        uncertParams, int* controls, float* uJumps, float* uBrownian, float*
+        uJumpSizes, float* uResults) {
+
+    // Global thread index
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+    if (idx < noPaths) {
+
     }
 }
 
@@ -963,7 +1033,7 @@ void SimulateGPU::simulateMTECUDA(SimulatorPtr sim,
     for (int ii = 0; ii < srp.size(); ii++) {
 
         // Species parameters
-        double stepSize = sim->getRoad()->getOptimiser()->getEconomic()->
+        float stepSize = (float)sim->getRoad()->getOptimiser()->getEconomic()->
                 getTimeStep();
         float grm = (float)(srp[ii]->getSpecies()->getGrowthRateMean()*
                 stepSize);
@@ -1123,13 +1193,15 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     speciesParams = (float*)malloc(srp.size()*2*sizeof(float));
     uncertParams = (float*)malloc(noUncertainties*6*sizeof(float));
 
-    cudaMalloc((void**)&d_noPatches,srp.size*sizeof(int));
+    cudaMalloc((void**)&d_noPatches,srp.size()*sizeof(int));
     cudaMalloc((void**)&d_initPops,patches*sizeof(float));
     cudaMalloc((void**)&d_capacities,patches*sizeof(float));
     cudaMalloc((void**)&d_transitions,transition*sizeof(float));
     cudaMalloc((void**)&d_survival,transition*noControls*sizeof(float));
-    cudaMalloc((void**)&d_speciesParams,srp.size()*2*sizeof(float));
-    cudaMalloc((void**)&d_uncertParams,(noUncertainties*6*sizeof(float));
+    cudaMalloc((void**)&d_speciesParams,srp.size()*3*sizeof(float));
+    cudaMalloc((void**)&d_uncertParams,noUncertainties*6*sizeof(float));
+    cudaMalloc((void**)&d_tempPops,noPaths*nYears*patches*srp.size()*
+            sizeof(float));
 
     int counter1 = 0;
     int counter2 = 0;
@@ -1138,16 +1210,17 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     // Read in the information into the correct format
     for (int ii = 0; ii < srp.size(); ii++) {
         memcpy(initPops+counter1,srp[ii]->getInitPops().data(),
-                srp[ii]->getHabPatches().size());
+                srp[ii]->getHabPatches().size()*sizeof(float));
         memcpy(capacities+counter1,srp[ii]->getCapacities().data(),
-                srp[ii]->getHabPatches().size());
+                srp[ii]->getHabPatches().size()*sizeof(float));
 
         speciesParams[counter1] = srp[ii]->getSpecies()->getGrowthRateMean()*
                 varParams->getGrowthRatesMultipliers()(scenario->getPopGR());
         speciesParams[counter1+1] = srp[ii]->getSpecies()->getGrowthRateSD()*
                 varParams->getGrowthRateSDMultipliers()(scenario->getPopGRSD());
+        speciesParams[counter1+2] = srp[ii]->getSpecies()->getThreshold();
 
-        counter1 += srp[ii]->getHabPatches().size();
+        counter1 += 3;
 
         memcpy(transitions+counter2,srp[ii]->getTransProbs().data(),
                 pow(srp[ii]->getHabPatches().size(),2));
@@ -1160,7 +1233,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         }
     }
 
-    for (int ii = 0; ii < fuels.size()); ii++) {
+    for (int ii = 0; ii < fuels.size(); ii++) {
         uncertParams[noUncertainties*ii] = fuels[ii]->getCurrent();
         uncertParams[noUncertainties*ii+1] = fuels[ii]->getMean();
         uncertParams[noUncertainties*ii+2] = fuels[ii]->getNoiseSD();
@@ -1169,7 +1242,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         uncertParams[noUncertainties*ii+5] = fuels[ii]->getJumpProb();
     }
 
-    for (int ii = 0; ii < commodities.size()); ii++) {
+    for (int ii = 0; ii < commodities.size(); ii++) {
         uncertParams[fuels.size()*6 + noUncertainties*ii] =
                 commodities[ii]->getCurrent();
         uncertParams[fuels.size()*6 + noUncertainties*ii+1] =
@@ -1185,23 +1258,57 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     }
 
     // Transfer the data to the device
-    cudaMemcpy(d_noPatches,noPatches,srp.size()*sizeof(int));
+    cudaMemcpy(d_noPatches,noPatches,srp.size()*sizeof(int),
+            cudaMemcpyHostToDevice);
     cudaMemcpy(d_initPops,initPops,patches*sizeof(float),
             cudaMemcpyHostToDevice);
     cudaMemcpy(d_transitions,transitions,transition*sizeof(float),
             cudaMemcpyHostToDevice);
     cudaMemcpy(d_survival,survival,transition*sizeof(float),
             cudaMemcpyHostToDevice);
-    cudaMemcpy(d_speciesParams,speciesParams,srp.size()*2*sizeof(float));
-    cudaMemcpy(d_uncertParams,uncertParams,noUncertainties*6*sizeof(float));
+    cudaMemcpy(d_speciesParams,speciesParams,srp.size()*3*sizeof(float),
+            cudaMemcpyHostToDevice);
+    cudaMemcpy(d_uncertParams,uncertParams,noUncertainties*6*sizeof(float),
+            cudaMemcpyHostToDevice);
 
     float *d_randCont, *d_growthRate, *d_uBrownian, *d_uJumpSizes,
             *d_uJumps, *d_uResults;
+    int *d_controls;
+
+    srand(time(NULL));
+    int _seed = rand();
+    curandGenerator_t gen;
     curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
     curandSetPseudoRandomGeneratorSeed(gen, _seed);
 
+    cudaMalloc((void**)&d_randCont,nYears*noPaths*sizeof(float));
+
     // 2. Random matrices for randomised control
     curandGenerateUniform(gen, d_randCont, nYears*noPaths);
+
+    cudaMalloc((void**)&d_controls,nYears*noPaths*sizeof(int));
+
+    int noBlocks = (int)(noPaths*nYears % maxThreadsPerBlock) ?
+            (int)(noPaths*nYears/maxThreadsPerBlock  + 1) :
+            (int)(noPaths*nYears/maxThreadsPerBlock);
+    int noThreadsPerBlock = min(noPaths,maxThreadsPerBlock);
+
+    randControls<<<noBlocks,noThreadsPerBlock>>>(noPaths,noControls,
+            d_randCont,d_controls);
+
+    // We no longer need the floating point random controls vector
+    cudaFree(d_randCont);
+
+    cudaMalloc((void**)&d_growthRate,nYears*noPaths*patches*srp.size()*
+            sizeof(float));
+    cudaMalloc((void**)&d_uBrownian,nYears*noPaths*noUncertainties*
+            sizeof(float));
+    cudaMalloc((void**)&d_uJumpSizes,nYears*noPaths*noUncertainties*
+            sizeof(float));
+    cudaMalloc((void**)&d_uJumps,nYears*noPaths*noUncertainties*
+            sizeof(float));
+    cudaMalloc((void**)&d_uResults,noUncertainties*nYears*noPaths*
+            sizeof(float));
 
     // 3. Random matrices for growth rate parameter for species
     curandGenerateNormal(gen, d_growthRate, nYears*noPaths*patches*srp.size(),
@@ -1224,19 +1331,23 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     // we use in our policy map.
     float *d_totalPops, *d_aars, *d_mcPops;
     cudaMalloc(&d_totalPops,(nYears+1)*noPaths*sizeof(float));
-    cudaMalloc(&d_aars,(nYears+1)*noPaths*noControls*sizeof(float));
-    cudaMalloc(&d_mcPops,(nYears+1)*noPaths*patches*sizeof(float));
+    cudaMalloc(&d_mcPops,(nYears+1)*noPaths*patches*sizeof(float));    
+    cudaMalloc((void**)&d_aars,srp.size()*(nYears+1)*noPaths*noControls*
+            sizeof(float));
 
     // Compute forward paths (CUDA kernel)
-    int noBlocks = (int)(noPaths % maxThreadsPerBlock) ?
+    noBlocks = (int)(noPaths % maxThreadsPerBlock) ?
             (int)(noPaths/maxThreadsPerBlock + 1) :
             (int)(noPaths/maxThreadsPerBlock);
-    int noThreadsPerBlock = min(noPaths,maxThreadsPerBlock);
 
-    forwardPathKernel<<<noBlocks,noThreadsPerBlock>>>();
+    forwardPathKernel<<<noBlocks,noThreadsPerBlock>>>(1,noPaths,nYears,
+            srp.size(),patches,noControls,noUncertainties,stepSize,
+            d_tempPops,d_transitions,d_survival,d_speciesParams,d_growthRate,
+            d_capacities,d_aars,d_uncertParams,d_controls,d_uJumps,d_uBrownian,
+            d_uJumpSizes,d_uResults);
     cudaDeviceSynchronize();
 
-    // Choose the appropriate method
+    // Choose the appropriate method for backwards induction
     switch (optimiser->getROVMethod()) {
 
         case Optimiser::ALGO1:
@@ -1265,13 +1376,30 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         break;
 
         case Optimiser::ALGO6:
+        // Full model with local linear kernel and forward path recomputation
         {
+            // For each backward step
+            for (int ii = nYears; ii >= 0; ii--) {
+                // Perform regression and save results
 
+                // Recompute forward paths
+
+            }
+
+            // At the final initial time step, take an average of the path
+            // values
         }
         break;
 
         case Optimiser::ALGO7:
+        // From Zhang et al. 2016
         {
+            // Compute global linear regression
+
+            // For each backward step
+            for (int ii = nYears; ii > 0; ii--) {
+
+            }
         }
         break;
 
