@@ -17,7 +17,8 @@ public:
     OtherInputs(std::string& idf, std::string& orf, std::string& itf,
             std::string& erf, double minLat, double maxLat, double minLon,
             double maxLon, unsigned long latPoints, unsigned long lonPoints,
-            unsigned long habGridRes, unsigned long noPaths);
+            unsigned long habGridRes, unsigned long noPaths, unsigned long
+            dimRes);
 
     /**
      * Destructor
@@ -230,9 +231,26 @@ public:
         this->noPaths = paths;
     }
 
-	// STATIC ROUTINES ////////////////////////////////////////////////////////
+    /**
+     * Returns the resolution of each ROV predictor used in the regressions
+     *
+     * @return Dimension resolution as unsigned long
+     */
+    unsigned long getDimRes() {
+        return this->dimRes;
+    }
+    /**
+     * Sets the resoultion of each ROV predictor used in the regressions
+     *
+     * @param dr as unsigned long
+     */
+    void setDimRes(unsigned long dr) {
+        this->dimRes = dr;
+    }
 
-	// CALCULATION ROUTINES ///////////////////////////////////////////////////
+    // STATIC ROUTINES ////////////////////////////////////////////////////////
+
+    // CALCULATION ROUTINES ///////////////////////////////////////////////////
 
 private:
     std::string inputDataFile;      /**< Absolute location of input data file */
@@ -247,6 +265,7 @@ private:
     unsigned long lonPoints;        /**< Number of longitude points for grid */
     unsigned long habGridRes;       /**< Habitat grid resolution in longest dimension */
     unsigned long noPaths;          /**< Number of simulation paths */
+    unsigned long dimRes;           /**< Resolution for each dimension in ROV regression */
 };
 
 #endif

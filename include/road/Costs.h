@@ -196,7 +196,7 @@ public:
     }
 
     /**
-     * Returns the fuel cost per unit traffic per unit fuel per vehicle class
+     * Returns the annualised fuel usage per unit traffic per hour per vehicle class
      *
      * @return Unit fuel cost as const Eigen::VectorXd&
      */
@@ -204,7 +204,7 @@ public:
         return this->unitFuelVar;
     }
     /**
-     * Sets the fuel cost per unit traffic per unit fuel per vehicle class
+     * Returns the annualised fuel usage per unit traffic per hour per vehicle class
      *
      * @param fuel as const Eigen::VectorXd&
      */
@@ -291,7 +291,7 @@ private:
     double lengthVar;			/**< Variable length costs per unit traffic */
     double location;			/**< Location-based fixed costs */
     double penaltyCost;			/**< Animal mortality penalty cost */
-    Eigen::VectorXd unitFuelVar;        /**< Fuel costs per unit traffic */
+    Eigen::VectorXd unitFuelVar;        /**< Fuel usage per unit traffic */
     static double unitRevenueVar;       /**< Haul load per unit traffic */
 };
 

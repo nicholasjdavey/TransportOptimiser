@@ -386,6 +386,8 @@ void SpeciesRoadPatches::computeTransitionProbabilities() {
     double maxDist = log(0.05)/(-(this->species->getLambdaMean() + this->
             species->getLambdaSD()*lda));
 
+    // TO DO: Ranging coefficient
+
     this->transProbs = Eigen::MatrixXd::Zero(this->habPatch.size(),
             this->habPatch.size());
 

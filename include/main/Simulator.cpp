@@ -422,6 +422,12 @@ void Simulator::simulateROVCR(std::vector<Eigen::MatrixXd>& visualisePops,
 void Simulator::naturalBirthDeath(const SpeciesRoadPatchesPtr species, const
         Eigen::VectorXd& capacities, Eigen::VectorXd& pops) {
 
+    // Get experimental scenario multipliers
+    ExperimentalScenarioPtr sc = this->road.lock()->getOptimiser()->
+            getScenario();
+    VariableParametersPtr vp = this->road.lock()->getOptimiser()->
+            getVariableParams();
+
 //    RoadPtr road = this->road.lock();
 //    OptimiserPtr optimiser = road->getOptimiser();
 //    ThreadManagerPtr threader = optimiser->getThreadManager();
@@ -439,8 +445,9 @@ void Simulator::naturalBirthDeath(const SpeciesRoadPatchesPtr species, const
 //    unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().
 //            count();
 //    std::mt19937 generator(seed1);
-    std::normal_distribution<double> growth(spec->getGrowthRateMean(),
-            spec->getGrowthRateSD());
+    std::normal_distribution<double> growth(spec->getGrowthRateMean()*vp->
+            getGrowthRatesMultipliers()(sc->getPopGR()),spec->getGrowthRateSD()
+            *vp->getGrowthRateSDMultipliers()(sc->getPopGRSD()));
 
     Eigen::VectorXd gr(pops.size());
     double stepSize = species->getRoad()->getOptimiser()->getEconomic()->

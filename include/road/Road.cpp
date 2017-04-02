@@ -123,6 +123,8 @@ void Road::evaluateRoad(bool learning) {
 void Road::computeOperating(bool learning) {
 
     OptimiserPtr optPtrShared = this->optimiser.lock();
+    ExperimentalScenarioPtr sc = this->optimiser.lock()->getScenario();
+    VariableParametersPtr vp = this->optimiser.lock()->getVariableParams();
 
     switch (optPtrShared->getType()) {
 
@@ -203,7 +205,8 @@ void Road::computeOperating(bool learning) {
                                 this->optimiser.lock()->
                                 getConfidenceInterval()));
                         double threshold = this->optimiser.lock()->
-                                getSpecies()[ii]->getThreshold();
+                                getSpecies()[ii]->getThreshold()*vp->
+                                getPopulationLevels()(sc->getPopLevel());
                         double perAnimalPenalty = (this->optimiser.lock())->
                                 getSpecies()[ii]->getCostPerAnimal();
 

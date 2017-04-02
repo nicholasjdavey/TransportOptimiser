@@ -111,6 +111,7 @@ public:
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
 
 private:
+    // At this stage ore content per tonne is fixed
     std::vector<CommodityCovariancePtr> covariances;/**< Covariances with other commodities */
     double oreContent;            /**< Mean proportion of raw ore made up by this commodity */
     double oreContentSD;          /**< Standard deviation of amount in ore */

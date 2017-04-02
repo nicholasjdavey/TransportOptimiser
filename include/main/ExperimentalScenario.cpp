@@ -13,13 +13,14 @@ ExperimentalScenario::ExperimentalScenario(OptimiserPtr optimiser) {
     this->commodity = 0;
     this->commoditySD = 0;
     this->currentScenario = 0;
+    this->oreCompSD = 0;
     this->run = 0;
 }
 
 ExperimentalScenario::ExperimentalScenario(OptimiserPtr optimiser, int program,
         int popLevel, int habPref, int lambda, int rangingCoeff,
         int animalBridge, int popGR, int popGRSD, int commodity,
-        int commoditySD, int run) {
+        int commoditySD, int ore, int run) {
 
     this->optimiser = optimiser;
     this->program = program;
@@ -33,6 +34,7 @@ ExperimentalScenario::ExperimentalScenario(OptimiserPtr optimiser, int program,
     this->commodity = commodity;
     this->commoditySD = commoditySD;
     this->run = run;
+    this->oreCompSD = ore;
 }
 
 ExperimentalScenario::~ExperimentalScenario() {}
@@ -40,8 +42,6 @@ ExperimentalScenario::~ExperimentalScenario() {}
 void ExperimentalScenario::computeScenarioNumber() {
 
     OptimiserPtr optimiser = this->optimiser.lock();
-    int ps = optimiser->getVariableParams()->getPopulationLevels().
-            size();
     int hps = optimiser->getVariableParams()->getHabPref().size();
     int ls = optimiser->getVariableParams()->getLambda().size();
     int bs = optimiser->getVariableParams()->getBeta().size();
@@ -53,6 +53,8 @@ void ExperimentalScenario::computeScenarioNumber() {
             getCommodityMultipliers().size();
     int csdms = optimiser->getVariableParams()->
             getCommoditySDMultipliers().size();
+    int ocsdm = optimiser->getVariableParams()->
+            getCommodityPropSD().size();
     int abs = optimiser->getVariableParams()->getBridge().size();
 
     // Experimental scenario also needs to save the surrogate model and
@@ -67,7 +69,11 @@ void ExperimentalScenario::computeScenarioNumber() {
     int oo = this->getCommodity();
     int pp = this->getCommoditySD();
     int qq = this->getAnimalBridge();
+    int rr = this->getOreCompositionSD();
 
-    this->currentScenario = ps*ii + hps*jj + ls*kk + bs*ll + grms*mm + grsdms*nn +
-            cms*oo + csdms*pp + abs*qq;
+    this->currentScenario = ii*hps*ls*bs*grms*grsdms*cms*csdms*ocsdm*abs +
+            jj*ls*bs*grms*grsdms*cms*csdms*ocsdm*abs + kk*bs*grms*grsdms*cms*
+            csdms*ocsdm*abs + ll*grms*grsdms*cms*csdms*ocsdm*abs + mm*grsdms*
+            cms*csdms*ocsdm*abs + nn*cms*csdms*ocsdm*abs + oo*csdms*ocsdm*abs
+            + pp*ocsdm*abs + qq*abs + rr;
 }

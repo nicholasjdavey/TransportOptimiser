@@ -211,7 +211,7 @@ void Costs::computeLocationCosts() {
 }
 
 void Costs::computeLengthCosts() {
-    // All costs end up as per unit traffic volume PER YEAR
+    // All costs end up as per unit hourly traffic volume PER YEAR
     RoadPtr roadPtrShared = this->road.lock();
 
     RoadCellsPtr cells = roadPtrShared->getRoadCells();

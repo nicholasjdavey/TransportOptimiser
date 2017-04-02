@@ -203,7 +203,7 @@ int main(int argc, char **argv) {
     std::string itf = "Input Data/input_terrain_file.csv";
     std::string erf = "Input Data/existing_roads_file.csv";
     OtherInputsPtr otherInputs(new OtherInputs(idf,orf,itf,erf,0,1,0,1,1000,
-            1000,20,5000));
+            1000,20,5000,100));
 
     // EARTHWORK COSTS
     Eigen::VectorXd cd(6);
@@ -235,12 +235,14 @@ int main(int argc, char **argv) {
     c << 100;
     Eigen::VectorXd csd(3);
     csd << 1,2,3;
+    Eigen::VectorXd cpsd(3);
+    cpsd << 1,2,3;
     VariableParametersPtr varParams(new VariableParameters(popLevels,bridge,
-            hp,l,beta,pgr,pgrsd,c,csd));
+            hp,l,beta,pgr,pgrsd,c,csd,cpsd));
 
     // EXPERIMENTAL SCENARIO
     ExperimentalScenarioPtr scenario(new ExperimentalScenario(roadGA,0,0,0,0,0,
-            0,0,0,0,0,0));
+            0,0,0,0,0,0,0));
 
     scenario->setCurrentScenario(0);
 

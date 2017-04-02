@@ -26,7 +26,8 @@ public:
      */
     ExperimentalScenario(OptimiserPtr optimiser, int program, int popLevel,
             int habPrefSD, int lambdaSD, int rangingCoeffSD, int animalBridge,
-            int popGR, int popGRSD, int commodity, int commoditySD, int run);
+            int popGR, int popGRSD, int commodity, int commoditySD, int ore,
+            int run);
     /**
      * Destructor
      */
@@ -159,7 +160,7 @@ public:
      *
      * @return Population growth rate mean multiplier index as int
      */
-    int getPopGR () {
+    int getPopGR() {
         return this->popGR;
     }
     /**
@@ -176,7 +177,7 @@ public:
      *
      * @return Population growth rate SD multiplier index as int
      */
-    int getPopGRSD () {
+    int getPopGRSD() {
         return this->popGRSD;
     }
     /**
@@ -218,7 +219,7 @@ public:
      *
      * @param commodity as int
      */
-    void setCommoditySd(int commoditySD) {
+    void setCommoditySD(int commoditySD) {
         this->commoditySD = commoditySD;
     }
 
@@ -237,6 +238,23 @@ public:
      */
     void setRun(int run) {
         this->run = run;
+    }
+
+    /**
+     * Returns the index of the ore comosition uncertainty multiplier
+     *
+     * @return Ore composition standard deviation multiplier as int
+     */
+    int getOreCompositionSD() {
+        return this->oreCompSD;
+    }
+    /**
+     * Sets the index of the ore composition uncertainty multiplier
+     *
+     * @param ore as int
+     */
+    void setOreCompositionSD(int ore) {
+        this->oreCompSD = ore;
     }
 
     /**
@@ -268,7 +286,7 @@ public:
     // OPERATORS //////////////////////////////////////////////////////////////
 
 ///////////////////////////////////////////////////////////////////////////////
-private:
+private: // (0 = no uncertainty in each of the below)
     std::weak_ptr<Optimiser> optimiser; /**< Calling Optimiser */
     int run;            /**< Current run of scenario */
     int program;        /**< Index of Program used */
@@ -280,7 +298,8 @@ private:
     int popGR;          /**< Index of population growth uncertainty used */
     int popGRSD;        /**< Index of population growth rate SD used (0 = no uncertainty) */
     int commodity;      /**< Index of commodity price mean multiplier used */
-    int commoditySD;    /**< Index of commodity price uncertainty multiplier used (0 = no uncertainty) */
+    int commoditySD;    /**< Index of commodity price uncertainty multiplier used */
+    int oreCompSD;      /**< Index of ore composition standard deviation multiplier used */
     int currentScenario;/**< Index of current scenario. Used for saving results */
 };
 

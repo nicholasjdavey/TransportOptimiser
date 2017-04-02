@@ -16,12 +16,12 @@ public:
      * Constructor
      *
      * Constructs a %VariableParameters object with default values.
-	 */
+     */
     VariableParameters(const Eigen::VectorXd& popLevels, const Eigen::VectorXi
             &bridge, const Eigen::VectorXd& hp, const Eigen::VectorXd& l, const
             Eigen::VectorXd& b, const Eigen::VectorXd& pgr, const
             Eigen::VectorXd& pgrsd, const Eigen::VectorXd& c, const
-            Eigen::VectorXd& csd);
+            Eigen::VectorXd& csd, Eigen::VectorXd& cpsd);
     /**
      * Destructor
      */
@@ -207,6 +207,23 @@ public:
         this->animalBridge = bridge;
     }
 
+    /**
+     * Returns the ore composition standard deviation scaling
+     *
+     * @return Ore composition standard deviation scaling as const Eigen::VectorXd
+     */
+    const Eigen::VectorXd getCommodityPropSD() {
+        return this->commodityPropSD;
+    }
+    /**
+     * Sets the ore composition standard deviation scaling
+     *
+     * @param cpsd as Eigen::VectorXd&
+     */
+    void setCommodityPropSD(Eigen::VectorXd& cpsd) {
+        this->commodityPropSD = cpsd;
+    }
+
     // STATIC ROUTINES ///////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES //////////////////////////////////////////////////////
@@ -223,6 +240,10 @@ public:
     Eigen::VectorXd popGRSD;            /**< Population growth rate standard deviation scalings to use */
     Eigen::VectorXd commodity;          /**< Percentage of base commodity mean price to use */
     Eigen::VectorXd commoditySD;        /**< Commodity price standard deviation scaling to use */
+    // For now, commodity SD also controls the jump parameter, jump size standard deviation and
+    // mean reversion strength
+    // To be added in the future
+    Eigen::VectorXd commodityPropSD;    /**< Ore composition standard deviation scaling to use */
 };
 
 #endif
