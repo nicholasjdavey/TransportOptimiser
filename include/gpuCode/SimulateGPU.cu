@@ -662,10 +662,14 @@ __global__ void multiLocLinReg(int noPoints, int noDims, int dimRes, int nYears,
         // Fixed window width
 
         // 2. Second, build the matrices used in the calculation
-        float *A, *B;
+        // A - Input design matrix
+        // B - Input known matrix
+        // C - Output matrix of coefficients
+        float *A, *B, *C;
 
         A = (float*)malloc(pow(noDims+1,2)*sizeof(float));
         B = (float*)malloc((noDims+1)*sizeof(float));
+        C = (float*)malloc((noDims+1)*sizeof(float));
 
         // Initialise values to zero
         for (int ii = 0; ii <= noDims; ii++) {
@@ -696,13 +700,22 @@ __global__ void multiLocLinReg(int noPoints, int noDims, int dimRes, int nYears,
 
         // 3. Use cuBlas to solve the set of linear equations to determine the
         // coefficients matrix.
-        // --- CUDA solver initialization
-//        cusolverDnHandle_t solver_handle;
-//        cusolverDnCreate(&solver_handle);
-
         // --- CUBLAS initialization
         cublasHandle_t cublas_handle;
         cublasStatus_t status = cublasCreate_v2(&cublas_handle);
+
+        // a. LU Decomposition
+        // --- Creating the array of pointers needed as input/output to the
+        // batched getrf
+        float **inout_pointers = (float **)malloc(sizeof(float*));
+        inout_pointers[0] = A;
+
+        int *pivotArray;
+        int *infoArray;
+        cudaMalloc((void**)&pivotArray,(noDims+1)*sizeof(int));
+        cudaMalloc((void**)&infoArray,sizeof(int));
+        cublasSgetrfBatched(cublas_handle,noDims+1,inout_pointers,noDims,
+                pivotArray,infoArray,1);
 
         // 4. Save the coefficients to the regression matrix
 
