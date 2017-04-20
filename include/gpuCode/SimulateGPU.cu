@@ -6,6 +6,7 @@
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 #include "../transportbase.h"
+#include "knn_cublas_with_indexes"
 
 // ASSISTANT KERNELS //////////////////////////////////////////////////////////
 
@@ -51,6 +52,9 @@ __global__ void set_random_number_from_kernels(float* _ptr, curandState*
         }
     }
 }
+
+// These kernels are used for knn search
+
 
 // MAIN KERNELS ///////////////////////////////////////////////////////////////
 
@@ -435,8 +439,8 @@ __global__ void randControls(int noPaths, int noControls, float* randCont,
 // The kernel for computing forward paths in ROV. This routine considers
 // each patch as containing a certain number of each species.
 __global__ void forwardPathKernel(int start, int noPaths, int nYears, int
-        noSpecies, int noPatches, int noControls, int noFuels,
-        int noUncertainties, float timeStep, float* pops, float* transitions,
+        noSpecies, int noPatches, int noControls, int noFuels, int
+        noUncertainties, float timeStep, float* pops, float* transitions,
         float* survival, float* speciesParams, float* rgr, float* caps, float*
         aars, float* uncertParams, int* controls, float* uJumps, float*
         uBrownian, float* uJumpSizes, float* uResults, float* totalPops) {
@@ -560,24 +564,146 @@ __global__ void forwardPathKernel(int start, int noPaths, int nYears, int
     }
 }
 
-__global__ void allocateXYRegressionData(int noPaths, int noControls, int*
-        controls, int *dataPoints, float *condExp, float *xvals, float
-        *yvals) {
+__global__ void computePathStates(int noPaths, int noDims, int nYears, int
+        noControls, int year, int* controls, int noFuels, float *fuelCosts,
+        float *uResults, int noUncertainties, int *fuelIdx, int noCommodities,
+        float* aars, float* totalPops, float* xin) {
+
+    // Global thread index
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+    if (idx < noPaths) {
+        // 1. Adjusted population for each species
+        for (int ii = 0; ii < noDims-1; ii++) {
+            xin[idx*noPaths + ii] = totalPops[year*(noDims-1)*noPaths + idx*
+                    (noDims-1) + ii]*aars[ii*nYears*noPaths*noControls + idx*
+                    noControls + controls[year*noPaths + idx]];
+        }
+
+        // 2. Unit profit
+        float unitFuel = 0.0;
+        float orePrice = 0.0;
+
+        // Compute the unit fuel cost component
+        for (int ii = 0; ii < noFuels; ii++) {
+            unitFuel += fuelCosts[ii]*uResults[idx*nYears*
+                    noUncertainties + (year+1)*noUncertainties +
+                    fuelIdx[ii]];
+        }
+        // Compute the unit revenue from ore
+        for (int ii = 0; ii < noCommodities; ii++) {
+            orePrice += uComposition[idx*nYears*noCommodities + (year+1)*
+                    noCommodities + ii]*uResults[idx*nYears*noUncertainties +
+                    (start+1)*noUncertainties + noFuels + ii];
+        }
+
+        xin[idx*noPaths + noDims] = unitCost + unitFuel - unitRevenue*orePrice;
+    }
+}
+
+__global__ void allocateXYRegressionData(int noPaths, int noControls, int
+        noDims, int year, int* controls, float* xin, float *condExp, int
+        *dataPoints, float *xvals, float *yvals) {
 
     for (int ii = 0; ii < noControls; ii++) {
         dataPoints[ii] = 0;
     }
 
+    // For each path
     for (int ii = 0; ii < noPaths; ii++) {
+        yvals[noPaths + controls[ii]*dataPoints[controls[ii]]] = condExp[
+                year*noPaths* + ii];
+
+        // Save the input dimension values to the corresponding data group
+        for (int jj = 0; jj < noDims; jj++) {
+            xvals[dataPoints[controls[ii]]*(noControls*noDims) + controls[ii]*
+                    noDims + jj] = xin[ii*noDims + jj];
+        }
+
+        // Increment the number of data points for this control
+        dataPoints[controls[ii]]++;
+    }
+}
+
+__global__ void computeStateMinMax(int noControls, int noDims, int noPaths,
+        float* dataPoints, float* xvals, float* xmins, float* xmaxes) {
+
+    for (int ii = 0; ii < noControls, ii++) {
+        float *xmin, *xmax;
+        xmin = (float*)malloc(noDims*sizeof(float));
+        xmax = (float*)malloc(noDims*sizeof(float));
+
+        for (int jj = 0; jj < noDims; jj++) {
+            xmin[jj] = xvals[ii*noDims + jj];
+            xmax[jj] = xmin;
+        }
+
+        for (int jj = 0; jj < dataPoints[ii], jj++) {
+            for (int kk = 0; kk < noDims; kk ++) {
+                float xtemp = xvals[ii*noDims + kk + jj*noControls*noDims];
+                if (xmin[jj] > xtemp) {
+                    xmin[jj] = xtemp;
+                } else if (xmax[jj] < xtemp) {
+                    xmax[jj] = xtemp;
+                }
+            }
+        }
+
+        for (int jj = 0; jj < noDims; jj++) {
+            xmins[ii*noDims + jj] = xmin[jj];
+            xmaxes[ii*noDims + jj] = xmax[jj];
+        }
+
+        free(xmin);
+        free(xmax);
+    }
+}
+
+__global__ void createQueryPoints(int noPoints, int noDims, int dimRes, int
+        control, float* xmins, float* xmaxes, float* d_regression, float*
+        queryPts) {
+
+    // Global thread index
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+    if (idx < noPoints) {
+
+        // First, deconstruct the index into the index along each dimension
+        int *dimIdx;
+        dimIdx = (int*)malloc(noDims*sizeof(int));
+
+        int rem = idx;
+
+        for (int ii = 0; ii < noDims; ii++) {
+            int div = (int)(rem/pow(dimRes,noDims-ii-1));
+            dimIdx[noDims - ii - 1] = div;
+            rem = rem - div*pow(dimRes,noDims-ii-1);
+        }
+
+        // Get the query point coordinates
+        for (int ii = 0; ii < noDims; ii++) {
+            queryPts[idx*noDims + ii] = ((float)dimIdx[ii]+0.5)*(xmaxes[control
+                    *noDims + ii] - xmins[control*noDims + ii])/(float)dimRes +
+                    xmins[control*noDims + ii];
+
+            // Save the X value for the query point
+            d_regression[year*noControls*(dimRes*noDims + (int)pow(dimRes,
+                    noDims)*2) + control*(dimRes*noDims + (int)pow(dimRes,
+                    noDims)*2) + ii*dimRes + dimIdx[ii]] = xQ[ii];
+        }
+
+        free(dimIdx);
     }
 }
 
 __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
         noSpecies, int noPatches, int noControls, int noUncertainties, float
-        timeStep, float* pops, float* totalPops, float* transitions, float*
-        survival, float* speciesParams, float* rgr, float* caps, float* aars,
-        float* uncertParams, float* regression, float* uJumps, float*
-        uBrownian, float* uJumpSizes, float* uResults, int* fuelIdx) {
+        timeStep, float unitCost, float unitRevenue, float rrr, int noFuels,
+        int noCommodities, float* Q, float* fuelCosts, float* pops, float*
+        totalPops, float* transitions, float* survival, float* speciesParams,
+        float* rgr, float* caps, float* aars, float* regression, float*
+        uComposition, float* uResults, int* fuelIdx, float* condExp, int*
+        optCont, float* adjPops, float*unitProfits) {
 
     // Global thread index
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -585,6 +711,28 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
     // We do not need to recompute the exogenous uncertainties (everything
     // else other than animal populations)
     if (idx < noPaths) {
+        float* payoffs, *currPayoffs;
+        payoffs = (float*)malloc(noControls*sizeof(float));
+        currPayoffs = (float*)malloc(noControls*sizeof(float));
+        bool* valid;
+        valid = (bool*)malloc(noControls*sizeof(float));
+
+        float unitFuel = 0.0;
+        float orePrice = 0.0;
+
+        // Compute the unit fuel cost component
+        for (int ii = 0; ii < noFuels; ii++) {
+            unitFuel += fuelCosts[ii]*uResults[idx*nYears*
+                    noUncertainties + (start+1)*noUncertainties +
+                    fuelIdx[ii]];
+        }
+        // Compute the unit revenue from ore
+        for (int ii = 0; ii < noCommodities; ii++) {
+            orePrice += uComposition[idx*nYears*noCommodities + (start+1)*
+                    noCommodities + ii]*uResults[idx*nYears*noUncertainties +
+                    (start+1)*noUncertainties + noFuels + ii];
+        }
+
         if (start == nYears) {
             // At the last period we run the road if the adjusted population
             // for a particular control (pop-pop*aar_jj) is greater than the
@@ -592,16 +740,12 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
             // payoff, which we then regress onto the adjusted population to
             // determine the expected payoff at time T given a prevailing end
             // adjusted population. Everything is considered deterministic at
-            // this stage.
-            float* payoffs;
-            payoffs = (float*)malloc(noControls*sizeof(float));
-            bool* valid;
-            valid = (bool*)malloc(noControls*sizeof(float));
-
+            // this stage. Therefore, we do not need to compute this section.
             for (int ii = 0; ii < noControls; ii++) {
                 // Compute the single period financial payoff for each control
-                // for this period and the adjusted profit. If the adjusted
-                // profit is above the threshold, then the payoff is invalid.
+                // for this period and the adjusted profit. If any adjusted
+                // population is below the threshold, then the payoff is
+                // invalid.
                 valid[ii] = true;
                 for (int jj = 0; jj < noSpecies; jj++) {
                     float adjPop = totalPops[start*noSpecies*noPaths + idx*
@@ -609,19 +753,218 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                             + idx*noControls + ii];
 
                     if (adjPop < speciesParams[noSpecies*jj + 2]) {
-                        valid = false;
+                        valid[ii] = false;
                         break;
                     }
                 }
 
-                // Compute the payoff for the control if valid
-                if (valid) {
-
+                // Compute the payoff for the control if valid.
+                if (valid[ii]) {
+                    // Now compute the overall period profit for this control
+                    // given the prevailing stochastic factors (undiscounted).
+                    payoffs[ii] = Q[ii]*(unitCost + unitFuel - unitRevenue*
+                            orePrice);
+                } else {
+                    payoffs[ii] = NAN;
                 }
             }
-        } else {
 
+            // Save the optimal control, conditional expectation and state to
+            // the policy map variables
+
+            // The optimal value is the one with the lowest net present cost.
+            // As the zero flow rate option is always available, we can
+            // initially set the optimal control to this before checking the
+            // other controls.
+            condExp[idx+(nYears+1*noPaths)] = payoffs[0];
+            optCont[idx+(nYears+1)*noPaths] = 0;
+
+            for (int ii = 1; ii < noControls; ii++) {
+                if (isfinite(payoffs[ii])) {
+                    if (payoffs[ii] < condExp[idx+(nYears+1*noPaths)]) {
+                        condExp[idx+(nYears+1*noPaths)] = payoffs[ii];
+                        optCont[idx+(nYears+1)*noPaths] = ii;
+                    }
+                }
+            }
+
+            // The states are the adjusted populations per unit traffic for
+            // each species and the current period unit profit. We use the
+            // aar of the very last control to compute this.
+            for (int ii = 0; ii < noSpecies; ii++) {
+                adjPops[ii*noPaths+idx] = totalPops[start*noSpecies*noPaths
+                        + idx*noSpecies + ii]*aars[ii*nYears*noPaths*noControls
+                        + (idx+1)*noControls - 1]/Q[noControls - 1];
+            }
+
+            // The previailing unit profit
+            unitProfits[start*noPaths + idx] = unitCost + unitFuel -
+                    unitRevenue*orePrice;
+
+        } else {
+            // For all other time periods, we need to recompute the forward
+            // paths and add the present values of the expected payoffs to the
+            // current period payoff using the regression functions that were
+            // computed outside of this kernel.
+
+            // As the original points were developed with linear regression,
+            // we use linear interpolation as a reasonable approximation.
+            // Furthermore, speed is an issue, so we need a faster approach
+            // than a more accurate one such as cubic spline interpolation.
+
+            // Determine the current period payoffs to select the optimal
+            // control for this period.
+            for (int ii = 0; ii < noControls; ii++) {
+                // Compute the single period financial payoff for each control
+                // for this period and the adjusted profit. If any adjusted
+                // population is below the threshold, then the payoff is
+                // invalid.
+                valid[ii] = true;
+                for (int jj = 0; jj < noSpecies; jj++) {
+                    float adjPop = totalPops[start*noSpecies*noPaths + idx*
+                            noSpecies + jj]*aars[jj*nYears*noPaths*noControls
+                            + idx*noControls + ii];
+
+                    if (adjPop < speciesParams[noSpecies*jj + 2]) {
+                        valid[ii] = false;
+                        break;
+                    }
+                }
+
+                // Compute the payoff for the control if valid using the
+                // regressions. We keep track of the overall temporary cost-to-
+                // go in order to pick the optimal control as well as the
+                // current period payoffs in order to compute the adjusted
+                // cost-to-go that accounts for endogenous uncertainty.
+                if (valid[ii]) {
+                    // Now compute the overall period profit for this control
+                    // given the prevailing stochastic factors (undiscounted).
+                    currPayoffs[ii] = Q[ii]*(unitCost + unitFuel - unitRevenue*
+                            orePrice);
+
+                    float optg;
+
+                    // Find the current state
+
+                    payoffs[ii] = currPayoffs[ii] + ;
+                } else {
+                    currPayoffs[ii] = NAN;
+                    payoffs[ii] = NAN;
+                }
+            }
+
+            // Initialise the conditional expectation for this path at this
+            // stage using the optimal control. Again, the first control of
+            // no traffic flow will have a finite payoff as it is always a
+            // valid option.
+            condExp[idx+(nYears+1*noPaths)] = payoffs[0];
+            optCont[idx+(nYears+1)*noPaths] = 0;
+
+            for (int ii = 1; ii < noControls; ii++) {
+                if (isfinite(payoffs[ii])) {
+                    if (payoffs[ii] < condExp[idx+(nYears+1*noPaths)]) {
+                        condExp[idx+(nYears+1*noPaths)] = payoffs[ii];
+                        optCont[idx+(nYears+1)*noPaths] = ii;
+                    }
+                }
+            }
+
+            // Now recompute the optimal forward path and add the discounted
+            // optimal payoff at each period to this path's conditional
+            // expectation.
+
+            for (int jj = start+1; jj <= nYears; jj++) {
+                // We must keep track of the population(s) over time as well as
+                // the optimal choice taken. This means computing the current
+                // state.
+
+                // Determine the previailing AAR for each species and the total
+                // population under each control (if valid)
+                float* tempPops;
+                tempPops = (float*)malloc(noControls*noSpecies*sizeof(float));
+
+                for (int kk = 0; kk < noControls; kk++) {
+                    valid[kk] = true;
+
+                    for (int ll = 0; ll < noSpecies; ll++) {
+                        tempPops[kk*noSpecies+ll] = 0;
+
+                        for (int mm = 0; mm < noPatches; mm++) {
+                            for (int nn = 0; nn < noPatches; nn++) {
+                                tempPops[kk*noSpecies+ll] += pops[idx*nYears*
+                                        noSpecies*noPatches + (jj-1)*noSpecies*
+                                        noPatches + ll*noPatches + nn]*
+                                        transitions[ll*noPatches*noPatches +
+                                        mm*noPatches + nn]*survival[ll*
+                                        noPatches*noPatches*noControls + kk*
+                                        noPatches*noPatches + mm*noPatches +
+                                        nn];
+                            }
+                        }
+
+                        if (tempPops[kk*noSpecies+ll] < speciesParams[
+                                noSpecies*ll + 2]) {
+                            valid[ll] = false;
+                            break;
+                        }
+                    }
+                }
+
+                free(tempPops);
+
+                // We first determine the optimal control to pick based on the
+                // prevailing state. We only consider valid controls.
+                if (jj == 0) {
+                    // For the first time step, there is no regression as the
+                    // first state is deterministic. Therefore,
+                    for (int kk = 0; kk < noControls; kk++) {
+                        payoffs[kk] = 0.0;
+                    }
+                } else {
+                    for (int kk = 0; kk < noControls; kk++) {
+                        payoffs[kk] = 0.0;
+                    }
+                }
+
+                // Save the optimal control, conditional expectation and state to
+                // the policy map variables
+
+                // The optimal value is the one with the lowest net present cost.
+                // As the zero flow rate option is always available, we can
+                // initially set the optimal control to this before checking the
+                // other controls.
+                condExp[idx+(nYears+1*noPaths)] = payoffs[0];
+                optCont[idx+(nYears+1)*noPaths] = 0;
+
+                for (int ii = 1; ii < noControls; ii++) {
+                    if (isfinite(payoffs[ii])) {
+                        if (payoffs[ii] < condExp[idx+(nYears+1*noPaths)]) {
+                            condExp[idx+(nYears+1*noPaths)] = payoffs[ii];
+                            optCont[idx+(nYears+1)*noPaths] = ii;
+                        }
+                    }
+                }
+                // The states are the adjusted populations per unit traffic for
+                // each species and the current period unit profit. We use the
+                // aar of the very last control to compute this.
+                for (int ii = 0; ii < noSpecies; ii++) {
+                    adjPops[ii*noPaths+idx] = totalPops[start*noSpecies*noPaths
+                            + idx*noSpecies + ii]*aars[ii*nYears*noPaths*noControls
+                            + (idx+1)*noControls - 1]/Q[noControls - 1];
+                }
+
+                // The previailing unit profit
+                unitProfits[start*noPaths + idx] = unitCost + unitFuel -
+                        unitRevenue*orePrice;
+
+            }
         }
+        // We don't need to keep the optimal control at this stage but can
+        // easily store it later if we wish.
+
+        // Free memory
+        free(payoffs);
+        free(valid);
     }
 }
 
@@ -630,10 +973,33 @@ __global__ void multiLinReg() {
 
 }
 
+// Create cuBlas handles for each thread
+__global__ void createHandles(cublasHandle_t* handles, int noThreads) {
+
+    // Global thread index
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+    if (idx < noThreads) {
+        cublasStatus_t status = cublasCreate_v2(&handles[idx]);
+    }
+}
+
+// Destroy cuBlas handles for each thread
+__global__ void destroyHandles(cublasHandle_t* handles, int noThreads) {
+
+    // Global thread index
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+    if (idx < noThreads) {
+        cublasStatus_t status = cublasDestroy_v2(handles[idx]);
+    }
+}
+
 // Multiple local linear regression
 __global__ void multiLocLinReg(int noPoints, int noDims, int dimRes, int nYears,
-        int noControls, int year, int control, int* dataPoints, float *xvals,
-        float *yvals, float *d_regression) {
+        int noControls, int year, int control, int k, int* dataPoints, float
+        *xvals, float *yvals, float *d_regression, float* xmins, float* xmaxes,
+        float *dist, float *ind, cublasHandle_t* handles) {
 
     // Global thread index
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -651,58 +1017,60 @@ __global__ void multiLocLinReg(int noPoints, int noDims, int dimRes, int nYears,
     }
 
     if (idx < noPoints) {
+        // Get the query point coordinates
+        float *xQ;
+        xQ = (float*)malloc(noDims*sizeof(float));
 
-        // 1. First find the k nearest neighbours to the query point
-        // Epanechnikov kernel
+        for (int ii = 0; ii < noDims; ii++) {
+            xQ[ii] = ((float)dimIdx[ii]+0.5)*(xmaxes[control*noDims + ii] -
+                    xmins[control*noDims + ii])/(float)dimRes +
+                    xmins[control*noDims + ii];
+        }
 
-        // Gaussian kernel
+        // 1. First find the k nearest neighbours to the query point (already)
+        // computed prior).
 
-        // N-nearest neighbour kernel (this is slowest)
-
-        // Fixed window width
-
-        // 2. Second, build the matrices used in the calculation
+        // 2. Build the matrices used in the calculation
         // A - Input design matrix
         // B - Input known matrix
         // C - Output matrix of coefficients
-        float *A, *B, *C;
+        float *A, *B, *C, *X;
 
         A = (float*)malloc(pow(noDims+1,2)*sizeof(float));
         B = (float*)malloc((noDims+1)*sizeof(float));
-        C = (float*)malloc((noDims+1)*sizeof(float));
+        C = (float*)malloc(pow(noDims+1,2)*sizeof(float));
+        X = (float*)malloc((noDims+1)*sizeof(float));
 
-        // Initialise values to zero
         for (int ii = 0; ii <= noDims; ii++) {
+            // We will use a Gaussian kernel and normalise by the distance of
+            // the furthest point of the nearest k neighbours.
+            float h = dist[(idx+1)*k - 1];
+
+            // Initialise values to zero
             B[ii] = 0.0;
 
-            for (int kk = 0; kk < dataPoints[control]; kk++) {
-                B[ii] += yvals[ii]*(xvals[kk*noDims+ii] - d_regression[year*
-                        noControls*(dimRes*noDims + (int)pow(dimRes,noDims)*2)
-                        + control*(dimRes*noDims + (int)pow(dimRes,noDims)*2)
-                        + ii*dimRes + dimIdx[ii]]);
+            for (int kk = 0; kk < k; kk++) {
+                float d = dist[idx*k + kk];
+                float z = exp(-(d/h)*(d/h)/2)/sqrt(2*M_PI);
+
+                B[ii] += yvals[ii]*(xvals[ind[kk]*noDims+ii] - xQ[ii])*z*z;
             }
 
             for (int jj = 0; jj <= noDims; jj++) {
                 A[ii*(noDims+1)+jj] = 0;
 
                 for (int kk = 0; kk <= dataPoints[control]; kk++) {
-                    A[ii*(noDims+1)+jj] += (xvals[kk*noDims+ii] - d_regression[
-                            year*noControls*(dimRes*noDims + (int)pow(dimRes,
-                            noDims)*2) + control*(dimRes*noDims + (int)pow(
-                            dimRes,noDims)*2) + ii*dimRes + dimIdx[ii]])*(
-                            xvals[kk*noDims+jj] - d_regression[year*noControls*
-                            (dimRes*noDims + (int)pow(dimRes,noDims)*2) +
-                            control*(dimRes*noDims + (int)pow(dimRes,noDims)*2)
-                            + jj*dimRes + dimIdx[jj]]);
+                    float d = dist[idx*k + kk];
+                    float z = exp(-(d/h)*(d/h)/2)/sqrt(2*M_PI);
+
+                    A[ii*(noDims+1)+jj] += (xvals[ind[kk]*noDims+ii]-xQ[ii])*(
+                            xvals[ind[kk]*noDims+jj] - xQ[jj])*z*z;
                 }
             }
         }
 
         // 3. Use cuBlas to solve the set of linear equations to determine the
         // coefficients matrix.
-        // --- CUBLAS initialization
-        cublasHandle_t cublas_handle;
-        cublasStatus_t status = cublasCreate_v2(&cublas_handle);
 
         // a. LU Decomposition
         // --- Creating the array of pointers needed as input/output to the
@@ -712,16 +1080,60 @@ __global__ void multiLocLinReg(int noPoints, int noDims, int dimRes, int nYears,
 
         int *pivotArray;
         int *infoArray;
-        cudaMalloc((void**)&pivotArray,(noDims+1)*sizeof(int));
-        cudaMalloc((void**)&infoArray,sizeof(int));
-        cublasSgetrfBatched(cublas_handle,noDims+1,inout_pointers,noDims,
-                pivotArray,infoArray,1);
+        pivotArray = (int*)malloc((noDims+1)*sizeof(int));
+        infoArray = (int*)malloc(sizeof(int));
+        // The payoffs are always finite and should not be different for the
+        // same inputs. Therefore, we ought not to have any singular matrices.
+        cublasSgetrfBatched(handles[threadIdx.x],noDims+1,inout_pointers,
+                noDims,pivotArray,infoArray,1);
 
-        // 4. Save the coefficients to the regression matrix
+//        if (infoArray[0] != 0) {
+//            std::cout <<
+//                    "Factorization of matrix %d Failed: Matrix may be singular"
+//                    << std::endl;
+//            cudaDeviceReset();
+//            exit(EXIT_FAILURE);
+//        }
+
+        // b. Compute the inverse of A
+        // Allocate space for the inverted matrix
+        float **out_pointers = (float**)malloc(sizeof(float*));
+        out_pointers[0] = C;
+
+        cublasSgetriBatched(handles[threadIdx.x],noDims+1,(const float**)
+                inout_pointers,
+                noDims+1,pivotArray,out_pointers,noDims+1,infoArray,noDims+1);
+
+//        if (infoArray[0] != 0) {
+//            std::cout <<
+//                    "Factorization of matrix %d Failed: Matrix may be singular"
+//                    << std::endl;
+//            cudaDeviceReset();
+//            exit(EXIT_FAILURE);
+//        }
+
+        // Now multiply to get the coefficients
+        float alpha1 = 1.0f;
+        float beta1 = 0.0f;
+
+        cublasSgemv(handles[threadIdx.x],CUBLAS_OP_N,noDims+1,noDims+1,&alpha1,
+                C,noDims+1,B,noDims+1,&beta1,X,1);
+
+        // 4. Compute the y value at the x point of interest using the just-
+        //    found regression coefficients. This is simply the y intercept we
+        //    just computed and save to the regression matrix.
+        d_regression[year*noControls*(dimRes*noDims + (int)pow(dimRes,
+                noDims)*2) + control*(dimRes*noDims + (int)pow(dimRes,
+                noDims)*2) + noDims*dimRes + idx] = X[0];
 
         // Free memory
         free(A);
         free(B);
+        free(C);
+        free(xQ);
+        free(X);
+        free(pivotArray);
+        free(infoArray);
     }
     free(dimIdx);
 }
@@ -1304,12 +1716,17 @@ void SimulateGPU::simulateMTECUDA(SimulatorPtr sim,
 
 void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         std::vector<SpeciesRoadPatchesPtr>& srp,
-        std::vector<std::vector<Eigen::MatrixXd> > &aars,
-        std::vector<Eigen::MatrixXd> &totalPops, Eigen::MatrixXd& condExp,
-        Eigen::MatrixXi& optCont) {
+        std::vector<Eigen::MatrixXd> &adjPops, Eigen::MatrixXd&
+        unitProfits, std::vector<Eigen::MatrixXd> &totalPops, Eigen::MatrixXd&
+        condExp, Eigen::MatrixXi& optCont) {
     // Currently there is no species interaction. This can be a future question
     // and would be an interesting extension on how it can be implemented,
     // what the surrogate looks like and how the patches are formed.
+
+    // The predictor variables are the adjusted population and current unit
+    // profit. To determine the optimal control, we find the adjusted
+    // populations for each species for each control and check against the
+    // policy map.
 
     // Get device properties
     int device = 0;
@@ -1336,9 +1753,15 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     int noControls = program->getFlowRates().size();
     int noUncertainties = commodities.size() + fuels.size();
 
-    double unitProfit = sim->getRoad()->getAttributes()->getUnitVarRevenue();
+    // Fixed cost per unit traffic
     double unitCost = sim->getRoad()->getAttributes()->getUnitVarCosts();
-    double stepSize = optimiser->getEconomic()->getTimeStep();
+    // Fuel consumption per vehicle class per unit traffic (L)
+    Eigen::VectorXf fuelCosts = sim->getRoad()->getCosts()->getUnitFuelCost()
+            .cast<float>();
+    // Load per unit traffic
+    float unitRevenue = (float)sim->getRoad()->getCosts()->getUnitRevenue();
+    float stepSize = (float)optimiser->getEconomic()->getTimeStep();
+    float rrr = (float)optimiser->getEconomic()->getRRR();
 
     // Get the important values for the road first and convert them to formats
     // that the kernel can use
@@ -1348,7 +1771,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     // 1. Transition and survival matrices for each species and each control
     float *transitions, *survival, *initPops, *capacities, *speciesParams,
             *uncertParams, *d_transitions, *d_survival, *d_initPops,
-            *d_tempPops, *d_capacities, *d_speciesParams, *d_uncertParams;
+            *d_tempPops, *d_capacities, *d_speciesParams, *d_uncertParams,
+            *d_fuelCosts;
 
     int *noPatches, *d_noPatches;
 
@@ -1379,6 +1803,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     cudaMalloc((void**)&d_uncertParams,noUncertainties*6*sizeof(float));
     cudaMalloc((void**)&d_tempPops,noPaths*nYears*patches*srp.size()*
             sizeof(float));
+    cudaMalloc((void**)&d_fuelCosts,fuelCosts.size()*sizeof(float));
 
     int counter1 = 0;
     int counter2 = 0;
@@ -1474,11 +1899,21 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
             cudaMemcpyHostToDevice);
     cudaMemcpy(d_uncertParams,uncertParams,noUncertainties*6*sizeof(float),
             cudaMemcpyHostToDevice);
+    cudaMemcpy(d_fuelCosts,fuelCosts.data(),fuelCosts.size()*sizeof(float),
+            cudaMemcpyHostToDevice);
+
+    // Free the host memory
+    free(transitions);
+    free(survival);
+    free(initPops);
+    free(capacities);
+    free(speciesParams);
+    free(uncertParams);
 
     // Exogenous parameters (fuels, commodities)
     // Ore composition is simply Gaussian for now
     float *d_randCont, *d_growthRate, *d_uBrownian, *d_uJumpSizes,
-            *d_uJumps, *d_uResults, *d_uComposition;
+            *d_uJumps, *d_uResults, *d_uComposition, *d_flowRates;
     int *d_controls;
 
     srand(time(NULL));
@@ -1501,6 +1936,11 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
     randControls<<<noBlocks,noThreadsPerBlock>>>(noPaths,noControls,
             d_randCont,d_controls);
+    // The flow rates corresponding to the random controls
+    Eigen::MatrixXf flowRatesF = program->getFlowRates().cast<float>();
+    cudaMalloc((void**)&d_flowRates,noControls*sizeof(float));
+    cudaMemcpy(d_flowRates,flowRatesF.data(),noControls*sizeof(float),
+            cudaMemcpyHostToDevice);
 
     // We no longer need the floating point random controls vector
     cudaFree(d_randCont);
@@ -1566,6 +2006,11 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
             d_uJumps,d_uBrownian,d_uJumpSizes,d_uResults,d_totalPops);
     cudaDeviceSynchronize();
 
+    // Free device memory that is no longer needed
+    cudaFree(d_uBrownian);
+    cudaFree(d_uJumpSizes);
+    cudaFree(d_uJumps);
+
     // Determine the number of uncertainties. The uncertainties are the unit
     // payoff of the road (comprised of commodity and fuel prices, which are
     // pre-processed to determine covariances etc. and are treated as a single
@@ -1575,13 +2020,38 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
     // Prepare the floating point versions of the output
     float *d_condExp;
+    // Prepare the index of the fuel use by each vehicle class
     int *d_fuelIdx;
 
     cudaMalloc(&d_fuelIdx,fuelIdx.size()*sizeof(int));
     cudaMemcpy(d_fuelIdx,fuelIdx.data(),fuelIdx.size()*sizeof(int),
             cudaMemcpyHostToDevice);
 
-    Eigen::MatrixXf condExpF(condExp.rows(),condExp.cols());
+    // Where to copy the results back to the host in floating point ready to
+    // copy to the double precision outputs.
+    std::vector<Eigen::MatrixXf> adjPopsF(nYears+1);
+
+    for (int ii = 0; ii <= nYears; ii++) {
+        adjPopsF[ii].resize(noPaths,srp.size());
+    }
+
+    // 2. Unit profits map inputs at each time step
+    Eigen::MatrixXf unitProfitsF(nYears+1,noPaths);
+
+    float *d_unitProfits;
+    cudaMalloc((void**)&d_unitProfits,unitProfits.rows()*unitProfits.
+            cols()*sizeof(float));
+
+    // Total population on each path for each time step
+    std::vector<Eigen::MatrixXf> totalPops(srp.size());
+
+    for (int ii = 0; ii < srp.size(); ii++) {
+        totalPops[ii].resize(noPaths,nYears);
+    }
+
+    // 3. Optimal profit-to-go outputs matrix (along each path)
+    Eigen::MatrixXf condExpF(noPaths,nYears);
+
     cudaMalloc((void**)&d_condExp,condExp.rows()*condExp.cols()*sizeof(float));
 
     int* d_optCont;
@@ -1625,19 +2095,54 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         // This method is the most accurate but is very slow.
         {
             // Make the grid for regressions. One for each control for each
-            // time step mapped against the N-dimensional grid.
-            float *d_regression;
+            // time step mapped against the N-dimensional grid. We interpolate
+            // when we compute the forward paths.
+            float *d_regression, *d_adjPops;
             int dimRes = sim->getRoad()->getOptimiser()->getOtherInputs()->
                     getDimRes();
 
             cudaMalloc((void**)&d_regression,nYears*noControls*(dimRes*noDims +
                     pow(dimRes,noDims)*2)*sizeof(float));
+            cudaMalloc((void**)&d_adjPops,adjPops[0].rows()*adjPops[0].cols()*
+                    sizeof(float));
 
-            // The first backward step is simply the single period payoff for
-            // each control
+            // --- CUBLAS initialization
+            cublasHandle_t *d_handles;
+            cudaMalloc((void**)&d_handles,maxThreadsPerBlock*sizeof(
+                    cublasHandle_t));
+            createHandles<<<1,maxThreadsPerBlock>>>(d_handles,
+                    maxThreadsPerBlock);
+            cudaDeviceSynchronize();
 
-            // For each further backward step
-            for (int ii = nYears - 1; ii >= 0; ii--) {
+            // The last step is simply the valid control with the highest
+            // single period payoff
+            optimalForwardPaths<<<noBlocks,noThreadsPerBlock>>>(nYears,noPaths,
+                    nYears,srp.size(),patches,noControls,noUncertainties,
+                    stepSize,unitCost,unitRevenue,rrr,fuelCosts.size(),
+                    commodities.size(),d_flowRates,d_fuelCosts,d_tempPops,
+                    d_totalPops,d_transitions,d_survival,d_speciesParams,
+                    d_growthRate,d_capacities,d_aars,d_regression,
+                    d_uComposition,d_uResults,d_fuelIdx,d_condExp,
+                    d_optCont,d_adjPops,d_unitProfits);
+            cudaDeviceSynchronize();
+
+            // Copy the adjusted populations to the output variable. This is
+            // only provided for completeness. The algorithm does not use the
+            // results as they pertain to the very last time step.
+            cudaMemcpy(adjPopsF[nYears].data(),d_adjPops,srp.size()*noPaths*
+                    sizeof(float),cudaMemcpyDeviceToHost);
+
+            // Find the maximum and minimum x value along each path for the
+            // dependant variables. This allocates space for the input
+            // variables for the regressions.
+            float *d_xmaxes, *d_xmins;
+            cudaMalloc((void**)&d_xmaxes,noControls*noDims*sizeof(float));
+            cudaMalloc((void**)&d_xmins,noControls*noDims*sizeof(float));
+
+            // For each backward step not including the last period, we need to
+            // determine the adjusted population for each species and the unit
+            // payoffs.
+            for (int ii = nYears-1; ii >= 0; ii--) {
                 // Perform regression and save results
                 int noBlocks2 = (int)((int)pow(dimRes,noDims)*noControls %
                         maxThreadsPerBlock) ? (int)(pow(dimRes,noDims)*
@@ -1646,36 +2151,120 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 int maxThreadsPerBlock2 = min((int)pow(dimRes,noDims)*
                         noControls,maxThreadsPerBlock);
 
-                // Build the regression data for each control on the device
-                float *d_xvals, *d_yvals;
+                float *d_xin, *d_xvals, *d_yvals;
                 int* d_dataPoints;
-                cudaMalloc((void**)&d_xvals,noDims*noPaths*sizeof(float));
-                cudaMalloc((void**)&d_yvals,noPaths*sizeof(float));
+                // The data points are arranged so that the number of rows
+                // equals the number of dimensions and the number of columns
+                // equals the number of data points.
+                cudaMalloc((void**)&d_xin,noDims*noPaths*sizeof(float));
+                cudaMalloc((void**)&d_xvals,noControls*noDims*noPaths*
+                        sizeof(float));
+                cudaMalloc((void**)&d_yvals,noControls*noPaths*sizeof(float));
                 cudaMalloc((void**)&d_dataPoints,noControls*sizeof(int));
+
+                // Compute the state values
+                computePathStates<<<noBlocks,noThreadsPerBlock>>>(noPaths,
+                        nYears,noDims,noControls,ii,d_controls,fuels.size(),
+                        d_fuelCosts,d_uResults,noUncertainties,d_fuelIdx,
+                        commodities.size(),d_aars,d_totalPops,d_xin);
 
                 // This kernel does not take advantage of massive parallelism.
                 // It is simply to allow us to call data that is already on
-                // the device.
-                allocateXYRegressionData<<<1,1>>>(noPaths, noControls,
-                        d_controls, d_dataPoints, d_condExp, d_xvals, d_yvals);
+                // the device for allocating data for use in the regressions.
+                allocateXYRegressionData<<<1,1>>>(noPaths, noControls,noDims,
+                        ii,d_controls,d_xin,d_condExp, d_dataPoints,d_xvals,
+                        d_yvals);
+                cudaDeviceSynchronize();
+                cudaFree(xin);
+
+                // Get the minimum and maximum X value for each dimension for
+                // each control.
+                computeStateMinMax<<<1,1>>>(noControls,noDims,noPaths,
+                        d_dataPoints,d_xvals,d_xmins,d_xmaxes);
+
+                // Allocate the k nearest neighbours for each design point in
+                // order to do the regression stage after this. This component is
+                // the slowest component.
+                int *dataPoints;
+                dataPoints = (int*)malloc(noControls*sizeof(int));
+                cudaMemcpy(dataPoints,&d_dataPoints,noControls*sizeof(int),
+                        cudaMemcpyDeviceToHost);
 
                 for (int jj = 0; jj < noControls; jj++) {
+                    // Use 5% of the nearest points for now
+                    int k = dataPoints[jj]/5;
+
+                    // We first need to perform a k nearest neighbour search
+                    float *ref, *query, *dist, *ind;
+                    ref = (float*)malloc(dataPoints[jj]*noDims*sizeof(float));
+                    query = (float*)malloc(pow(dimRes,noDims)*noDims*
+                            sizeof(float));
+                    dist = (float*)malloc(pow(dimRes,noDims)*k*sizeof(float));
+                    ind = (int*)malloc(pow(dimRes,noDims)*k*sizeof(float));
+
+                    float *d_queryPts, *d_dist, *d_ind;
+                    cudaMalloc((void**)&d_queryPts,pow(dimRes,noDims)*noDims*
+                            sizeof(float));
+                    cudaMalloc((void**)&d_dist,pow(dimRes,noDims)*k*sizeof(
+                            float));
+                    cudaMalloc((void**)&d_ind,pow(dimRes,noDims)*k*sizeof(
+                            float));
+
+                    createQueryPoints<<<noBlocks2,maxThreadsPerBlock2>>>((int)
+                            pow(dimRes,noDims),noDims,dimRes,jj,d_xmins,
+                            d_xmaxes,d_regression,d_queryPts);
+                    cudaMemcpy(query,d_queryPts,pow(dimRes,noDims)*noDims*
+                            sizeof(float),cudaMemcpyDeviceToHost);
+                    cudaFree(d_queryPts);
+
+                    cudaMemcpy(ref,d_xvals+noPaths*dataPoints[jj],
+                            dataPoints[jj]*noDims*sizeof(float),
+                            cudaMemcpyDeviceToHost);
+
+                    // Compute the knn searches
+                    knn_cublas_with_indexes::knn(ref,dataPoints[jj],query,pow(
+                            dimRes,noDims)*noDims,noDims,k,dist,ind);
+
+                    cudaMemcpy(d_dist,dist,pow(dimRes,noDims)*k*sizeof(float),
+                            cudaMemcpyHostToDevice);
+
+                    cudaMemcpy(d_ind,ind,pow(dimRes,noDims)*k*sizeof(float),
+                            cudaMemcpyHostToDevice);
+
+                    free(ref);
+                    free(queryPts);
+                    free(dist);
+                    free(ind);
                     // Perform the regression for this control at this time
                     multiLocLinReg<<<noBlocks2,maxThreadsPerBlock2>>>((int)
                             pow(dimRes,noDims)*noControls,noDims,dimRes,nYears,
                             noControls,ii,jj,d_dataPoints,d_xvals,d_yvals,
-                            d_regression);
+                            d_regression,d_xmins,d_xmaxes,d_dist,d_ind,
+                            d_handles);
                     cudaDeviceSynchronize();
+
+                    cudaFree(d_dist);
+                    cudaFree(d_ind);
                 }
+
+                free(dataPoints);
 
                 // Recompute forward paths
                 optimalForwardPaths<<<noBlocks,noThreadsPerBlock>>>(ii,noPaths,
                         nYears,srp.size(),patches,noControls,noUncertainties,
-                        stepSize,d_tempPops,d_totalPops,d_transitions,
-                        d_survival,d_speciesParams,d_growthRate,d_capacities,
-                        d_aars,d_uncertParams,d_regression,d_uJumps,
-                        d_uBrownian,d_uJumpSizes,d_uResults,d_fuelIdx);
+                        stepSize,unitCost,unitRevenue,rrr,fuelCosts.size(),
+                        commodities.size(),d_flowRates,d_fuelCosts,d_tempPops,
+                        d_totalPops,d_transitions,d_survival,d_speciesParams,
+                        d_growthRate,d_capacities,d_aars,d_regression,
+                        d_uComposition,d_uResults,d_fuelIdx,d_condExp,
+                        d_optCont,d_adjPops,d_unitProfits);
                 cudaDeviceSynchronize();
+
+                // Copy the adjusted populations for this time step to the
+                // output variables. The conditional expectations, optimal
+                // controls and unit profits are copied later.
+                cudaMemcpy(adjPopsF[ii].data(),d_adjPops,srp.size()*noPaths*
+                        sizeof(float),cudaMemcpyDeviceToHost);
 
                 cudaFree(d_xvals);
                 cudaFree(d_yvals);
@@ -1685,8 +2274,14 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
             // At the final initial time step, take an average of the path
             // values
 
+
             // Free memory
+            destroyHandles<<<1,maxThreadsPerBlock>>>(d_handles,
+                    maxThreadsPerBlock);
             cudaFree(d_regression);
+            cudaFree(d_xmaxes);
+            cudaFree(d_xmins);
+            cudaFree(d_adjPops);
         }
         break;
 
@@ -1708,15 +2303,41 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         break;
     }
 
-    // Copy device results to host memory
+    // Copy the conditional expectations, optimal controls and unit profits for
+    // to the output variables to host memory and then to double precision
+    // to the output variables (where needed).
     cudaMemcpy(optCont.data(),d_optCont,optCont.rows()*optCont.cols()*sizeof(
             int),cudaMemcpyDeviceToHost);
+
     cudaMemcpy(condExpF.data(),d_condExp,condExp.rows()*condExp.cols()*sizeof(
             float),cudaMemcpyDeviceToHost);
     condExp = condExpF.cast<double>();
 
+    cudaMemcpy(unitProfitsF.data(),d_unitProfits,unitProfits.rows()*unitProfits
+            .cols()*sizeof(float),cudaMemcpyDeviceToHost);
+    unitProfits = unitProfitsF.cast<double>();
+
     // Free remaining device memory
+    cudaFree(d_unitProfits);
+    cudaFree(d_transitions);
+    cudaFree(d_survival);
+    cudaFree(d_initPops);
+    cudaFree(d_tempPops);
+    cudaFree(d_capacities);
+    cudaFree(d_speciesParams);
+    cudaFree(d_fuelCosts);
+    cudaFree(d_growthRate);
+    cudaFree(d_uResults);
+    cudaFree(d_uComposition);
+    cudaFree(d_flowRates);
+    cudaFree(d_controls);
+
     cudaFree(d_condExp);
     cudaFree(d_optCont);
     cudaFree(d_fuelIdx);
+
+    // Remove these here?
+    cudaFree(d_totalPops);
+    cudaFree(d_aars);
+    cudaFree(d_mcPops);
 }
