@@ -844,8 +844,12 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
 
                     float optg;
 
-                    // Find the current state
+                    // Find the current state payoff
+                    // Conditional expectation of future periods using
+                    // multilinear interpolation.
 
+
+                    // Add the current period to the overall payoff
                     payoffs[ii] = currPayoffs[ii] + ;
                 } else {
                     currPayoffs[ii] = NAN;
@@ -853,10 +857,11 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                 }
             }
 
-            // Initialise the conditional expectation for this path at this
+            // Initialise the conditional expectations for this path at this
             // stage using the optimal control. Again, the first control of
             // no traffic flow will have a finite payoff as it is always a
-            // valid option.
+            // valid option. We select the control with the lowest overall
+            // payoff.
             condExp[idx+(nYears+1*noPaths)] = payoffs[0];
             optCont[idx+(nYears+1)*noPaths] = 0;
 
@@ -2262,7 +2267,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
                 // Copy the adjusted populations for this time step to the
                 // output variables. The conditional expectations, optimal
-                // controls and unit profits are copied later.
+                // controls and unit profits are copied as well if we are
+                // producing the policy map for the optimal road.
                 cudaMemcpy(adjPopsF[ii].data(),d_adjPops,srp.size()*noPaths*
                         sizeof(float),cudaMemcpyDeviceToHost);
 
