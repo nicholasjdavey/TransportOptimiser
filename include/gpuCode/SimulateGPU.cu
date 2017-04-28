@@ -565,9 +565,9 @@ __global__ void forwardPathKernel(int start, int noPaths, int nYears, int
 }
 
 __global__ void computePathStates(int noPaths, int noDims, int nYears, int
-        noControls, int year, int* controls, int noFuels, float *fuelCosts,
-        float *uResults, int noUncertainties, int *fuelIdx, int noCommodities,
-        float* aars, float* totalPops, float* xin) {
+        noControls, int year, float unitCost, int* controls, int noFuels, float
+        *fuelCosts, float *uResults, int noUncertainties, int *fuelIdx, int
+        noCommodities, float* aars, float* totalPops, float* xin) {
 
     // Global thread index
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -660,8 +660,8 @@ __global__ void computeStateMinMax(int noControls, int noDims, int noPaths,
 }
 
 __global__ void createQueryPoints(int noPoints, int noDims, int dimRes, int
-        control, float* xmins, float* xmaxes, float* d_regression, float*
-        queryPts) {
+        control, int year, float* xmins, float* xmaxes, float* regression,
+        float* queryPts) {
 
     // Global thread index
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -687,7 +687,7 @@ __global__ void createQueryPoints(int noPoints, int noDims, int dimRes, int
                     xmins[control*noDims + ii];
 
             // Save the X value for the query point
-            d_regression[year*noControls*(dimRes*noDims + (int)pow(dimRes,
+            regression[year*noControls*(dimRes*noDims + (int)pow(dimRes,
                     noDims)*2) + control*(dimRes*noDims + (int)pow(dimRes,
                     noDims)*2) + ii*dimRes + dimIdx[ii]] = xQ[ii];
         }
@@ -699,11 +699,11 @@ __global__ void createQueryPoints(int noPoints, int noDims, int dimRes, int
 __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
         noSpecies, int noPatches, int noControls, int noUncertainties, float
         timeStep, float unitCost, float unitRevenue, float rrr, int noFuels,
-        int noCommodities, float* Q, float* fuelCosts, float* pops, float*
-        totalPops, float* transitions, float* survival, float* speciesParams,
-        float* rgr, float* caps, float* aars, float* regression, float*
-        uComposition, float* uResults, int* fuelIdx, float* condExp, int*
-        optCont, float* adjPops, float*unitProfits) {
+        int noCommodities, int dimRes, float* Q, float* fuelCosts, float* pops,
+        float* totalPops, float* transitions, float* survival, float*
+        speciesParams, float* rgr, float* caps, float* aars, float* regression,
+        float* uComposition, float* uResults, int* fuelIdx, float* condExp,
+        int* optCont, float* adjPops, float*unitProfits) {
 
     // Global thread index
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -812,6 +812,35 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
             // Furthermore, speed is an issue, so we need a faster approach
             // than a more accurate one such as cubic spline interpolation.
 
+            // Find the current state through multilinear interpolation
+            float *state;
+            state = (float*)malloc((noSpecies+1)*sizeof(float));
+
+            // We first determine the current state. This consists of the
+            // ajdusted population of each species and the current unit
+            // profit.
+            for (int ii = 0; ii <noSpecies; ii++) {
+                state[ii] = totalPops[start*noPaths + idx]*aars[start*noPaths
+                        + idx];
+            }
+            // 2. Unit profit
+            float unitFuel = 0.0;
+            float orePrice = 0.0;
+
+            // Compute the unit fuel cost component
+            for (int ii = 0; ii < noFuels; ii++) {
+                unitFuel += fuelCosts[ii]*uResults[idx*nYears*
+                        noUncertainties + (year+1)*noUncertainties +
+                        fuelIdx[ii]];
+            }
+            // Compute the unit revenue from ore
+            for (int ii = 0; ii < noCommodities; ii++) {
+                orePrice += uComposition[idx*nYears*noCommodities + (year+1)*
+                        noCommodities + ii]*uResults[idx*nYears*noUncertainties +
+                        (start+1)*noUncertainties + noFuels + ii];
+            }
+            state[noSpecies] = unitCost + unitFuel - unitRevenue*orePrice;
+
             // Determine the current period payoffs to select the optimal
             // control for this period.
             for (int ii = 0; ii < noControls; ii++) {
@@ -842,11 +871,57 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                     currPayoffs[ii] = Q[ii]*(unitCost + unitFuel - unitRevenue*
                             orePrice);
 
-                    float optg;
+                    // First find global the upper and lower bounds in each
+                    // dimension as well as the indices of the
+                    float *lower, *upper, *coeffs;
+                    int *lowerInd;
+                    lower = (float*)malloc((noSpecies+1)*sizeof(float));
+                    upper = (float*)malloc((noSpecies+1)*sizeof(float));
+                    coeffs = (float*)malloc(((int)pow(2,(noSpecies+1)))*
+                            sizeof(float));
+                    lowerInd = (int*)malloc((noSpecies+1)*sizeof(float));
 
-                    // Find the current state
+                    for (int jj = 0; jj <= noSpecies; jj++) {
+                        lower[jj] = regression[start*noControls*(dimRes*(
+                                noSpecies+1) + (int)pow(dimRes,noSpecies+1)*2)
+                                + ii*(dimRes*(noSpecies+1) + (int)pow(dimRes,
+                                (noSpecies+1))*2) + jj*dimRes];
+                        upper[jj] = regression[start*noControls*(dimRes*(
+                                noSpecies+1) + (int)pow(dimRes,noSpecies+1)*2)
+                                + ii*(dimRes*(noSpecies+1) + (int)pow(dimRes,
+                                (noSpecies+1))*2) + (jj+1)*dimRes - 1];
 
-                    payoffs[ii] = currPayoffs[ii] + ;
+                        lowerInd[jj] = (int)dimRes*(state[jj] - lower[jj])/(
+                                upper[jj] - lower[jj]);
+                    }
+
+                    // Now that we have all the index requirements, let's
+                    // interpolate.
+                    // First, assign the yvalues to the coefficients matrix
+                    float x0 = regression[start*noControls*(dimRes*(noSpecies +
+                            1) + (int)pow(dimRes,noSpecies+1)*2) + ii*(dimRes*(
+                            noSpecies+1) + (int)pow(dimRes,(noSpecies+1))*2) +
+                            jj*dimRes + lowerInd[0]];
+                    float x1 = regression[start*noControls*(dimRes*(noSpecies +
+                            1) + (int)pow(dimRes,noSpecies+1)*2) + ii*(dimRes*(
+                            noSpecies+1) + (int)pow(dimRes,(noSpecies+1))*2) +
+                            jj*dimRes + lowerInd[0] + 1];
+                    float xd = (state[0] - x0)/(x1-x0);
+
+                    for (int jj = 0; jj < (int)pow(2,(noSpecies+1)); jj++) {
+                        coeffs[jj] = regression[]
+                    }
+
+                    for (int jj = 1; jj <= noSpecies; jj++) {
+                        for (int kk = 0; kk < (int)pow(2,jj))
+                    }
+
+                    payoffs[ii] = currPayoffs[ii] + coeffs[0];
+
+                    free(lower);
+                    free(upper);
+                    free(coeffs);
+                    free(lowerInd)
                 } else {
                     currPayoffs[ii] = NAN;
                     payoffs[ii] = NAN;
@@ -1137,7 +1212,6 @@ __global__ void multiLocLinReg(int noPoints, int noDims, int dimRes, int nYears,
     }
     free(dimIdx);
 }
-
 
 // WRAPPERS ///////////////////////////////////////////////////////////////////
 
@@ -2119,10 +2193,10 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
             optimalForwardPaths<<<noBlocks,noThreadsPerBlock>>>(nYears,noPaths,
                     nYears,srp.size(),patches,noControls,noUncertainties,
                     stepSize,unitCost,unitRevenue,rrr,fuelCosts.size(),
-                    commodities.size(),d_flowRates,d_fuelCosts,d_tempPops,
-                    d_totalPops,d_transitions,d_survival,d_speciesParams,
-                    d_growthRate,d_capacities,d_aars,d_regression,
-                    d_uComposition,d_uResults,d_fuelIdx,d_condExp,
+                    commodities.size(),dimRes,d_flowRates,d_fuelCosts,
+                    d_tempPops,d_totalPops,d_transitions,d_survival,
+                    d_speciesParams,d_growthRate,d_capacities,d_aars,
+                    d_regression,d_uComposition,d_uResults,d_fuelIdx,d_condExp,
                     d_optCont,d_adjPops,d_unitProfits);
             cudaDeviceSynchronize();
 
@@ -2164,9 +2238,9 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
                 // Compute the state values
                 computePathStates<<<noBlocks,noThreadsPerBlock>>>(noPaths,
-                        nYears,noDims,noControls,ii,d_controls,fuels.size(),
-                        d_fuelCosts,d_uResults,noUncertainties,d_fuelIdx,
-                        commodities.size(),d_aars,d_totalPops,d_xin);
+                        nYears,noDims,noControls,ii,unitCost,d_controls,
+                        fuels.size(),d_fuelCosts,d_uResults,noUncertainties,
+                        d_fuelIdx,commodities.size(),d_aars,d_totalPops,d_xin);
 
                 // This kernel does not take advantage of massive parallelism.
                 // It is simply to allow us to call data that is already on
@@ -2235,7 +2309,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                     free(queryPts);
                     free(dist);
                     free(ind);
-                    // Perform the regression for this control at this time
+                    // Perform the regression for this control at this time at
+                    // each of the query points.
                     multiLocLinReg<<<noBlocks2,maxThreadsPerBlock2>>>((int)
                             pow(dimRes,noDims)*noControls,noDims,dimRes,nYears,
                             noControls,ii,jj,d_dataPoints,d_xvals,d_yvals,
@@ -2253,11 +2328,11 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 optimalForwardPaths<<<noBlocks,noThreadsPerBlock>>>(ii,noPaths,
                         nYears,srp.size(),patches,noControls,noUncertainties,
                         stepSize,unitCost,unitRevenue,rrr,fuelCosts.size(),
-                        commodities.size(),d_flowRates,d_fuelCosts,d_tempPops,
-                        d_totalPops,d_transitions,d_survival,d_speciesParams,
-                        d_growthRate,d_capacities,d_aars,d_regression,
-                        d_uComposition,d_uResults,d_fuelIdx,d_condExp,
-                        d_optCont,d_adjPops,d_unitProfits);
+                        commodities.size(),dimRes,d_flowRates,d_fuelCosts,
+                        d_tempPops,d_totalPops,d_transitions,d_survival,
+                        d_speciesParams,d_growthRate,d_capacities,d_aars,
+                        d_regression,d_uComposition,d_uResults,d_fuelIdx,
+                        d_condExp,d_optCont,d_adjPops,d_unitProfits);
                 cudaDeviceSynchronize();
 
                 // Copy the adjusted populations for this time step to the
