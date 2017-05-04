@@ -259,7 +259,7 @@ void Simulator::simulateMTE(std::vector<Eigen::MatrixXd>& visualiseResults) {
     this->simulateMTEPath(srp,initPops,capacities,visualiseResults);
 }
 
-void Simulator::simulateROVCR() {
+void Simulator::simulateROVCR(bool policyMap) {
     // For now, this method only considers a single species
 
     // SIM ROVCR (we cannot use the base Monte Carlo routine for this method)
@@ -361,13 +361,6 @@ void Simulator::simulateROVCR() {
     // 2. Unit profits map inputs at each time step
     Eigen::MatrixXd unitProfits(nYears+1,noPaths);
 
-    // Total population on each path for each time step
-    std::vector<Eigen::MatrixXd> totalPops(srp.size());
-
-    for (int ii = 0; ii < srp.size(); ii++) {
-        totalPops[ii].resize(noPaths,nYears);
-    }
-
     // 3. Optimal profit-to-go outputs matrix (along each path)
     Eigen::MatrixXd condExp(noPaths,nYears);
 
@@ -378,13 +371,12 @@ void Simulator::simulateROVCR() {
 
         // Eigen::RowVectorXd endPopulations(srp.size());
 
-        // Fill in code here
+        // Fill in code here. Don't bother for now.
 
     } else {
         // Create
         // We have to use Monte Carlo simulation
 
-        // Create a matrix to store the results
         if (threader != nullptr) {
             // If we have access to GPU-enabled computing, we exploit it
             // here and at the calling function in the GA optimiser, we
@@ -394,7 +386,7 @@ void Simulator::simulateROVCR() {
             if (gpu) {
                 // Call the external, CUDA-compiled code
                 SimulateGPU::simulateROVCUDA(this->me(),srp,adjPops,
-                        unitProfits,totalPops,condExp,optCont);
+                        unitProfits,condExp,optCont);
 
             } else {
                 // Put multi-threaded code without the GPU here
@@ -408,10 +400,62 @@ void Simulator::simulateROVCR() {
             // Don't bother for now
         }
     }
+
+    // Compute the mean of each control to determine the optimal control and
+    // operating value at time 0. We also compute the standard deviation.
+    float *mean;
+    float *noPaths;
+    mean = (float*)malloc(controls*sizeof(float));
+    noPaths = (float*)malloc(controls*sizeof(float));
+
+    for (int ii = 0; ii < controls; ii++) {
+        mean[ii] = 0;
+        noPaths[ii] = 0;
+    }
+
+    for (int ii = 0; ii < noPaths; ii++) {
+        mean[optCont[ii]] += condExp[ii];
+        noPaths[optCont[ii]] += (float)optCont[ii];
+    }
+
+    for (int ii = 0; ii < controls; ii++) {
+        mean[ii] = mean[ii]/noPaths[ii];
+    }
+
+    int firstControl = 0;
+    road->getAttributes()->setVarProfitIC(mean[0]);
+
+    for (int ii = 1; ii < controls; ii++) {
+        if (mean[ii] < road->getAttributes()->getVarProfitIC()) {
+            road->getAttributes()->setVarProfitIC(mean[ii]);
+            firstControl = ii;
+        }
+    }
+
+    // Knowing the optimal control at time zero, we can compute the standard
+    // deviation.
+    float var = 0;
+
+    for (int ii = 0; ii < noPaths; ii++) {
+        if (optCont[ii] == firstControl) {
+            var += pow(mean[firstControl] - condExp[ii],2);
+        }
+    }
+
+    road->getAttributes()->setTotalValueSD(pow(var/noPaths[firstControl]),0.5);
+
+    free(mean);
+    free(noPaths);
+
+    // If we are visualising the policy map, save this info too
+    if (policyMap) {
+        // Complete later
+    }
 }
 
 void Simulator::simulateROVCR(std::vector<Eigen::MatrixXd>& visualisePops,
         std::vector<int> &visualiseFlows) {
+    // Visualise a single path for the road for demonstration purposes
 
 }
 

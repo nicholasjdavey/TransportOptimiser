@@ -135,15 +135,12 @@ namespace SimulateGPU {
      * @param sim as SimulatorPtr
      * @param srp as std::vector<SpeciesRoadPatchesPtr>&
      * @param aars Eigen::MatrixXd&
-     * @param totalPops as Eigen::MatrixXd&
      * @param condExp as Eigen::MatrixXd&
      * @param optCont as Eigen::MatrixXi&
      */
     void simulateROVCUDA(SimulatorPtr sim,
             std::vector<SpeciesRoadPatchesPtr>& srp,
-            std::vector<Eigen::MatrixXd> &adjPops,
-            Eigen::MatrixXd &unitProfits,
-            std::vector<Eigen::MatrixXd>& totalPops,
+            std::vector<Eigen::MatrixXd> &adjPops, Eigen::MatrixXd &,
             Eigen::MatrixXd& condExp, Eigen::MatrixXi& optCont);
 
     /**

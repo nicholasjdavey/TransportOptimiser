@@ -242,17 +242,35 @@ void Road::computeOperating(bool learning) {
                     this->simulator.reset();
                     this->simulator = simulator;
                     this->simulator->simulateROVCR();
-                } else {
-                    // First compute the initial AAR under the full traffic flow
-                    // (this is an input to the surrogate)
+                    // We use this to determine the relationships between the
+                    // input variables and the expected operating values.
 
+                } else {
+                    // Surrogate model
+
+                    // First compute the initial unit AAR for each species
+                    // (this is an input to the surrogate) as well as the
+                    // current unit profit (in terms of per unit fuel cost and
+                    // other variable costs). These become inputs for the
+                    // surrogate model.
+                    this->computeSimulationPatches();
                     int noSpecies = this->optimiser.lock()->getSpecies().size();
+
                     std::vector<Eigen::VectorXd> aar(noSpecies);
 
                     for (int ii = 0; ii < noSpecies; ii++) {
                         this->srp[ii]->computeInitialAAR();
                         aar[ii] = this->srp[ii]->getInitAAR();
                     }
+                    this->attributes->setIAR(aar);
+
+                    // Compute the road value using the surrogate model
+                    float use, usesd, value, valuesd;
+                    this->optimiser.lock()->evaluateSurrogateModelROV(this->
+                            me(),value,valuesd,use,usesd);
+
+                    this->attributes->setVarProfitIC(value);
+                    this->attributes->setTotalValueSD(valuesd);
                 }
                 // There is no penalty for this road as traffic is controlled
                 // to maintain the populations above critical thresholds.

@@ -143,8 +143,10 @@ public:
     /**
      * Runs the optimally controlled traffic scenario over the entire design
      * horizon for all species encountered by the road.
+     *
+     * @param policyMap as bool (default = false)
      */
-    virtual void simulateROVCR();
+    virtual void simulateROVCR(bool policyMap = false);
 
     /**
      * Overloaded version of the preceding function for storing an entire
