@@ -20,8 +20,8 @@ int main(int argc, char **argv) {
     // We will later add the attributes to the Optimiser Object
     std::string solScheme = "GA";
 
-    RoadGAPtr roadGA(new RoadGA(0.6,0.375,500,50,1e-4,0.95,0.95,10,solScheme,5,
-            Optimiser::MTE,1.0,15,0.05,10,3,10,RoadGA::TOURNAMENT,
+    RoadGAPtr roadGA(new RoadGA(0.6,0.375,500,50,1e-4,0.95,0.95,10,20,
+            solScheme,5, Optimiser::MTE,1.0,15,0.05,10,3,10,RoadGA::TOURNAMENT,
             RoadGA::RANK,0.4,0.65,5,0.1,true,Optimiser::ALGO1));
 
     // SET THREADER
@@ -29,8 +29,8 @@ int main(int argc, char **argv) {
     roadGA->setThreadManager(threader);
 
     // Initialise the input classes
-    // REGION
-    std::string regionData = "Input Data/region.csv";
+    // REGION (not used for now)
+    std::string regionData = "Input_Data/region.csv";
     RegionPtr region(new Region(regionData,true));
 
     // Create X and Y matrices
@@ -151,8 +151,12 @@ int main(int argc, char **argv) {
 
     std::string nm = "species1";
 
-    SpeciesPtr animal(new Species(nm,false,2.52e-3,0.0928e-3,-2.52e-3,0.1014e-3,
-            1.4,0.5,0.7,0.012,2.78,1.39,1e7,true,1000,0.7,habTypes));
+    UncertaintyPtr sp1gr(new Uncertainty(roadGA,nm,0.014,0.014,0.005,0.1,0.1,0.1,
+        true));
+
+    SpeciesPtr animal(new Species(nm,false,2.52e-3,0.0928e-3,-2.52e-3,
+            0.1014e-3,sp1gr,0.5,0.7,0.012,2.78,1.39,1e7,true,1000,1,
+            habTypes));
 
     std::vector<SpeciesPtr> species(1);
     species[0] = animal;
@@ -171,13 +175,16 @@ int main(int argc, char **argv) {
     std::string petrolName = "petrol";
     std::string commodityName = "ore";
 
-    CommodityPtr diesel(new Commodity(roadGA,dieselName,1.2,0.01,0.01,true,0,0));
+    CommodityPtr diesel(new Commodity(roadGA,dieselName,1.2,1.2,0.01,0.01,0,0,true,
+            0,0));
     diesel->setCurrent(1.2);
     fuels[0] = diesel;
-    CommodityPtr petrol(new Commodity(roadGA,petrolName,1.05,0.01,0.01,true,0,0));
+    CommodityPtr petrol(new Commodity(roadGA,petrolName,1.05,1.05,0.01,0.01,0,0,
+            true,0,0));
     petrol->setCurrent(1.05);
     fuels[1] = petrol;
-    CommodityPtr ore(new Commodity(roadGA,commodityName,100,0.1,0.01,true,0.8,0.20));
+    CommodityPtr ore(new Commodity(roadGA,commodityName,100,100,0.1,0.01,0,0,true,
+            0.8,0.20));
     ore->setCurrent(120);
     commodities[0] = ore;
 
@@ -217,7 +224,7 @@ int main(int argc, char **argv) {
     std::string itf = "Input Data/input_terrain_file.csv";
     std::string erf = "Input Data/existing_roads_file.csv";
     OtherInputsPtr otherInputs(new OtherInputs(idf,orf,itf,erf,0,1,0,1,1000,
-            1000,20,20000,100));
+            1000,20,1000,100));
 
     // EARTHWORK COSTS
     Eigen::VectorXd cd(6);
@@ -232,7 +239,7 @@ int main(int argc, char **argv) {
 
     // VARIABLE PARAMETERS
     Eigen::VectorXd popLevels(6);
-    popLevels << 50,60,70,80,90,100;
+    popLevels << 0.50,0.60,0.70,0.80,0.90,0.100;
     Eigen::VectorXi bridge(1);
     bridge << 0;
     Eigen::VectorXd hp(1);
@@ -242,7 +249,7 @@ int main(int argc, char **argv) {
     Eigen::VectorXd beta(1);
     beta << 0;
     Eigen::VectorXd pgr(3);
-    pgr << 50,100,150;
+    pgr << 0.5,1,1.5;
     Eigen::VectorXd pgrsd(3);
     pgrsd << 1,2,3;
     Eigen::VectorXd c(1);

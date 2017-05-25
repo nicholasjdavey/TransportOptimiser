@@ -44,8 +44,8 @@ public:
      *
      * Constructs an %Uncertainty object with assigned values
      */
-    Uncertainty(OptimiserPtr optimiser, std::string nm, double mp, double sd,
-            double rev, bool active);
+    Uncertainty(OptimiserPtr optimiser, std::string nm, double curr, double mp,
+            double sd, double rev, double pj, double jp, bool active);
 
     /**
      * Destructor
@@ -269,6 +269,7 @@ private:
     std::string name;                   /**< Name of the product */
     double current;                     /**< Current level of uncertainty */
     double meanP;                       /**< Long-run mean */
+    double trend;                       /**< Linear increase/decrease */
     double standardDev;                 /**< Standard deviation */
     double reversion;                   /**< Strength of mean reversion */
     double poissonJump;                 /**< Poisson parameter for jump sizes */

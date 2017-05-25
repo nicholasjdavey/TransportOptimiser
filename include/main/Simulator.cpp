@@ -14,7 +14,7 @@ SimulatorPtr Simulator::me() {
     return shared_from_this();
 }
 
-void Simulator::simulateMTE() {
+Optimiser::ComputationStatus Simulator::simulateMTE() {
     // This routine computes the animal costs based on mean time to extinction.
     // We use Monte Carlo simulation (if any uncertainty) where we run the road
     // at full flow until the end of the design horizon. This is used for
@@ -33,7 +33,7 @@ void Simulator::simulateMTE() {
     unsigned long noPaths = optimiser->getOtherInputs()->getNoPaths();
 
     std::vector<SpeciesRoadPatchesPtr> srp = road->getSpeciesRoadPatches();
-    Eigen::VectorXd iar(srp.size());
+    Eigen::MatrixXd iar(srp.size(),1);
 
     // First, compute the IARs for the road
     if (threader != nullptr) {
@@ -96,12 +96,9 @@ void Simulator::simulateMTE() {
         Eigen::RowVectorXd endPopulations(srp.size());
 
         // No need for Monte Carlo simulation
-        std::vector<Eigen::VectorXd> finalPops =
-                initPops;
-        this->simulateMTEPath(srp,initPops,
-                capacities,finalPops);
-        for (int ii = 0; ii < srp.size();
-                ii++) {
+        std::vector<Eigen::VectorXd> finalPops = initPops;
+        this->simulateMTEPath(srp,initPops,capacities,finalPops);
+        for (int ii = 0; ii < srp.size(); ii++) {
             endPopulations(ii) = finalPops[ii].sum();
         }
 
@@ -119,7 +116,7 @@ void Simulator::simulateMTE() {
             if (gpu) {
                 // Call the external, CUDA-compiled code
                 SimulateGPU::simulateMTECUDA(this->me(),srp,initPops,
-                        capacities,endPopulations);
+                            capacities,endPopulations);
 
             } else {
                 // We evaluate the actual road using Monte Carlo simulation
@@ -207,7 +204,7 @@ void Simulator::simulateMTE(std::vector<Eigen::MatrixXd>& visualiseResults) {
 
     std::vector<SpeciesRoadPatchesPtr> srp = road->
             getSpeciesRoadPatches();
-    Eigen::VectorXd iar(srp.size());
+    Eigen::MatrixXd iar(srp.size(),1);
 
     // First, compute the IARs for the road
     if (threader != nullptr) {
@@ -289,7 +286,7 @@ void Simulator::simulateROVCR(bool policyMap) {
     int nYears = optimiser->getEconomic()->getYears();
 
     std::vector<SpeciesRoadPatchesPtr> srp = road->getSpeciesRoadPatches();
-    Eigen::VectorXd iar(srp.size());
+    Eigen::MatrixXd iar(srp.size(),1);
 
     // First, compute the IAR for each species for this road
     if (threader != nullptr) {
@@ -404,22 +401,22 @@ void Simulator::simulateROVCR(bool policyMap) {
     // Compute the mean of each control to determine the optimal control and
     // operating value at time 0. We also compute the standard deviation.
     float *mean;
-    float *noPaths;
+    float *controlPaths;
     mean = (float*)malloc(controls*sizeof(float));
-    noPaths = (float*)malloc(controls*sizeof(float));
+    controlPaths = (float*)malloc(controls*sizeof(float));
 
     for (int ii = 0; ii < controls; ii++) {
         mean[ii] = 0;
-        noPaths[ii] = 0;
+        controlPaths[ii] = 0;
     }
 
     for (int ii = 0; ii < noPaths; ii++) {
-        mean[optCont[ii]] += condExp[ii];
-        noPaths[optCont[ii]] += (float)optCont[ii];
+        mean[optCont.data()[ii]] += condExp.data()[ii];
+        controlPaths[optCont.data()[ii]] += (float)optCont.data()[ii];
     }
 
     for (int ii = 0; ii < controls; ii++) {
-        mean[ii] = mean[ii]/noPaths[ii];
+        mean[ii] = mean[ii]/controlPaths[ii];
     }
 
     int firstControl = 0;
@@ -437,15 +434,16 @@ void Simulator::simulateROVCR(bool policyMap) {
     float var = 0;
 
     for (int ii = 0; ii < noPaths; ii++) {
-        if (optCont[ii] == firstControl) {
-            var += pow(mean[firstControl] - condExp[ii],2);
+        if (optCont.data()[ii] == firstControl) {
+            var += pow(mean[firstControl] - condExp.data()[ii],2);
         }
     }
 
-    road->getAttributes()->setTotalValueSD(pow(var/noPaths[firstControl]),0.5);
+    road->getAttributes()->setTotalValueSD(pow(var/controlPaths[firstControl],
+            0.5));
 
     free(mean);
-    free(noPaths);
+    free(controlPaths);
 
     // If we are visualising the policy map, save this info too
     if (policyMap) {
@@ -491,9 +489,10 @@ void Simulator::naturalBirthDeath(const SpeciesRoadPatchesPtr species, const
 //    unsigned seed1 = std::chrono::system_clock::now().time_since_epoch().
 //            count();
 //    std::mt19937 generator(seed1);
-    std::normal_distribution<double> growth(spec->getGrowthRateMean()*vp->
-            getGrowthRatesMultipliers()(sc->getPopGR()),spec->getGrowthRateSD()
-            *vp->getGrowthRateSDMultipliers()(sc->getPopGRSD()));
+    std::normal_distribution<double> growth(spec->getGrowthRate()->getMean()*
+            vp->getGrowthRatesMultipliers()(sc->getPopGR()),spec->
+            getGrowthRate()->getNoiseSD()*vp->getGrowthRateSDMultipliers()(sc->
+            getPopGRSD()));
 
     Eigen::VectorXd gr(pops.size());
     double stepSize = species->getRoad()->getOptimiser()->getEconomic()->

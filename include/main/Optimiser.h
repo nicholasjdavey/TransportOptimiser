@@ -81,6 +81,11 @@ public:
         ALGO7  /**< Regression Monte Carlo with targeted end population (Zhang et al.) */
     } ROVType;
 
+    typedef enum {
+        COMPUTATION_FAILED,
+        COMPUTATION_SUCCESS,
+    } ComputationStatus;
+
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
     /**
@@ -125,9 +130,10 @@ public:
      */
     Optimiser(double mr, double cf, unsigned long gens, unsigned long
             popSize, double stopTol, double confInt, double confLvl, unsigned
-            long habGridRes, std::string solScheme, unsigned long noRuns,
-            Optimiser::Type type, unsigned long sg, double msr, bool gpu=false,
-            Optimiser::ROVType method = Optimiser::ALGO5);
+            long habGridRes, unsigned long surrDimRes, std::string solScheme,
+            unsigned long noRuns, Optimiser::Type type, unsigned long sg,
+            double msr, bool gpu=false, Optimiser::ROVType method =
+            Optimiser::ALGO5);
     /**
      * Destructor
      */
@@ -608,6 +614,23 @@ public:
     }
 
     /**
+     * Returns the surrogate resolution in each dimension
+     *
+     * @return Resolution as unsigned long
+     */
+    unsigned long getSurrDimRes() {
+        return this->surrDimRes;
+    }
+    /**
+     * Sets the surrogate resolution in each dimension
+     *
+     * @param res as unsigned long
+     */
+    void setSurrDimRes(unsigned long res) {
+        this->surrDimRes = res;
+    }
+
+    /**
      * Returns the solution scheme of the solver
      *
      * @return Solution scheme as std::string
@@ -795,6 +818,47 @@ public:
     }
 
     /**
+     * Returns a reference to the surrogate functions so that they may be used
+     *
+     * The surrogate model is stored as a fixed-resolution map of predictor
+     * points (res*noDims) with corresponding regressed values (res^noDims)
+     *
+     * The first res x noDims values are the fixed predictor points that can be
+     * interpolated. They are sorted by each dimension so that all the 'res'
+     * values along each dimension are listed first followed by the 'res'
+     * values for the next dimension, and so on. The next 'res*noDims' values
+     * are the corresponding predicted values. The way to index is as follows:
+     *
+     * 1. Value of predictor ii in dimension jj
+     *
+     *    double value = this->surrogateROV[jj*res + ii]
+     *
+     * 2. Value of corresponding regressed value for coordinate I[jj_0, jj_1,
+     *    ..., jj_(noDims-1)]
+     *
+     *    int idx = res*noDims;
+     *
+     *    for (int ii = 0; ii < noDims; ii++) {
+     *       idx += I[ii]*res^(noDims - ii - 1);
+     *    }
+     *
+     *    double value = this->surrogateROV[idx];
+     *
+     * @return Surrogates as std::vector<std::vector<Eigen::VectorXd>>&
+     */
+    std::vector<std::vector<Eigen::VectorXd>>& getSurrogateROV() {
+        return this->surrogateROV;
+    }
+    /**
+     * Sets the surrogate function so that it may be called at a later stage
+     *
+     * @param surr as std::vector<std::vector<std::vector<double>>>&
+     */
+    void setSurrogateROV(std::vector<std::vector<Eigen::VectorXd>>& surr) {
+        this->surrogateROV = surr;
+    }
+
+    /**
      * Evaluates the surrogate model for a given road in the fixed traffic flow
      * case.
      *
@@ -811,14 +875,18 @@ public:
      * case.
      *
      * @param (input) road as RoadPtr
+     * @param (output) value as double&
+     * @param (output) valueSD as double&
      * @param (output) use as double&
      * @param (output) use standard deviation as double&
      */
-    void evaluateSurrogateModelROVCR(RoadPtr road, double use, double usesd);
+    void evaluateSurrogateModelROVCR(RoadPtr road, double value, double
+            valueSD);
 
 ///////////////////////////////////////////////////////////////////////////////
 protected:
-    std::vector<std::vector<std::vector<alglib::spline1dinterpolant>>> surrogate;   /**< Surrogate model for evaluating road (for each run) stored as a collection of splines*/
+    std::vector<std::vector<std::vector<alglib::spline1dinterpolant>>> surrogate;   /**< MTE Surrogate model for evaluating road (for each run) stored as a collection of splines (To be deprecated) */
+    std::vector<std::vector<Eigen::VectorXd>> surrogateROV;                         /**< ROV Surrogate model */
     ExperimentalScenarioPtr scenario;                                               /**< Current experiment */
     Optimiser::Type type;                                                           /**< Type of ecological incorporation */
     Eigen::MatrixXd currentRoadPopulation;                                          /**< Current encoded population of roads */
@@ -845,6 +913,7 @@ protected:
     double confInt;                                                                 /**< Required confidence interval */
     double confLvl;                                                                 /**< Desired confidence level (default = 95%) */
     unsigned long habGridRes;                                                       /**< Habitat grid 1D resolution */
+    unsigned long surrDimRes;                                                       /**< Resolution along each dimension of the surrogate */
     unsigned long noRuns;                                                           /**< Number of runs to perform */
     double eliteIndividuals;                                                        /**< Proportion of elite individuals to retain each generation */
     double maxSampleRate;                                                           /**< Maximum rate at which to perform sampling for surrogate models */
@@ -855,6 +924,13 @@ protected:
     GnuplotPtr surrPlotHandle;                                                      /**< Pipe for plotting surrogate model results */
     bool gpu;                                                                       /**< If we are using GPUs to assist computing */
     Optimiser::ROVType method;                                                      /**< ROV algorithm */
+
+    // Sharing of derived from base
+    template <typename Derived>
+    std::shared_ptr<Derived> meDerived()
+    {
+        return std::static_pointer_cast<Derived>(shared_from_this());
+    }
 };
 
 #endif

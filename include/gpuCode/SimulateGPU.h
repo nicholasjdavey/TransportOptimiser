@@ -24,7 +24,16 @@
 /**
  * Namespace for wrapping CUDA-enabling functions for use in C++ code
  */
+
+class Optimiser;
+typedef std::shared_ptr<Optimiser> OptimiserPtr;
+
+class RoadGA;
+typedef std::shared_ptr<RoadGA> RoadGAPtr;
+
 namespace SimulateGPU {
+
+    // CUDA WRAPPERS //////////////////////////////////////////////////////////
 
     /**
      * Computes the expected present value for an uncertain parameter (e.g.
@@ -121,6 +130,7 @@ namespace SimulateGPU {
      * @param (input) initPops as std::vector<Eigen::VectorXd>&
      * @param (input) capacities as std::vector<Eigen::VectorXd>&
      * @param (output) endPops as Eigen::MatrixXd& (output)
+     * @return Computation status as Optimiser::ComputationStatus
      */
     void simulateMTECUDA(SimulatorPtr sim,
             std::vector<SpeciesRoadPatchesPtr>& srp,
@@ -134,14 +144,15 @@ namespace SimulateGPU {
      * @brief simulateROVCUDA
      * @param sim as SimulatorPtr
      * @param srp as std::vector<SpeciesRoadPatchesPtr>&
-     * @param aars Eigen::MatrixXd&
+     * @param adjPops std::vector<Eigen::MatrixXd>&
+     * @param unitProfits Eigen::MatrixXd&
      * @param condExp as Eigen::MatrixXd&
      * @param optCont as Eigen::MatrixXi&
      */
     void simulateROVCUDA(SimulatorPtr sim,
             std::vector<SpeciesRoadPatchesPtr>& srp,
-            std::vector<Eigen::MatrixXd> &adjPops, Eigen::MatrixXd &,
-            Eigen::MatrixXd& condExp, Eigen::MatrixXi& optCont);
+            std::vector<Eigen::MatrixXd> &adjPops, Eigen::MatrixXd &
+            unitProfits, Eigen::MatrixXd& condExp, Eigen::MatrixXi& optCont);
 
     /**
      * Performs MTE simulations for all sample roads used to build the
@@ -162,6 +173,38 @@ namespace SimulateGPU {
      * sample roads
      */
     void surrogateROVCUDA();
+
+    /**
+     * Builds and returns the surrogate model for the MTE scenario using CUDA
+     *
+     * @param
+     */
+    void buildSurrogateMTECUDA();
+
+    /**
+     * Builds the ROV surrogate using CUDA
+     *
+     * @param op as OptimiserPtr
+     * @param surrogate as Eigen::VectorXd&
+     */
+    void buildSurrogateROVCUDA(RoadGAPtr op);
+
+    //  HELPER ROUTINES (COMPUTED ON CPU) ///////////////////////////////////////////
+
+    /**
+     * Converts a dense matrix to a sparse matrix, providing the output values and
+     * corresponding row index of each element.
+     *
+     * @param denseIn as float*
+     * @param rows as int
+     * @param cols as int
+     * @param sparseOut as float*
+     * @param elemsPerCol as int*
+     * @param rowIdx as int*
+     * @param totalElements as int&
+     */
+    void dense2Sparse(float* denseIn, int rows, int cols, float* sparseOut, int*
+            elemsPerCol, int* rowIdx, int &totalElements);
 
 //    // CALLING CUSOLVER ///////////////////////////////////////////////////////////
 //    /*******************/

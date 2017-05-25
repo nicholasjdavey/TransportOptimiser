@@ -57,8 +57,8 @@ makelibs: $(OBJLIBSTEM) force_look
 
 # Suffix rule to make test executables
 %.exe: %.cpp
-	$(ECHO) $(LD) $(CUDAOBJECTS) $(OBJECTS) $(LXXFLAGS) $< -o $@
-	$(LD) $(CUDAOBJECTS) $(OBJECTS) $(LXXFLAGS) $< -o $@
+	$(ECHO) $(LD) $(CUDAOBJECTS) $(OBJECTS) $< $(LXXFLAGS) -o $@
+	$(LD) $(CUDAOBJECTS) $(OBJECTS) $< $(LXXFLAGS) -o $@
 
 clean:
 	-rm $(CUDAOBJECTS) $(OBJECTS) $(CURROBJS) $(EXE)

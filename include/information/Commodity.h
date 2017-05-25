@@ -33,8 +33,9 @@ public:
      *
      * Constructs a %Commodity object with assigned values
      */
-    Commodity(OptimiserPtr optimiser, std::string nm, double mp, double sd,
-            double rev, bool active, double oc, double ocsd);
+    Commodity(OptimiserPtr optimiser, std::string nm, double curr, double mp,
+            double sd, double rev, double pj, double jp, bool active, double oc,
+            double ocsd);
 
     /**
      * Destructor

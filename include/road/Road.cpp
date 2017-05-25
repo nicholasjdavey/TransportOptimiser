@@ -154,7 +154,11 @@ void Road::computeOperating(bool learning) {
                     SimulatorPtr simulator(new Simulator(this->me()));
                     this->simulator.reset();
                     this->simulator = simulator;
+
+                    // Find out the greatest number of patches for each of the
+                    // species.
                     this->simulator->simulateMTE();
+
                     // Need to write the routine for full simulation in the
                     // Simulation class
                     // NOTE: THIS ROUTINE IS RUN IN PARALLEL!!!!!!!!!!!!!!!!!!!
@@ -170,7 +174,7 @@ void Road::computeOperating(bool learning) {
                     this->computeSimulationPatches();
                     int noSpecies = this->optimiser.lock()->getSpecies().size();
 
-                    Eigen::VectorXd aar(noSpecies);
+                    Eigen::MatrixXd aar(noSpecies,1);
 
                     for (int ii = 0; ii < noSpecies; ii++) {
                         this->srp[ii]->computeInitialAAR();
@@ -256,19 +260,27 @@ void Road::computeOperating(bool learning) {
                     this->computeSimulationPatches();
                     int noSpecies = this->optimiser.lock()->getSpecies().size();
 
-                    std::vector<Eigen::VectorXd> aar(noSpecies);
+                    int noControls = this->optimiser.lock()->getPrograms()[
+                            this->optimiser.lock()->getScenario()->
+                            getProgram()]->getFlowRates().size();
+
+                    Eigen::MatrixXd aar(noSpecies,noControls);
 
                     for (int ii = 0; ii < noSpecies; ii++) {
                         this->srp[ii]->computeInitialAAR();
-                        aar[ii] = this->srp[ii]->getInitAAR();
+                        for (int jj = 0; jj < noControls; jj++) {
+                            aar(ii,jj) = this->srp[ii]->getInitAAR()(jj);
+                        }
                     }
                     this->attributes->setIAR(aar);
 
                     // Compute the road value using the surrogate model
-                    float use, usesd, value, valuesd;
-                    this->optimiser.lock()->evaluateSurrogateModelROV(this->
-                            me(),value,valuesd,use,usesd);
+                    float value, valuesd;
+                    this->optimiser.lock()->evaluateSurrogateModelROVCR(this->
+                            me(),value,valuesd);
 
+                    // We pick the operating value as the path value that has X%
+                    // of path values below it.
                     this->attributes->setVarProfitIC(value);
                     this->attributes->setTotalValueSD(valuesd);
                 }

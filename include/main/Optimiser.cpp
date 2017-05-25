@@ -6,9 +6,9 @@ Optimiser::Optimiser() {
 
 Optimiser::Optimiser(double mr, double cf, unsigned long gens, unsigned
         long popSize, double stopTol, double confInt, double confLvl, unsigned
-        long habGridRes, std::string solScheme, unsigned long noRuns,
-        Optimiser::Type type, unsigned long sg, double msr, bool gpu,
-        Optimiser::ROVType method) {
+        long habGridRes, unsigned long surrDimRes, std::string solScheme,
+        unsigned long noRuns, Optimiser::Type type, unsigned long sg, double
+        msr, bool gpu, Optimiser::ROVType method) {
 
 //	std::vector<ProgramPtr>* programs(new std::vector<ProgramPtr>());
     unsigned long const hardware_threads = std::thread::hardware_concurrency();
@@ -30,6 +30,7 @@ Optimiser::Optimiser(double mr, double cf, unsigned long gens, unsigned
     this->maxSampleRate = msr;
     this->gpu = gpu;
     this->method = method;
+    this->surrDimRes = surrDimRes;
 }
 
 Optimiser::~Optimiser() {
@@ -146,6 +147,7 @@ void Optimiser::evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd
 
         const Eigen::VectorXd& initAAR = speciesRoadPatches[ii]->getInitAAR();
 
+        // We will replace this with our own interpolation routine
         pops(ii) = alglib::spline1dcalc(this->surrogate[2*this->scenario->
                 getCurrentScenario()][this->scenario->getRun()][ii],initAAR(
                 initAAR.size()-1));
@@ -155,7 +157,51 @@ void Optimiser::evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd
     }
 }
 
-void Optimiser::evaluateSurrogateModelROVCR(RoadPtr road, double use, double
-        usesd) {
+void Optimiser::evaluateSurrogateModelROVCR(RoadPtr road, double value, double
+        valuesd) {
 
+    // PREDICTORS /////////////////////////////////////////////////////////////
+    Eigen::VectorXd predictors(this->species.size() + 1);
+
+    // INITIAL AARS
+    for (int ii = 0; ii < this->species.size(); ii++) {
+        const Eigen::VectorXd& initAAR = road->getSpeciesRoadPatches()[ii]->
+                getInitAAR();
+        predictors(ii) = initAAR(initAAR.size()-1);
+    }
+
+    // INITIAL PERIOD UNIT PROFIT
+    // For now, we use the initial unit profit
+
+    // Fixed cost per unit traffic
+    double unitCost = road->getAttributes()->getUnitVarCosts();
+    // Fuel consumption per vehicle class per unit traffic (L)
+    Eigen::VectorXd fuelCosts = road->getCosts()->getUnitFuelCost();
+    Eigen::VectorXd currentFuelPrice(fuelCosts.size());
+
+    for (int ii = 0; ii < fuelCosts.size(); ii++) {
+        currentFuelPrice(ii) = (road->getOptimiser()->getTraffic()->
+                getVehicles())[ii]->getFuel()->getCurrent();
+    }
+
+    unitCost += fuelCosts.transpose()*currentFuelPrice;
+
+    // As the revenue per unit traffic is the same for each road, we leave it
+    // out for now.
+    // Load per unit traffic
+    // double unitRevenue = road->getCosts()->getUnitRevenue();
+
+    predictors(species.size()) = unitCost;
+
+    // Interpolate the multivariate grid using these values
+
+    // MEAN
+    value = Utility::interpolateSurrogate(this->surrogateROV[2*this->scenario->
+            getCurrentScenario()][this->scenario->getRun()],predictors,
+            this->surrDimRes);
+
+    // STANDARD DEVIATION
+    valuesd = Utility::interpolateSurrogate(this->surrogateROV[2*this->
+            scenario->getCurrentScenario()+1][this->scenario->getRun()],
+            predictors,this->surrDimRes);
 }

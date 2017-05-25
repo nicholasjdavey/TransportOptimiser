@@ -2,11 +2,94 @@
 #include <cuda.h>
 #include <curand.h>
 #include <curand_kernel.h>
-#include <cusolverDn.h>
+//#include <cusolverDn.h>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 #include "../transportbase.h"
 #include "knn_cublas_with_indexes.h"
+
+// ERROR CHECKING MACROS //////////////////////////////////////////////////////
+
+#define CUDA_CALL(x) { gpuAssert((x), __FILE__, __LINE__); }
+inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort
+        =true)
+{
+    if (code != cudaSuccess) {
+        fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file,
+                line);
+        cudaDeviceReset();
+
+//        if (abort) throw std::exception();
+    }
+}
+
+static const int max_shared_floats = 8000;
+
+/**
+ * Converts a CURAND error code from enum to text
+ *
+ * @param error as curandStatus_t
+ * @return Error code as static const char
+ */
+static const char *curandGetErrorString(curandStatus_t error)
+{
+    switch (error)
+    {
+        case CURAND_STATUS_SUCCESS:
+            return "CURAND_STATUS_SUCCESS";
+
+        case CURAND_STATUS_VERSION_MISMATCH:
+            return "CURAND_STATUS_VERSION_MISMATCH";
+
+        case CURAND_STATUS_NOT_INITIALIZED:
+            return "CURAND_STATUS_NOT_INITIALIZED";
+
+        case CURAND_STATUS_ALLOCATION_FAILED:
+            return "CURAND_STATUS_ALLOCATION_FAILED";
+
+        case CURAND_STATUS_TYPE_ERROR:
+            return "CURAND_STATUS_TYPE_ERROR";
+
+        case CURAND_STATUS_OUT_OF_RANGE:
+            return "CURAND_STATUS_OUT_OF_RANGE";
+
+        case CURAND_STATUS_LENGTH_NOT_MULTIPLE:
+            return "CURAND_STATUS_LENGTH_NOT_MULTIPLE";
+
+        case CURAND_STATUS_DOUBLE_PRECISION_REQUIRED:
+            return "CURAND_STATUS_DOUBLE_PRECISION_REQUIRED";
+
+        case CURAND_STATUS_LAUNCH_FAILURE:
+            return "CURAND_STATUS_LAUNCH_FAILURE";
+
+        case CURAND_STATUS_PREEXISTING_FAILURE:
+            return "CURAND_STATUS_PREEXISTING_FAILURE";
+
+        case CURAND_STATUS_INITIALIZATION_FAILED:
+            return "CURAND_STATUS_INITIALIZATION_FAILED";
+
+        case CURAND_STATUS_ARCH_MISMATCH:
+            return "CURAND_STATUS_ARCH_MISMATCH";
+
+        case CURAND_STATUS_INTERNAL_ERROR:
+            return "CURAND_STATUS_INTERNAL_ERROR";
+    }
+
+    return "<unknown>";
+}
+
+#define CURAND_CALL(x) { gpuAssert((x), __FILE__, __LINE__); }
+inline void gpuAssert(curandStatus_t code, const char *file, int line, bool
+        abort=true)
+{
+    if (code != CURAND_STATUS_SUCCESS) {
+        fprintf(stderr,"GPUassert: %s %s %d\n",curandGetErrorString(code),
+                file, line);
+        cudaDeviceReset();
+
+//        if (abort) throw std::exception();
+    }
+}
 
 // ASSISTANT KERNELS //////////////////////////////////////////////////////////
 
@@ -370,16 +453,38 @@ __global__ void patchComputation(int noCandidates, int W, int H, int skpx, int
         results[5*idx+3] = cx;
         results[5*idx+4] = cy;
 
-//        printf("%4d, %5d, %8.0f, %5.0f, %5.0f, %5.0f, %5.0f\n",idx,blockSizeX,
-//                results[5*idx],results[5*idx+1],results[5*idx+2],
-//                results[5*idx+3],results[5*idx+4]);
+//        if (results[5*idx] > 0) {
+//            printf("%4d, %5d, %8.0f, %5.0f, %5.0f, %5.0f, %5.0f\n",idx,blockSizeX,
+//                    results[5*idx],results[5*idx+1],results[5*idx+2],
+//                    results[5*idx+3],results[5*idx+4]);
+//        }
     }
 }
 
+//// Computes the movement and mortality of a species from the forward path
+//// kernels
+//__global__ void mmKernel(float* popsIn, float* popsOut, float* mmm, int patches) {
+//    int ii = threadIdx.x;
+
+//    if (ii < patches) {
+//        extern __shared__ float s[];
+
+//        s[ii] = 0.0;
+
+//        for (int jj = 0; jj < patches; jj++) {
+//            s[ii] += popsIn[ii]*mmm[ii*patches + jj];
+//        }
+//        __syncthreads();
+
+//        popsOut[ii] = s[ii];
+//    }
+//}
+
 // The mte kernel represents a single path for mte
-__global__ void mteKernel(int noPaths, int nYears, int noPatches, float grm,
-        float grsd, float *initPops, float* caps, float* mmm, float* eps,
-        float* drf) {
+__global__ void mteKernel(int noPaths, int nYears, int noPatches, float
+        timeStep, float* rgr, float* brownians, float* jumpSizes, float* jumps,
+        float* speciesParams, float *initPops, float* caps, float*mmm, int*
+        rowIdx, int* elemsPerCol, float* pathPops, float* eps) {
     // Global index for finding the thread number
     int ii = blockIdx.x*blockDim.x + threadIdx.x;
 
@@ -387,42 +492,113 @@ __global__ void mteKernel(int noPaths, int nYears, int noPatches, float grm,
     // so desired, we can use dynamic parallelism because the card in the
     // machine has CUDA compute capability 3.5
     if (ii < noPaths) {
-        // Initialise the temporary vector
-        float *pops;
-        pops = (float*)malloc(noPatches*sizeof(float));
-        float *popsOld;
-        popsOld = (float*)malloc(noPatches*sizeof(float));
+        //extern __shared__ float s[];
 
         // Initialise the prevailing population vector
-        for (int jj = 0; jj < noPatches; jj ++) {
-            pops[jj] = 1.0f;
-            popsOld[jj] = initPops[jj];
+        for (int jj = 0; jj < noPatches; jj++) {
+            pathPops[(ii*2)*noPatches+jj] = initPops[jj];
         }
 
+        float grMean = speciesParams[0];
+
         for (int jj = 0; jj < nYears; jj++) {
-            // Movement and mortality
+            // Movement and mortality. This component is very slow without
+            // using shared memory. As we do not know the size of the patches
+            // at compile time, we need to be careful how much shared memory we
+            // allocate. For safety, we assume that we will have less than
+            // 64KB worth of patch data in the mmm matrix. Using single
+            // precision floating point numbers, this means that we can only
+            // have up to 8,000 patches. As this number is extremely large, we
+            // set a limit outside this routine to have at most 300 patches.
             for (int kk = 0; kk < noPatches; kk++) {
-                pops[kk] = 0.0;
-                for (int ll = 0; ll < noPatches; ll++) {
-                    pops[kk] += popsOld[ll]*mmm[kk*noPatches+ll];
+                pathPops[(ii*2+1)*noPatches+kk] = 0.0;
+            }
+
+            int iterator = 0;
+            for (int kk = 0; kk < noPatches; kk++) {
+                for (int ll = 0; ll < elemsPerCol[kk]; ll++) {
+                    pathPops[(ii*2+1)*noPatches+kk] += pathPops[(ii*2)*
+                            noPatches+rowIdx[iterator]]*mmm[iterator];
+                    iterator++;
                 }
             }
 
+            // Load the correct slice of the mmm matrix for each
+            // destination patch. Use the thread index as a helper to do
+            // this. Wait for all information to be loaded in before
+            // proceeding. We need to tile the mmm matrix here to obtain
+            // a sufficient speed up.
+
+//            for (int kk = 0; kk < noTiles; kk++) {
+//                int currDim = tileDim;
+
+//                if (threadIdx.x < noPatches) {
+//                    // First, allocate the memory for this tile
+//                    if (kk == noTiles-1) {
+//                        currDim = (int)(noTiles*tileDim == noPatches) ?
+//                                (int)tileDim : (int)(noPatches - kk*tileDim);
+//                    }
+
+//                    for (int ll = 0; ll < currDim; ll++) {
+//                        s[ll*noPatches + threadIdx.x] = mmm[kk*noPatches*
+//                                tileDim + ll*noPatches + threadIdx.x];
+//                    }
+//                }
+//                __syncthreads();
+
+//                // Now increment the populations for this path
+//                for (int kk = 0; kk < currDim; kk++) {
+//                    for (int ll = 0; ll < noPatches; ll++) {
+//                        pathPops[(ii*2+1)*noPatches+kk] += pathPops[(ii*2)*
+//                                noPatches+ll]*s[kk*noPatches + ll];
+//                    }
+//                }
+//            }
+
+//            for (int kk = 0; kk < noPatches; kk++) {
+//                for (int ll = 0; ll < noPatches; ll++) {
+////                    pathPops[(ii*2+1)*noPatches+kk] += pathPops[(ii*2)*
+////                            noPatches+ll]*s[ll];
+//                    pathPops[(ii*2+1)*noPatches+kk] += pathPops[(ii*2)*
+//                            noPatches+ll]*mmm[kk*noPatches+ll];
+//                }
+//            }
+
+//            matrixMultiplicationKernel<<<noBlocks,noThreadsPerBlock>>>(pathPops
+//                    + (ii*2)*noPatches, mmm, pathPops + (ii*2+1)*noPatches, 1,
+//                    noPatches, noPatches);
+//            cudaDeviceSynchronize();
+//            __syncthreads();
+
             // Natural birth and death
+
+            // Adjust the global growth rate mean for this species at this
+            // time step for this path.
+            float jump = (jumps[ii*nYears + jj] < speciesParams[6]) ? 1.0f :
+                    0.0f;
+            float meanP = speciesParams[1];
+            float reversion = speciesParams[4];
+
+            float brownian = brownians[ii*nYears + jj]*speciesParams[2];
+            float jumpSize = jumpSizes[ii*nYears + jj]*pow(speciesParams[5],2)
+                    - pow(speciesParams[5],2)/2;
+
+            grMean = grMean + reversion*(meanP - grMean)*timeStep + grMean
+                    *brownian + (exp(jumpSize) - 1)*grMean*jump;
+
             for (int kk = 0; kk < noPatches; kk++) {
-                float gr = grsd*drf[ii*(nYears*noPatches) + jj*noPatches + kk]
-                        + grm;
-                popsOld[kk] = pops[kk]*(1.0f + gr*(caps[kk]-pops[kk])/caps[kk]/
-                        100.0);
+                float gr = speciesParams[7]*rgr[ii*(nYears*noPatches) + jj*
+                        noPatches + kk]*grMean + grMean;
+                pathPops[(ii*2)*noPatches+kk] = pathPops[(ii*2+1)*noPatches+kk]
+                        *(1.0f + gr*(caps[kk]-pathPops[(ii*2+1)*noPatches+kk])/
+                        caps[kk]);
             }
         }
 
         eps[ii] = 0.0f;
         for (int jj = 0; jj < noPatches; jj++) {
-            eps[ii] += popsOld[jj];
+            eps[ii] += pathPops[(ii*2+1)*noPatches+jj];
         }
-        free(pops);
-        free(popsOld);
     }
 }
 
@@ -441,9 +617,11 @@ __global__ void randControls(int noPaths, int noControls, float* randCont,
 __global__ void forwardPathKernel(int start, int noPaths, int nYears, int
         noSpecies, int noPatches, int noControls, int noFuels, int
         noUncertainties, float timeStep, float* pops, float* transitions,
-        float* survival, float* speciesParams, float* rgr, float* caps, float*
-        aars, float* uncertParams, int* controls, float* uJumps, float*
-        uBrownian, float* uJumpSizes, float* uResults, float* totalPops) {
+        float* survival, float* speciesParams, float* caps, float* aars,
+        float* uncertParams, int* controls, float* uJumps, float* uBrownian,
+        float* uJumpSizes, float* uJumpsSpecies, float* uBrownianSpecies,
+        float* uJumpSizesSpecies, float* rgr, float* uResults, float*
+        totalPops) {
 
     // Global thread index
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -458,9 +636,14 @@ __global__ void forwardPathKernel(int start, int noPaths, int nYears, int
     // machine has CUDA compute compatability 3.5
 
     if (idx < noPaths) {
+        float* grMean;
+        grMean = (float*)malloc(noSpecies*sizeof(float));
+
+        for (int jj = 0; jj < noSpecies; jj++) {
+            grMean[jj] = speciesParams[jj*8];
+        }
 
         for (int ii = start; ii <= nYears; ii++) {
-
             // Control to pick
             int control = controls[idx*nYears + ii];
 
@@ -484,6 +667,24 @@ __global__ void forwardPathKernel(int start, int noPaths, int nYears, int
 //                        }
 //                    }
 //                }
+
+                // Adjust the global growth rate mean for this species at this
+                // time step for this path.
+                float jump = (uJumpsSpecies[idx*noSpecies*nYears +
+                        ii*noSpecies + jj] < speciesParams[jj*8 + 5]) ?
+                        1.0f : 0.0f;
+                float meanP = speciesParams[jj*8 + 1];
+                float reversion = speciesParams[jj*8 + 4];
+
+                float brownian = uBrownianSpecies[idx*noSpecies*nYears +
+                        ii*noSpecies + jj]*speciesParams[jj*8 + 2];
+                float jumpSize = uJumpSizesSpecies[idx*noSpecies*nYears
+                        + ii*noSpecies + jj]*pow(speciesParams[
+                        jj*8 + 5],2) - pow(speciesParams[jj*8 + 5],2)/2;
+
+                grMean[jj] = grMean[jj] + reversion*(meanP - grMean[jj])*
+                        timeStep + grMean[jj]*brownian + (exp(jumpSize) - 1)*
+                        grMean[jj]*jump;
 
                 for (int kk = 0; kk < noControls; kk++) {
                     aars[jj*nYears*noPaths*noControls + ii*noPaths*
@@ -520,10 +721,15 @@ __global__ void forwardPathKernel(int start, int noPaths, int nYears, int
                             }
                         }
                     }
-                    // Population growth
-                    float gr = speciesParams[jj*3]*rgr[idx*noSpecies*noPatches*
-                            nYears + ii*noSpecies*noPatches + jj*noPatches +
-                            kk] + speciesParams[jj*3+1];
+                    // Population growth based on a mean-reverting process
+                    rgr[idx*noSpecies*noPatches*nYears + ii*noSpecies*noPatches
+                            + jj*noPatches + kk] = grMean[jj] + rgr[idx*
+                            noSpecies*noPatches*nYears + ii*noSpecies*noPatches
+                            + jj*noPatches + kk]*speciesParams[jj*8 + 7];
+
+                    float gr = rgr[idx*noSpecies*noPatches*nYears + ii*
+                            noSpecies*noPatches + jj*noPatches + kk];
+
                     pops[idx*nYears*noSpecies*noPatches +
                             ii*noSpecies*noPatches + jj*noPatches + kk] =
                             pops[idx*nYears*noSpecies*noPatches
@@ -561,6 +767,7 @@ __global__ void forwardPathKernel(int start, int noPaths, int nYears, int
                         curr*brownian + (exp(jumpSize) - 1)*curr*jump;
             }
         }
+        free(grMean);
     }
 }
 
@@ -617,7 +824,7 @@ __global__ void allocateXYRegressionData(int noPaths, int noControls, int
 
         // Save the input dimension values to the corresponding data group
         for (int jj = 0; jj < noDims; jj++) {
-            xvals[dataPoints[controls[ii]]*(noControls*noDims) + controls[ii]*
+            xvals[dataPoints[controls[ii]]*noDims + controls[ii]*noPaths*
                     noDims + jj] = xin[ii*noDims + jj];
         }
 
@@ -635,13 +842,13 @@ __global__ void computeStateMinMax(int noControls, int noDims, int noPaths,
         xmax = (float*)malloc(noDims*sizeof(float));
 
         for (int jj = 0; jj < noDims; jj++) {
-            xmin[jj] = xvals[ii*noDims + jj];
+            xmin[jj] = xvals[ii*noDims*noPaths + jj];
             xmax[jj] = xmin[jj];
         }
 
         for (int jj = 0; jj < dataPoints[ii]; jj++) {
             for (int kk = 0; kk < noDims; kk ++) {
-                float xtemp = xvals[ii*noDims + kk + jj*noControls*noDims];
+                float xtemp = xvals[ii*noDims*noPaths + jj*noDims + kk];
                 if (xmin[jj] > xtemp) {
                     xmin[jj] = xtemp;
                 } else if (xmax[jj] < xtemp) {
@@ -874,7 +1081,8 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                             orePrice);
 
                     // First find global the upper and lower bounds in each
-                    // dimension as well as the indices of the
+                    // dimension as well as the index of the lower bound of the
+                    // regressed value in each dimension.
                     float *lower, *upper, *coeffs;
                     int *lowerInd;
                     lower = (float*)malloc((noSpecies+1)*sizeof(float));
@@ -912,12 +1120,12 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
 
                     // First, assign the yvalues to the coefficients matrix
                     for (int jj = 0; jj < (int)pow(2,noSpecies); jj++) {
-                        // Get the indices of the yvales of the lower and upper
+                        // Get the indices of the yvalues of the lower and upper
                         // bounding values on this dimension.
                         int idxL = start*noControls*(dimRes*(noSpecies + 1) +
-                                (int)pow(dimRes,(noSpecies+1)*2) + ii*(dimRes*
-                                (noSpecies + 1) + (int)pow(dimRes,(noSpecies+1)
-                                *2)) + dimRes*(noSpecies + 1));
+                                (int)pow(dimRes,(noSpecies+1))*2) + ii*(dimRes*
+                                (noSpecies + 1) + (int)pow(dimRes,(noSpecies+1))
+                                *2) + dimRes*(noSpecies + 1);
 
                         for (int kk = 1; kk <= noSpecies; kk++) {
                             int rem = ((int)(jj/((int)pow(2,noSpecies - kk))) +
@@ -925,18 +1133,17 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                                     noSpecies - kk))) + 1)/2);
                             if (rem > 0) {
                                 idxL += lowerInd[kk]*(int)pow(dimRes,noSpecies
-                                        - kk)*2;
+                                        - kk);
                             } else {
                                 idxL += (lowerInd[kk]+1)*(int)pow(dimRes,noSpecies
-                                        - kk)*2;
+                                        - kk);
                             }
                         }
 
                         int idxU = idxL + (lowerInd[0]+1)*(int)pow(dimRes,
-                                noSpecies)*2;
+                                noSpecies);
 
-                        idxL += idxL + lowerInd[0]*(int)pow(dimRes,noSpecies)
-                                *2;
+                        idxL += idxL + lowerInd[0]*(int)pow(dimRes,noSpecies);
 
                         coeffs[jj] = regression[idxL]*(1 - xd) +
                                 regression[idxU]*xd;
@@ -1096,15 +1303,17 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                     }
 
                     // Compute the payoff for the control if valid using the
-                    // regressions. We keep track of the overall temporary cost-to-
-                    // go in order to pick the optimal control as well as the
-                    // current period payoffs in order to compute the adjusted
-                    // cost-to-go that accounts for endogenous uncertainty.
+                    // regressions. We keep track of the overall temporary cost
+                    // -to- go in order to pick the optimal control as well as
+                    // the current period payoffs in order to compute the
+                    // adjusted cost-to-go that accounts for endogenous
+                    // uncertainty.
                     if (valid[jj]) {
-                        // Now compute the overall period profit for this control
-                        // given the prevailing stochastic factors (undiscounted).
-                        currPayoffs[jj] = Q[jj]*(unitCost + unitFuel - unitRevenue*
-                                orePrice);
+                        // Now compute the overall period profit for this
+                        // control given the prevailing stochastic factors
+                        // (undiscounted).
+                        currPayoffs[jj] = Q[jj]*(unitCost + unitFuel -
+                                unitRevenue*orePrice);
 
                         // First find global the upper and lower bounds in each
                         // dimension as well as the indices of the
@@ -1118,13 +1327,13 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
 
                         for (int kk = 0; kk <= noSpecies; kk++) {
                             lower[kk] = regression[ii*noControls*(dimRes*(
-                                    noSpecies+1) + (int)pow(dimRes,noSpecies+1)*2)
-                                    + jj*(dimRes*(noSpecies+1) + (int)pow(dimRes,
-                                    (noSpecies+1))*2) + kk*dimRes];
+                                    noSpecies+1) + (int)pow(dimRes,noSpecies+1)
+                                    *2) + jj*(dimRes*(noSpecies+1) + (int)pow(
+                                    dimRes,(noSpecies+1))*2) + kk*dimRes];
                             upper[kk] = regression[ii*noControls*(dimRes*(
-                                    noSpecies+1) + (int)pow(dimRes,noSpecies+1)*2)
-                                    + jj*(dimRes*(noSpecies+1) + (int)pow(dimRes,
-                                    (noSpecies+1))*2) + (kk+1)*dimRes - 1];
+                                    noSpecies+1) + (int)pow(dimRes,noSpecies+1)
+                                    *2) + jj*(dimRes*(noSpecies+1) + (int)pow(
+                                    dimRes,(noSpecies+1))*2) + (kk+1)*dimRes - 1];
 
                             lowerInd[kk] = (int)dimRes*(state[kk] - lower[kk])/(
                                     upper[kk] - lower[kk]);
@@ -1133,43 +1342,43 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                         // Now that we have all the index requirements, let's
                         // interpolate.
                         // Get the uppermost dimension x value
-                        float x0 = regression[ii*noControls*(dimRes*(noSpecies +
-                                1) + (int)pow(dimRes,noSpecies+1)*2) + jj*(dimRes*(
-                                noSpecies+1) + (int)pow(dimRes,(noSpecies+1))*2) +
-                                lowerInd[0]];
-                        float x1 = regression[ii*noControls*(dimRes*(noSpecies +
-                                1) + (int)pow(dimRes,noSpecies+1)*2) + jj*(dimRes*(
-                                noSpecies+1) + (int)pow(dimRes,(noSpecies+1))*2) +
-                                lowerInd[0] + 1];
+                        float x0 = regression[ii*noControls*(dimRes*(noSpecies
+                                + 1) + (int)pow(dimRes,noSpecies+1)*2) + jj*(
+                                dimRes*(noSpecies+1) + (int)pow(dimRes,
+                                (noSpecies+1))*2) + lowerInd[0]];
+                        float x1 = regression[ii*noControls*(dimRes*(noSpecies
+                                + 1) + (int)pow(dimRes,noSpecies+1)*2) + jj*(
+                                dimRes*(noSpecies+1) + (int)pow(dimRes,
+                                (noSpecies+1))*2) + lowerInd[0] + 1];
                         float xd = (state[0] - x0)/(x1-x0);
 
                         // First, assign the yvalues to the coefficients matrix
                         for (int kk = 0; kk < (int)pow(2,noSpecies); kk++) {
-                            // Get the indices of the yvales of the lower and upper
-                            // bounding values on this dimension.
+                            // Get the indices of the yvales of the lower and
+                            // upper bounding values on this dimension.
                             int idxL = ii*noControls*(dimRes*(noSpecies + 1) +
-                                    (int)pow(dimRes,(noSpecies+1)*2) + jj*(dimRes*
-                                    (noSpecies + 1) + (int)pow(dimRes,(noSpecies+1)
-                                    *2)) + dimRes*(noSpecies + 1));
+                                    (int)pow(dimRes,(noSpecies+1))*2) + jj*(
+                                    dimRes*(noSpecies + 1) + (int)pow(dimRes,
+                                    (noSpecies+1))*2) + dimRes*(noSpecies + 1);
 
                             for (int ll = 1; ll <= noSpecies; ll++) {
-                                int rem = ((int)(kk/((int)pow(2,noSpecies - ll))) +
-                                        1) - 2*(int)(((int)(kk/((int)pow(2,
-                                        noSpecies - ll))) + 1)/2);
+                                int rem = ((int)(kk/((int)pow(2,noSpecies -
+                                        ll))) + 1) - 2*(int)(((int)(kk/((int)
+                                        pow(2,noSpecies - ll))) + 1)/2);
                                 if (rem > 0) {
-                                    idxL += lowerInd[ll]*(int)pow(dimRes,noSpecies
-                                            - ll)*2;
+                                    idxL += lowerInd[ll]*(int)pow(dimRes,
+                                            noSpecies - ll);
                                 } else {
-                                    idxL += (lowerInd[ll] + 1)*(int)pow(dimRes,noSpecies
-                                            - ll)*2;
+                                    idxL += (lowerInd[ll] + 1)*(int)pow(dimRes,
+                                            noSpecies - ll)*2;
                                 }
                             }
 
-                            int idxU = idxL + (lowerInd[0] + 1)*(int)pow(dimRes,
-                                    noSpecies)*2;
+                            int idxU = idxL + (lowerInd[0] + 1)*(int)pow(
+                                    dimRes,noSpecies);
 
-                            idxL += idxL + lowerInd[0]*(int)pow(dimRes,noSpecies)
-                                    *2;
+                            idxL += idxL + lowerInd[0]*(int)pow(dimRes,
+                                    noSpecies);
 
                             coeffs[kk] = regression[idxL]*(1 - xd) +
                                     regression[idxU]*xd;
@@ -1416,7 +1625,7 @@ void SimulateGPU::expPV(UncertaintyPtr uncertainty) {
     // Get device properties
     int device = 0;
     struct cudaDeviceProp properties;
-    cudaGetDeviceProperties(&properties, device);
+    CUDA_CALL(cudaGetDeviceProperties(&properties, device));
     maxMultiProcessors = properties.multiProcessorCount;
     maxThreadsPerBlock = properties.maxThreadsPerBlock;
 
@@ -1439,26 +1648,25 @@ void SimulateGPU::expPV(UncertaintyPtr uncertainty) {
     int _seed = rand();
 
     results = (float*)malloc(noPaths*sizeof(float));
-    cudaMalloc((void **)&d_brownian, sizeof(float)*nYears*noPaths);
-    cudaMalloc((void **)&d_jumpSizes, sizeof(float)*nYears*noPaths);
-    cudaMalloc((void **)&d_jumps, sizeof(float)*nYears*noPaths);
-    cudaMalloc((void **)&d_results, sizeof(float)*nYears*noPaths);
+    CUDA_CALL(cudaMalloc((void **)&d_brownian, sizeof(float)*nYears*noPaths));
+    CUDA_CALL(cudaMalloc((void **)&d_jumpSizes, sizeof(float)*nYears*noPaths));
+    CUDA_CALL(cudaMalloc((void **)&d_jumps, sizeof(float)*nYears*noPaths));
+    CUDA_CALL(cudaMalloc((void **)&d_results, sizeof(float)*nYears*noPaths));
 
-    curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
-    curandSetPseudoRandomGeneratorSeed(gen, _seed);
+    CURAND_CALL(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
+    CURAND_CALL(curandSetPseudoRandomGeneratorSeed(gen, _seed));
 
-    curandGenerateNormal(gen, d_brownian, nYears*noPaths, 0.0f, uncertainty->
-            getNoiseSD()*timeStep*vp->getCommoditySDMultipliers()(
-            sc->getCommoditySD()));
-    curandGenerateNormal(gen, d_jumpSizes, nYears*noPaths,
+    CURAND_CALL(curandGenerateNormal(gen, d_brownian, nYears*noPaths, 0.0f,
+            uncertainty->getNoiseSD()*timeStep*vp->getCommoditySDMultipliers()(
+            sc->getCommoditySD())));
+    CURAND_CALL(curandGenerateNormal(gen, d_jumpSizes, nYears*noPaths,
             -pow(uncertainty->getPoissonJump()*vp->getCommoditySDMultipliers()(
             sc->getCommoditySD()),2)/2,pow(uncertainty->
             getPoissonJump()*vp->getCommoditySDMultipliers()(sc->getCommoditySD()
-            ),2));
-    curandGenerateUniform(gen, d_jumps, nYears*noPaths);
+            ),2)));
+    CURAND_CALL(curandGenerateUniform(gen, d_jumps, nYears*noPaths));
 
-    curandDestroyGenerator(gen);
-    cudaDeviceSynchronize();
+    CURAND_CALL(curandDestroyGenerator(gen));
 
     // Compute path values
     int noBlocks = (noPaths % maxThreadsPerBlock) ? (int)(
@@ -1474,10 +1682,11 @@ void SimulateGPU::expPV(UncertaintyPtr uncertainty) {
             uncertainty->getJumpProb()*vp->getCommoditySDMultipliers()(
             sc->getCommoditySD()), d_brownian, d_jumpSizes, d_jumps,
             d_results);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
 
-    cudaDeviceSynchronize();
-
-    cudaMemcpy(results,d_results,noPaths*sizeof(float),cudaMemcpyDeviceToHost);
+    CUDA_CALL(cudaMemcpy(results,d_results,noPaths*sizeof(float),
+            cudaMemcpyDeviceToHost));
 
     for (int ii = 0; ii < noPaths; ii++) {
         total += results[ii];
@@ -1492,10 +1701,10 @@ void SimulateGPU::expPV(UncertaintyPtr uncertainty) {
 
     uncertainty->setExpPVSD(sqrt(total));
 
-    cudaFree(d_brownian);
-    cudaFree(d_jumpSizes);
-    cudaFree(d_jumps);
-    cudaFree(d_results);
+    CUDA_CALL(cudaFree(d_brownian));
+    CUDA_CALL(cudaFree(d_jumpSizes));
+    CUDA_CALL(cudaFree(d_jumps));
+    CUDA_CALL(cudaFree(d_results));
     free(results);
 }
 
@@ -1523,13 +1732,13 @@ void SimulateGPU::eMMN(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
     Bf = (float*)malloc(c*d*sizeof(float));
     Cf = (float*)malloc(a*d*sizeof(float));
 
-    cudaMalloc(&d_A,a*b*sizeof(float));
-    cudaMemcpy(d_A,Af,a*b*sizeof(float),cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMalloc(&d_A,a*b*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_A,Af,a*b*sizeof(float),cudaMemcpyHostToDevice));
 
-    cudaMalloc(&d_B,c*d*sizeof(float));
-    cudaMemcpy(d_B,Bf,c*d*sizeof(float),cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMalloc(&d_B,c*d*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_B,Bf,c*d*sizeof(float),cudaMemcpyHostToDevice));
 
-    cudaMalloc(&d_C,a*d*sizeof(float));
+    CUDA_CALL(cudaMalloc(&d_C,a*d*sizeof(float)));
 
     // declare the number of blocks per grid and the number of threads per block
     dim3 threadsPerBlock(a, d);
@@ -1543,11 +1752,13 @@ void SimulateGPU::eMMN(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
 
     matrixMultiplicationKernelNaive<<<blocksPerGrid,threadsPerBlock>>>(d_A,d_B,
             d_C,a,b,c,d);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
 
     // Retrieve result and free data
-    cudaMemcpy(C.data(),d_C,a*d*sizeof(float),cudaMemcpyDeviceToHost);
+    CUDA_CALL(cudaMemcpy(C.data(),d_C,a*d*sizeof(float),
+            cudaMemcpyDeviceToHost));
 
-    cudaDeviceSynchronize();
     free(Af);
     free(Bf);
     free(Cf);
@@ -1580,11 +1791,13 @@ void SimulateGPU::eMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
     Eigen::MatrixXf Bf = B.cast<float>();
     Eigen::MatrixXf Cf = C.cast<float>();
 
-    cudaMalloc(&d_A,a*b*sizeof(float));
-    cudaMemcpy(d_A,Af.data(),a*b*sizeof(float),cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMalloc(&d_A,a*b*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_A,Af.data(),a*b*sizeof(float),
+            cudaMemcpyHostToDevice));
 
-    cudaMalloc(&d_B,c*d*sizeof(float));
-    cudaMemcpy(d_B,Bf.data(),c*d*sizeof(float),cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMalloc(&d_B,c*d*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_B,Bf.data(),c*d*sizeof(float),
+            cudaMemcpyHostToDevice));
 
     cudaMalloc(&d_C,a*d*sizeof(float));
 
@@ -1593,16 +1806,17 @@ void SimulateGPU::eMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
     dim3 grid(d/(BLOCK_SIZE*VECTOR_SIZE), a/BLOCK_SIZE);
 
     matrixMultiplicationKernel<<<grid,threads>>>(d_A,d_B,d_C,a,b,d);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
 
     // Retrieve result and free data
-    cudaMemcpy(Cf.data(),d_C,a*d*sizeof(float),cudaMemcpyDeviceToHost);
+    CUDA_CALL(cudaMemcpy(Cf.data(),d_C,a*d*sizeof(float),
+            cudaMemcpyDeviceToHost));
 
     C = Cf.cast<double>();
-
-    cudaDeviceSynchronize();
-    cudaFree(d_A);
-    cudaFree(d_B);
-    cudaFree(d_C);
+    CUDA_CALL(cudaFree(d_A));
+    CUDA_CALL(cudaFree(d_B));
+    CUDA_CALL(cudaFree(d_C));
 
 }
 
@@ -1628,13 +1842,15 @@ void SimulateGPU::ewMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd &B,
     Eigen::MatrixXf Bf = B.cast<float>();
     Eigen::MatrixXf Cf = C.cast<float>();
 
-    cudaMalloc(&d_A,a*b*sizeof(float));
-    cudaMemcpy(d_A,Af.data(),a*b*sizeof(float),cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMalloc(&d_A,a*b*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_A,Af.data(),a*b*sizeof(float),
+            cudaMemcpyHostToDevice));
 
-    cudaMalloc(&d_B,a*b*sizeof(float));
-    cudaMemcpy(d_B,Bf.data(),a*b*sizeof(float),cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMalloc(&d_B,a*b*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_B,Bf.data(),a*b*sizeof(float),
+            cudaMemcpyHostToDevice));
 
-    cudaMalloc(&d_C,a*b*sizeof(float));
+    CUDA_CALL(cudaMalloc(&d_C,a*b*sizeof(float)));
 
     // declare the number of blocks per grid and the number of threads per
     // block
@@ -1642,16 +1858,17 @@ void SimulateGPU::ewMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd &B,
     dim3 dimGrid(b/dimBlock.x,a/dimBlock.y);
 
     matrixMultiplicationKernelEW<<<dimGrid,dimBlock>>>(d_A,d_B,d_C,a,b);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
 
     // Retrieve result and free data
-    cudaMemcpy(Cf.data(),d_C,a*b*sizeof(float),cudaMemcpyDeviceToHost);
+    CUDA_CALL(cudaMemcpy(Cf.data(),d_C,a*b*sizeof(float),
+            cudaMemcpyDeviceToHost));
 
     C = Cf.cast<double>();
-
-    cudaDeviceSynchronize();
-    cudaFree(d_A);
-    cudaFree(d_B);
-    cudaFree(d_C);
+    CUDA_CALL(cudaFree(d_A));
+    CUDA_CALL(cudaFree(d_B));
+    CUDA_CALL(cudaFree(d_C));
 }
 
 void SimulateGPU::ewMD(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
@@ -1676,13 +1893,15 @@ void SimulateGPU::ewMD(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
     Eigen::MatrixXf Bf = B.cast<float>();
     Eigen::MatrixXf Cf = C.cast<float>();
 
-    cudaMalloc(&d_A,a*b*sizeof(float));
-    cudaMemcpy(d_A,Af.data(),a*b*sizeof(float),cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMalloc(&d_A,a*b*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_A,Af.data(),a*b*sizeof(float),
+            cudaMemcpyHostToDevice));
 
-    cudaMalloc(&d_B,a*b*sizeof(float));
-    cudaMemcpy(d_B,Bf.data(),a*b*sizeof(float),cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMalloc(&d_B,a*b*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_B,Bf.data(),a*b*sizeof(float),
+            cudaMemcpyHostToDevice));
 
-    cudaMalloc(&d_C,a*b*sizeof(float));
+    CUDA_CALL(cudaMalloc(&d_C,a*b*sizeof(float)));
 
     // declare the number of blocks per grid and the number of threads per
     // block
@@ -1690,16 +1909,17 @@ void SimulateGPU::ewMD(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
     dim3 dimGrid(b/dimBlock.x,a/dimBlock.y);
 
     matrixDivisionKernelEW<<<dimGrid,dimBlock>>>(d_A,d_B,d_C,a,b);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
 
     // Retrieve result and free data
-    cudaMemcpy(Cf.data(),d_C,a*b*sizeof(float),cudaMemcpyDeviceToHost);
+    CUDA_CALL(cudaMemcpy(Cf.data(),d_C,a*b*sizeof(float),
+            cudaMemcpyDeviceToHost));
 
     C = Cf.cast<double>();
-
-    cudaDeviceSynchronize();
-    cudaFree(d_A);
-    cudaFree(d_B);
-    cudaFree(d_C);
+    CUDA_CALL(cudaFree(d_A));
+    CUDA_CALL(cudaFree(d_B));
+    CUDA_CALL(cudaFree(d_C));
 }
 
 void SimulateGPU::lineSegmentIntersect(const Eigen::MatrixXd& XY1, const
@@ -1728,27 +1948,27 @@ void SimulateGPU::lineSegmentIntersect(const Eigen::MatrixXd& XY1, const
     float *d_XY1, *d_XY2, *d_X4_X3, *d_Y4_Y3, *d_X2_X1, *d_Y2_Y1;
     int *d_adjacency, *d_cross;
 
-    cudaMalloc(&d_XY1,XY1.rows()*XY1.cols()*sizeof(float));
-    cudaMemcpy(d_XY1,XY1f.data(),XY1.rows()*XY1.cols()*sizeof(float),
-            cudaMemcpyHostToDevice);
-    cudaMalloc(&d_XY2,XY2.rows()*XY2.cols()*sizeof(float));
-    cudaMemcpy(d_XY2,XY2f.data(),XY2.rows()*XY2.cols()*sizeof(float),
-            cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMalloc(&d_XY1,XY1.rows()*XY1.cols()*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_XY1,XY1f.data(),XY1.rows()*XY1.cols()*sizeof(float),
+            cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMalloc(&d_XY2,XY2.rows()*XY2.cols()*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_XY2,XY2f.data(),XY2.rows()*XY2.cols()*sizeof(float),
+            cudaMemcpyHostToDevice));
 
-    cudaMalloc(&d_X4_X3,XY2.rows()*sizeof(float));
-    cudaMemcpy(d_X4_X3,X4_X3.data(),XY2.rows()*sizeof(float),
-            cudaMemcpyHostToDevice);
-    cudaMalloc(&d_Y4_Y3,XY2.rows()*sizeof(float));
-    cudaMemcpy(d_Y4_Y3,Y4_Y3.data(),XY2.rows()*sizeof(float),
-            cudaMemcpyHostToDevice);
-    cudaMalloc(&d_X2_X1,XY1.rows()*sizeof(float));
-    cudaMemcpy(d_X2_X1,X2_X1.data(),XY1.rows()*sizeof(float),
-            cudaMemcpyHostToDevice);
-    cudaMalloc(&d_Y2_Y1,XY1.rows()*sizeof(float));
-    cudaMemcpy(d_Y2_Y1,Y2_Y1.data(),XY1.rows()*sizeof(float),
-            cudaMemcpyHostToDevice);
-    cudaMalloc(&d_adjacency,XY1.rows()*XY2.rows()*sizeof(int));
-    cudaMalloc(&d_cross,XY1.rows()*sizeof(int));
+    CUDA_CALL(cudaMalloc(&d_X4_X3,XY2.rows()*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_X4_X3,X4_X3.data(),XY2.rows()*sizeof(float),
+            cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMalloc(&d_Y4_Y3,XY2.rows()*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_Y4_Y3,Y4_Y3.data(),XY2.rows()*sizeof(float),
+            cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMalloc(&d_X2_X1,XY1.rows()*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_X2_X1,X2_X1.data(),XY1.rows()*sizeof(float),
+            cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMalloc(&d_Y2_Y1,XY1.rows()*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_Y2_Y1,Y2_Y1.data(),XY1.rows()*sizeof(float),
+            cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMalloc(&d_adjacency,XY1.rows()*XY2.rows()*sizeof(int)));
+    CUDA_CALL(cudaMalloc(&d_cross,XY1.rows()*sizeof(int)));
 
     // Compute the road crossings for each transition
     int noCombos = XY1.rows()*XY2.rows();
@@ -1763,31 +1983,31 @@ void SimulateGPU::lineSegmentIntersect(const Eigen::MatrixXd& XY1, const
     dim3 dimGrid(blockXDim,blockYDim);
     pathAdjacencyKernel<<<dimGrid,maxThreadsPerBlock>>>(XY1.rows(),XY2.rows(),
             d_XY1,d_XY2,d_X4_X3,d_Y4_Y3,d_X2_X1,d_Y2_Y1,d_adjacency);
-    cudaDeviceSynchronize();
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
 
-    cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess) {
-      fprintf(stderr, "ERROR: %s \n", cudaGetErrorString(error));
-    }
+//    cudaError_t error = cudaGetLastError();
+//    if (error != cudaSuccess) {
+//      fprintf(stderr, "ERROR: %s \n", cudaGetErrorString(error));
+//    }
 
     // Sum the number
     noBlocks = (XY1.rows() % maxThreadsPerBlock)? (int)(XY1.rows()/
             maxThreadsPerBlock + 1) : (int)(XY1.rows()/maxThreadsPerBlock);
     roadCrossingsKernel<<<noBlocks,maxThreadsPerBlock>>>(XY1.rows(),
             XY2.rows(),d_adjacency,d_cross);
-    cudaDeviceSynchronize();
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
 
     // Retrieve results
-    cudaMemcpy(crossings.data(),d_cross,XY1.rows()*sizeof(int),
-            cudaMemcpyDeviceToHost);
-
-    cudaDeviceSynchronize();
+    CUDA_CALL(cudaMemcpy(crossings.data(),d_cross,XY1.rows()*sizeof(int),
+            cudaMemcpyDeviceToHost));
     // Free memory
-    cudaFree(d_X4_X3);
-    cudaFree(d_Y4_Y3);
-    cudaFree(d_X2_X1);
-    cudaFree(d_Y2_Y1);
-    cudaFree(d_cross);
+    CUDA_CALL(cudaFree(d_X4_X3));
+    CUDA_CALL(cudaFree(d_Y4_Y3));
+    CUDA_CALL(cudaFree(d_X2_X1));
+    CUDA_CALL(cudaFree(d_Y2_Y1));
+    CUDA_CALL(cudaFree(d_cross));
 }
 
 void SimulateGPU::buildPatches(int W, int H, int skpx, int skpy, int xres,
@@ -1810,15 +2030,16 @@ void SimulateGPU::buildPatches(int W, int H, int skpx, int skpy, int xres,
     int *d_labelledImage;
 
     results = (float*)malloc(xres*yres*noRegions*5*sizeof(float));
-    cudaMalloc((void **)&d_results,xres*yres*noRegions*5*sizeof(float));
+    CUDA_CALL(cudaMalloc((void **)&d_results,xres*yres*noRegions*5*
+            sizeof(float)));
 
-    cudaMalloc((void **)&d_labelledImage,H*W*sizeof(int));
-    cudaMemcpy(d_labelledImage,labelledImage.data(),H*W*sizeof(int),
-            cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMalloc((void **)&d_labelledImage,H*W*sizeof(int)));
+    CUDA_CALL(cudaMemcpy(d_labelledImage,labelledImage.data(),H*W*sizeof(int),
+            cudaMemcpyHostToDevice));
 
-    cudaMalloc((void **)&d_populations,H*W*sizeof(float));
-    cudaMemcpy(d_populations,popsFloat.data(),H*W*sizeof(float),
-            cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMalloc((void **)&d_populations,H*W*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_populations,popsFloat.data(),H*W*sizeof(float),
+            cudaMemcpyHostToDevice));
 
     int noBlocks = ((xres*yres*noRegions) % maxThreadsPerBlock)? (int)(xres*
             yres*noRegions/maxThreadsPerBlock + 1) : (int)(xres*yres*noRegions/
@@ -1829,15 +2050,16 @@ void SimulateGPU::buildPatches(int W, int H, int skpx, int skpy, int xres,
             W, H, skpx, skpy, xres,yres,(float)subPatchArea,(float)xspacing,
             (float)yspacing,(float)habTyp->getMaxPop(),noRegions,
             d_labelledImage,d_populations,d_results);
-    cudaDeviceSynchronize();
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
 
-    cudaError_t error = cudaGetLastError();
-    if (error != cudaSuccess) {
-      fprintf(stderr, "ERROR: %s \n", cudaGetErrorString(error));
-    }
+//    cudaError_t error = cudaGetLastError();
+//    if (error != cudaSuccess) {
+//      fprintf(stderr, "ERROR: %s \n", cudaGetErrorString(error));
+//    }
 
-    cudaMemcpy(results,d_results,xres*yres*noRegions*5*sizeof(float),
-               cudaMemcpyDeviceToHost);
+    CUDA_CALL(cudaMemcpy(results,d_results,xres*yres*noRegions*5*sizeof(float),
+               cudaMemcpyDeviceToHost));
 
     // Now turn the results into patches
     for (int ii = 0; ii < xres*yres*noRegions; ii++) {
@@ -1845,19 +2067,20 @@ void SimulateGPU::buildPatches(int W, int H, int skpx, int skpy, int xres,
             // Create new patch to add to patches vector
             HabitatPatchPtr hab(new HabitatPatch());
             hab->setArea((double)results[5*ii]);
-            hab->setCX((double)results[ii+3]);
-            hab->setCY((double)results[ii+4]);
+            hab->setCX((double)results[5*ii+3]);
+            hab->setCY((double)results[5*ii+4]);
             hab->setPopulation((double)results[5*ii+2]);
             hab->setCapacity((double)results[5*ii+1]);
-            initPop += (double)results[5*ii];
-            initPops(noPatches) = (double)results[5*ii];
+            hab->setType(habTyp);
+            initPop += (double)results[5*ii+2];
+            initPops(noPatches) = (double)results[5*ii+2];
             patches[noPatches++] = hab;
         }
     }
 
-    cudaFree(d_populations);
-    cudaFree(d_labelledImage);
-    cudaFree(d_results);
+    CUDA_CALL(cudaFree(d_populations));
+    CUDA_CALL(cudaFree(d_labelledImage));
+    CUDA_CALL(cudaFree(d_results));
     free(results);
 }
 
@@ -1883,8 +2106,9 @@ void SimulateGPU::simulateMTECUDA(SimulatorPtr sim,
             getNoPaths();
 
     // Get experimental scenario multipliers
-    ExperimentalScenarioPtr sc = sim->getRoad()->getOptimiser()->getScenario();
-    VariableParametersPtr vp = sim->getRoad()->getOptimiser()->
+    ExperimentalScenarioPtr scenario = sim->getRoad()->getOptimiser()->
+            getScenario();
+    VariableParametersPtr varParams = sim->getRoad()->getOptimiser()->
             getVariableParams();
 
     // Get the important values for the road first and convert them to
@@ -1895,100 +2119,214 @@ void SimulateGPU::simulateMTECUDA(SimulatorPtr sim,
         // Species parameters
         float stepSize = (float)sim->getRoad()->getOptimiser()->getEconomic()->
                 getTimeStep();
-        float grm = (float)(srp[ii]->getSpecies()->getGrowthRateMean()*
-                stepSize*vp->getGrowthRatesMultipliers()(sc->getPopGR()));
-        float grsd = (float)(srp[ii]->getSpecies()->getGrowthRateSD()*
-                stepSize*vp->getGrowthRateSDMultipliers()(sc->getPopGRSD()));
         int nPatches = capacities[ii].size();
 
-        float *eps, *d_initPops, *d_eps, *d_caps, *d_mmm;
+        float *speciesParams, *d_speciesParams, *eps, *d_initPops, *d_eps,
+                *d_caps;
 
-        // RANDOM MATRIX
-        float *d_random_floats;
+        speciesParams = (float*)malloc(8*sizeof(float));
+        CUDA_CALL(cudaMalloc((void**)&d_speciesParams,8*sizeof(float)));
+
+        //int counter2 = 0;
+
+        // Read in the information into the correct format
+        speciesParams[0] = srp[ii]->getSpecies()->getGrowthRate()->getCurrent()
+                *varParams->getGrowthRatesMultipliers()(scenario->getPopGR());
+        speciesParams[1] = srp[ii]->getSpecies()->getGrowthRate()->getMean()
+                *varParams->getGrowthRatesMultipliers()(scenario->getPopGR());
+        speciesParams[2] = srp[ii]->getSpecies()->getGrowthRate()->getNoiseSD()
+                *varParams->getGrowthRateSDMultipliers()(scenario->
+                getPopGRSD());
+        speciesParams[3] = srp[ii]->getSpecies()->getThreshold()*varParams->
+                getPopulationLevels()(scenario->getPopLevel());
+        speciesParams[4] = srp[ii]->getSpecies()->getGrowthRate()->
+                getMRStrength()*varParams->getGrowthRateSDMultipliers()(
+                scenario->getPopGRSD());
+        speciesParams[5] = srp[ii]->getSpecies()->getGrowthRate()->
+                getPoissonJump()*varParams->getGrowthRateSDMultipliers()(
+                scenario->getPopGRSD());
+        speciesParams[6] = srp[ii]->getSpecies()->getGrowthRate()->
+                getJumpProb()*varParams->getGrowthRateSDMultipliers()(
+                scenario->getPopGRSD());
+        speciesParams[7] = srp[ii]->getSpecies()->getLocalVariability();
+
+        //counter2 += pow(srp[ii]->getHabPatches().size(),2);
+
+        CUDA_CALL(cudaMemcpy(d_speciesParams,speciesParams,8*sizeof(float),
+                cudaMemcpyHostToDevice));
+
+        // RANDOM MATRICES
+        float *d_growthRates, *d_uBrownianSpecies, *d_uJumpSizesSpecies,
+                *d_uJumpsSpecies;
+        //allocate space for 100 floats on the GPU
+        //could also do this with thrust vectors and pass a raw pointer
+        CUDA_CALL(cudaMalloc((void**)&d_growthRates,nYears*noPaths*nPatches*
+                sizeof(float)));
+        CUDA_CALL(cudaMalloc((void**)&d_uBrownianSpecies,nYears*noPaths*
+                sizeof(float)));
+        CUDA_CALL(cudaMalloc((void**)&d_uJumpSizesSpecies,nYears*noPaths*
+                sizeof(float)));
+        CUDA_CALL(cudaMalloc((void**)&d_uJumpsSpecies,nYears*noPaths*
+                sizeof(float)));
+
         curandGenerator_t gen;
         srand(time(NULL));
         int _seed = rand();
-        //allocate space for 100 floats on the GPU
-        //could also do this with thrust vectors and pass a raw pointer
-        cudaMalloc((void **)&d_random_floats, sizeof(float) *nYears*noPaths*
-                nPatches);
         curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
         curandSetPseudoRandomGeneratorSeed(gen, _seed);
-        curandGenerateNormal(gen, d_random_floats, nYears*noPaths*nPatches,
-                0.0f,1.0f);
-        curandDestroyGenerator(gen);
-        cudaDeviceSynchronize();
+
+        // Random matrices for growth rate parameter for species
+        CURAND_CALL(curandGenerateNormal(gen, d_growthRates, nYears*noPaths*
+                nPatches,0.0f,1.0f));
+
+        CURAND_CALL(curandGenerateNormal(gen, d_uBrownianSpecies, nYears*
+                noPaths, 0.0f,1.0f));
+
+        CURAND_CALL(curandGenerateNormal(gen, d_uJumpSizesSpecies, nYears*
+                noPaths, 0.0f,1.0f));
+
+        CURAND_CALL(curandGenerateUniform(gen, d_uJumpsSpecies, nYears*
+                noPaths));
+
+        CURAND_CALL(curandDestroyGenerator(gen));
 
         // INITIAL POPULATIONS
-        Eigen::MatrixXf initPopsF = initPops[ii].cast<float>();
-        cudaMalloc(&d_initPops,initPops[ii].size()*sizeof(float));
-        cudaMemcpy(d_initPops,initPopsF.data(),
-                initPops[ii].size()*sizeof(float),cudaMemcpyHostToDevice);
+        Eigen::VectorXf initPopsF = initPops[ii].cast<float>();
+        CUDA_CALL(cudaMalloc((void**)&d_initPops,initPops[ii].size()*
+                sizeof(float)));
+        CUDA_CALL(cudaMemcpy(d_initPops,initPopsF.data(),initPops[ii].size()*
+                sizeof(float),cudaMemcpyHostToDevice));
 
         // END POPULATIONS
         eps = (float*)malloc(noPaths*sizeof(float));
-        cudaMalloc(&d_eps, noPaths*sizeof(float));
+        CUDA_CALL(cudaMalloc((void**)&d_eps, noPaths*sizeof(float)));
 
-        for (int jj = 0; jj < noPaths; jj++) {
-            eps[jj] = 0.0f;
-        }
+        // TEMPORARY KERNEL POPULATIONS
+        float *d_pathPops;
+        CUDA_CALL(cudaMalloc((void**)&d_pathPops, noPaths*2*initPops[ii].size()
+                *sizeof(float)));
 
-        cudaMemcpy(d_eps,eps,noPaths*sizeof(float),cudaMemcpyHostToDevice);
+//        for (int jj = 0; jj < noPaths; jj++) {
+//            eps[jj] = 0.0f;
+//        }
+
+//        cudaMemcpy(d_eps,eps,noPaths*sizeof(float),cudaMemcpyHostToDevice);
 
         // CAPACITIES
         Eigen::VectorXf capsF = capacities[ii].cast<float>();
-        cudaMalloc(&d_caps,capacities[ii].size()*sizeof(float));
-        cudaMemcpy(d_caps,capsF.data(),capacities[ii].size()*sizeof(float),
-                cudaMemcpyHostToDevice);
+        CUDA_CALL(cudaMalloc((void**)&d_caps,capacities[ii].size()*
+                sizeof(float)));
+        CUDA_CALL(cudaMemcpy(d_caps,capsF.data(),capacities[ii].size()*
+                sizeof(float),cudaMemcpyHostToDevice));
 
         // MOVEMENT AND MORTALITY MATRIX
-        // We use the highest flow rate in the vector of survival matrices
-        const Eigen::MatrixXd& transProbs = srp[ii]->getTransProbs();
-        const Eigen::MatrixXd& survProbs = srp[ii]->getSurvivalProbs()[
-                srp[ii]->getSurvivalProbs().size()-1];
-        Eigen::MatrixXf mmm = (transProbs.array()*survProbs.array()).
-                cast<float>();
+        // Convert the movement and mortality matrix to a sparse matrix for use
+        // in the kernel efficiently.
+        float *d_sparseOut;
+        int *d_elemsPerCol, *d_rowIdx;
 
-        cudaMalloc(&d_mmm,mmm.rows()*mmm.cols()*sizeof(float));
-        cudaMemcpy(d_mmm,mmm.data(),mmm.rows()*mmm.cols()*
-                sizeof(float),cudaMemcpyHostToDevice);
+        {
+            const Eigen::MatrixXd& transProbs = srp[ii]->getTransProbs();
+            const Eigen::MatrixXd& survProbs = srp[ii]->getSurvivalProbs()[
+                    srp[ii]->getSurvivalProbs().size()-1];
+            Eigen::MatrixXf mmm = (transProbs.array()*survProbs.array()).
+                    cast<float>();
+
+            Eigen::MatrixXf sparseOut(mmm.rows(),mmm.cols());
+            Eigen::VectorXi elemsPerCol(capacities[ii].size());
+            Eigen::VectorXi rowIdx(mmm.rows()*mmm.cols());
+
+            int totalElements;
+            SimulateGPU::dense2Sparse(mmm.data(),capacities[ii].size(),
+                    capacities[ii].size(),sparseOut.data(),elemsPerCol.data(),
+                    rowIdx.data(),totalElements);
+
+            // Allocate GPU memory for sparse matrix
+            CUDA_CALL(cudaMalloc((void**)&d_sparseOut,totalElements*
+                    sizeof(float)));
+            CUDA_CALL(cudaMalloc((void**)&d_rowIdx,totalElements*sizeof(int)));
+            CUDA_CALL(cudaMalloc((void**)&d_elemsPerCol,capacities[ii].size()*
+                    sizeof(int)));
+
+            CUDA_CALL(cudaMemcpy(d_sparseOut,sparseOut.data(),totalElements*
+                    sizeof(float),cudaMemcpyHostToDevice));
+            CUDA_CALL(cudaMemcpy(d_rowIdx,rowIdx.data(),totalElements*sizeof(
+                    int),cudaMemcpyHostToDevice));
+            CUDA_CALL(cudaMemcpy(d_elemsPerCol,elemsPerCol.data(),
+                    capacities[ii].size()*sizeof(int),cudaMemcpyHostToDevice));
+        }
 
         ///////////////////////////////////////////////////////////////////////
         // Perform N simulation paths. Currently, there is no species
         // interaction, so we run each kernel separately and do not need to use
         // the Thrust library.
+
+        // Modify the below code the run the kernel multiple times depending on
+        // how many paths are required.
+
+        // Blocks and threads for each path
         int noBlocks = (int)(noPaths % maxThreadsPerBlock)?
                 (int)(noPaths/maxThreadsPerBlock + 1) :
                 (int)(noPaths/maxThreadsPerBlock);
         int noThreadsPerBlock = min(noPaths,maxThreadsPerBlock);
+        // Maximum number of floating points to store in shared memory will be
+        // 8000 for a 64KB shared memory block.
+//        int noTiles = (int)((int)pow((double)capacities[ii].size(),2) %
+//                max_shared_floats) ? (int)((int)pow((double)capacities[ii]
+//                .size(),2) / max_shared_floats + 1) : (int)((int)pow(
+//                (double)capacities[ii].size(),2) / max_shared_floats);
+//        int tileDim = capacities[ii].size()/noTiles;
+//        int sharedMemElements = tileDim*capacities[ii].size()*sizeof(float);
 
-        mteKernel<<<noBlocks,noThreadsPerBlock>>>
-                (noPaths,nYears,capacities[ii].size(),grm,grsd,d_initPops,
-                d_caps,d_mmm,d_eps,d_random_floats);
-        cudaDeviceSynchronize();
+//        clock_t begin = clock();
+
+        mteKernel<<<noBlocks,noThreadsPerBlock>>>(noPaths,nYears,
+                capacities[ii].size(),stepSize,d_growthRates,
+                d_uBrownianSpecies,d_uJumpSizesSpecies,d_uJumpsSpecies,
+                d_speciesParams,d_initPops,d_caps,d_sparseOut,d_rowIdx,
+                d_elemsPerCol,d_pathPops,d_eps);
+        CUDA_CALL(cudaPeekAtLastError());
+        CUDA_CALL(cudaDeviceSynchronize());
+
+//        clock_t end = clock();
+//        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//        std::cout << "MTE Time: " << elapsed_secs << " s" << std::endl;
+
+//        cudaError_t error = cudaGetLastError();
+//        if (error != cudaSuccess) {
+//          fprintf(stderr, "ERROR: %s \n", cudaGetErrorString(error));
+//        }
 
         // Retrieve results
-        cudaMemcpy(eps,d_eps,srp.size()*sizeof(float),cudaMemcpyDeviceToHost);
+        CUDA_CALL(cudaMemcpy(eps,d_eps,noPaths*sizeof(float),
+                cudaMemcpyDeviceToHost));
 
         for (int jj = 0; jj < noPaths; jj++) {
             endPops(jj,ii) = eps[jj];
         }
 
         // Free memory
-        cudaDeviceSynchronize();
-        cudaFree(d_random_floats);
-        cudaFree(d_initPops);
-        cudaFree(d_eps);
-        cudaFree(d_caps);
-        cudaFree(d_mmm);
+        CUDA_CALL(cudaFree(d_growthRates));
+        CUDA_CALL(cudaFree(d_uBrownianSpecies));
+        CUDA_CALL(cudaFree(d_uJumpSizesSpecies));
+        CUDA_CALL(cudaFree(d_uJumpsSpecies));
+        CUDA_CALL(cudaFree(d_speciesParams));
+        CUDA_CALL(cudaFree(d_initPops));
+        CUDA_CALL(cudaFree(d_pathPops));
+        CUDA_CALL(cudaFree(d_eps));
+        CUDA_CALL(cudaFree(d_caps));
+        CUDA_CALL(cudaFree(d_sparseOut));
+        CUDA_CALL(cudaFree(d_rowIdx));
+        CUDA_CALL(cudaFree(d_elemsPerCol));
         free(eps);
+        free(speciesParams);
     }
 }
 
 void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         std::vector<SpeciesRoadPatchesPtr>& srp,
-        std::vector<Eigen::MatrixXd> &adjPops,Eigen::MatrixXd&,Eigen::MatrixXd&
-        condExp, Eigen::MatrixXi& optCont) {
+        std::vector<Eigen::MatrixXd> &adjPops, Eigen::MatrixXd& unitProfits,
+        Eigen::MatrixXd& condExp, Eigen::MatrixXi& optCont) {
     // Currently there is no species interaction. This can be a future question
     // and would be an interesting extension on how it can be implemented,
     // what the surrogate looks like and how the patches are formed.
@@ -2061,15 +2399,15 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     capacities = (float*)malloc(patches*sizeof(float));
     transitions = (float*)malloc(transition*sizeof(float));
     survival = (float*)malloc(transition*noControls*sizeof(float));
-    speciesParams = (float*)malloc(srp.size()*2*sizeof(float));
-    uncertParams = (float*)malloc(noUncertainties*8*sizeof(float));
+    speciesParams = (float*)malloc(srp.size()*8*sizeof(float));
+    uncertParams = (float*)malloc(noUncertainties*6*sizeof(float));
 
     cudaMalloc((void**)&d_noPatches,srp.size()*sizeof(int));
     cudaMalloc((void**)&d_initPops,patches*sizeof(float));
     cudaMalloc((void**)&d_capacities,patches*sizeof(float));
     cudaMalloc((void**)&d_transitions,transition*sizeof(float));
     cudaMalloc((void**)&d_survival,transition*noControls*sizeof(float));
-    cudaMalloc((void**)&d_speciesParams,srp.size()*3*sizeof(float));
+    cudaMalloc((void**)&d_speciesParams,srp.size()*8*sizeof(float));
     cudaMalloc((void**)&d_uncertParams,noUncertainties*6*sizeof(float));
     cudaMalloc((void**)&d_tempPops,noPaths*nYears*patches*srp.size()*
             sizeof(float));
@@ -2086,14 +2424,30 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         memcpy(capacities+counter1,srp[ii]->getCapacities().data(),
                 srp[ii]->getHabPatches().size()*sizeof(float));
 
-        speciesParams[counter1] = srp[ii]->getSpecies()->getGrowthRateMean()*
-                varParams->getGrowthRatesMultipliers()(scenario->getPopGR());
-        speciesParams[counter1+1] = srp[ii]->getSpecies()->getGrowthRateSD()*
-                varParams->getGrowthRateSDMultipliers()(scenario->getPopGRSD());
-        speciesParams[counter1+2] = srp[ii]->getSpecies()->getThreshold()*
+        speciesParams[counter1] = srp[ii]->getSpecies()->getGrowthRate()->
+                getCurrent()*varParams->getGrowthRatesMultipliers()(scenario->
+                getPopGR());
+        speciesParams[counter1+1] = srp[ii]->getSpecies()->getGrowthRate()->
+                getMean()*varParams->getGrowthRatesMultipliers()(scenario->
+                getPopGR());
+        speciesParams[counter1+2] = srp[ii]->getSpecies()->getGrowthRate()->
+                getNoiseSD()*varParams->getGrowthRateSDMultipliers()(scenario->
+                getPopGRSD());
+        speciesParams[counter1+3] = srp[ii]->getSpecies()->getThreshold()*
                 varParams->getPopulationLevels()(scenario->getPopLevel());
+        speciesParams[counter1+4] = srp[ii]->getSpecies()->getGrowthRate()->
+                getMRStrength()*varParams->getGrowthRateSDMultipliers()(
+                scenario->getPopGRSD());
+        speciesParams[counter1+5] = srp[ii]->getSpecies()->getGrowthRate()->
+                getPoissonJump()*varParams->getGrowthRateSDMultipliers()(
+                scenario->getPopGRSD());
+        speciesParams[counter1+6] = srp[ii]->getSpecies()->getGrowthRate()->
+                getJumpProb()*varParams->getGrowthRateSDMultipliers()(
+                scenario->getPopGRSD());
+        speciesParams[counter1+7] = srp[ii]->getSpecies()->
+                getLocalVariability();
 
-        counter1 += 3;
+        counter1 += 8;
 
         memcpy(transitions+counter2,srp[ii]->getTransProbs().data(),
                 pow(srp[ii]->getHabPatches().size(),2));
@@ -2165,7 +2519,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
             cudaMemcpyHostToDevice);
     cudaMemcpy(d_survival,survival,transition*sizeof(float),
             cudaMemcpyHostToDevice);
-    cudaMemcpy(d_speciesParams,speciesParams,srp.size()*3*sizeof(float),
+    cudaMemcpy(d_speciesParams,speciesParams,srp.size()*8*sizeof(float),
             cudaMemcpyHostToDevice);
     cudaMemcpy(d_uncertParams,uncertParams,noUncertainties*6*sizeof(float),
             cudaMemcpyHostToDevice);
@@ -2183,7 +2537,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     // Exogenous parameters (fuels, commodities)
     // Ore composition is simply Gaussian for now
     float *d_randCont, *d_growthRate, *d_uBrownian, *d_uJumpSizes,
-            *d_uJumps, *d_uResults, *d_uComposition, *d_flowRates;
+            *d_uJumps, *d_uResults, *d_uComposition, *d_flowRates,
+            *d_uBrownianSpecies, *d_uJumpSizesSpecies, *d_uJumpsSpecies;
     int *d_controls;
 
     srand(time(NULL));
@@ -2218,6 +2573,12 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     // Endogenous uncertainty
     cudaMalloc((void**)&d_growthRate,nYears*noPaths*patches*srp.size()*
             sizeof(float));
+    cudaMalloc((void**)&d_uBrownianSpecies,nYears*noPaths*srp.size()*
+            sizeof(float));
+    cudaMalloc((void**)&d_uJumpSizesSpecies,nYears*noPaths*srp.size()*
+            sizeof(float));
+    cudaMalloc((void**)&d_uJumpsSpecies,nYears*noPaths*srp.size()*
+            sizeof(float));
 
     // Exogenous uncertainty
     cudaMalloc((void**)&d_uBrownian,nYears*noPaths*noUncertainties*
@@ -2234,6 +2595,14 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     // 3. Random matrices for growth rate parameter for species
     curandGenerateNormal(gen, d_growthRate, nYears*noPaths*patches*srp.size(),
             0.0f,1.0f);
+
+    curandGenerateNormal(gen, d_uBrownianSpecies, nYears*noPaths*srp.size(),
+            0.0f,1.0f);
+
+    curandGenerateNormal(gen, d_uJumpSizesSpecies, nYears*noPaths*srp.size(),
+            0.0f,1.0f);
+
+    curandGenerateUniform(gen, d_uJumpsSpecies, nYears*noPaths*srp.size());
 
     // 4. Random matrices for other uncertainties
     curandGenerateNormal(gen, d_uBrownian, nYears*noPaths*noUncertainties,0.0f,
@@ -2260,7 +2629,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     // we use in our policy map.
     float *d_totalPops, *d_aars, *d_mcPops;
     cudaMalloc(&d_totalPops,srp.size()*(nYears+1)*noPaths*sizeof(float));
-    cudaMalloc(&d_mcPops,(nYears+1)*noPaths*patches*sizeof(float));    
+    cudaMalloc(&d_mcPops,(nYears+1)*noPaths*patches*sizeof(float));
     cudaMalloc((void**)&d_aars,srp.size()*(nYears+1)*noPaths*noControls*
             sizeof(float));
 
@@ -2272,14 +2641,18 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     forwardPathKernel<<<noBlocks,noThreadsPerBlock>>>(1,noPaths,nYears,
             srp.size(),patches,noControls,fuels.size(),noUncertainties,
             stepSize,d_tempPops,d_transitions,d_survival,d_speciesParams,
-            d_growthRate,d_capacities,d_aars,d_uncertParams,d_controls,
-            d_uJumps,d_uBrownian,d_uJumpSizes,d_uResults,d_totalPops);
+            d_capacities,d_aars,d_uncertParams,d_controls,d_uJumps,
+            d_uBrownian,d_uJumpSizes,d_uJumpsSpecies,d_uBrownianSpecies,
+            d_uJumpSizesSpecies,d_growthRate,d_uResults,d_totalPops);
     cudaDeviceSynchronize();
 
     // Free device memory that is no longer needed
     cudaFree(d_uBrownian);
     cudaFree(d_uJumpSizes);
     cudaFree(d_uJumps);
+    cudaFree(d_uBrownianSpecies);
+    cudaFree(d_uJumpSizesSpecies);
+    cudaFree(d_uJumpsSpecies);
 
     // Determine the number of uncertainties. The uncertainties are the unit
     // payoff of the road (comprised of commodity and fuel prices, which are
@@ -2309,7 +2682,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     Eigen::MatrixXf unitProfitsF(nYears+1,noPaths);
 
     float *d_unitProfits;
-    cudaMalloc((void**)&d_unitProfits,unitProfits.rows()*unitProfits.
+    cudaMalloc((void**)&d_unitProfits,unitProfitsF.rows()*unitProfitsF.
             cols()*sizeof(float));
 
     // 3. Optimal profit-to-go outputs matrix (along each path)
@@ -2435,8 +2808,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 // This kernel does not take advantage of massive parallelism.
                 // It is simply to allow us to call data that is already on
                 // the device for allocating data for use in the regressions.
-                allocateXYRegressionData<<<1,1>>>(noPaths, noControls,noDims,
-                        ii,d_controls,d_xin,d_condExp, d_dataPoints,d_xvals,
+                allocateXYRegressionData<<<1,1>>>(noPaths,noControls,noDims,
+                        ii,d_controls,d_xin,d_condExp,d_dataPoints,d_xvals,
                         d_yvals);
                 cudaDeviceSynchronize();
 
@@ -2482,7 +2855,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                             sizeof(float),cudaMemcpyDeviceToHost);
                     cudaFree(d_queryPts);
 
-                    cudaMemcpy(ref,d_xvals+noPaths*dataPoints[jj],
+                    cudaMemcpy(ref,d_xvals + jj*noPaths*noDims,
                             dataPoints[jj]*noDims*sizeof(float),
                             cudaMemcpyDeviceToHost);
 
@@ -2576,8 +2949,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
             float),cudaMemcpyDeviceToHost);
     condExp = condExpF.cast<double>();
 
-    cudaMemcpy(unitProfitsF.data(),d_unitProfits,unitProfits.rows()*unitProfits
-            .cols()*sizeof(float),cudaMemcpyDeviceToHost);
+    cudaMemcpy(unitProfitsF.data(),d_unitProfits,unitProfitsF.rows()*
+            unitProfitsF.cols()*sizeof(float),cudaMemcpyDeviceToHost);
     unitProfits = unitProfitsF.cast<double>();
 
     // Free remaining device memory
@@ -2603,4 +2976,178 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     cudaFree(d_totalPops);
     cudaFree(d_aars);
     cudaFree(d_mcPops);
+}
+
+void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
+
+    // Get device properties
+    int device = 0;
+    struct cudaDeviceProp properties;
+    cudaGetDeviceProperties(&properties, device);
+    maxMultiProcessors = properties.multiProcessorCount;
+    maxThreadsPerBlock = properties.maxThreadsPerBlock;
+
+    // --- CUBLAS initialization
+    cublasHandle_t *d_handles;
+    cudaMalloc((void**)&d_handles,maxThreadsPerBlock*sizeof(
+            cublasHandle_t));
+    createHandles<<<1,maxThreadsPerBlock>>>(d_handles,
+            maxThreadsPerBlock);
+    cudaDeviceSynchronize();
+
+    // Pertinent parameters
+    int dimRes = op->getSurrDimRes();
+    int noDims = op->getSpecies().size()+1;
+    int samples = op->getNoSamples();
+    // Use 5% of the nearest points for now
+    int k = samples/5;
+
+    // Convert to floating point
+    Eigen::VectorXf surrogateF(dimRes*noDims+pow(dimRes,noDims));
+    Eigen::VectorXf predictors(noDims*samples);
+    Eigen::VectorXf values = op->getValues().segment(0,samples).cast<float>();
+    Eigen::VectorXf valuesSD = op->getValuesSD().segment(0,samples)
+            .cast<float>();
+
+    // We also need to transpose the data so that the individual observations
+    // are in columns
+    for (int ii = 0; ii < samples; ii++) {
+        predictors.segment(ii*noDims,noDims-1) = op->getIARS().block(ii,0,
+                1,noDims-1).cast<float>();
+        predictors((ii+1)*noDims-1) = (float)op->getUse()(ii);
+    }
+
+    // Call regression kernel for computing the mean and standard
+    // deviation
+    int noBlocks = (int)((int)pow(dimRes,noDims) % maxThreadsPerBlock) ?
+            (int)(pow(dimRes,noDims)/maxThreadsPerBlock + 1) : (int)(
+            pow(dimRes,noDims)/maxThreadsPerBlock);
+    maxThreadsPerBlock = min((int)pow(dimRes,noDims),maxThreadsPerBlock);
+
+    // Arrange the incoming information
+    float *d_xmaxes, *d_xmins, *d_xvals, *d_yvals, *d_surrogate;
+    cudaMalloc((void**)&d_xmaxes,noDims*sizeof(float));
+    cudaMalloc((void**)&d_xmins,noDims*sizeof(float));
+
+    cudaMalloc((void**)&d_xvals,noDims*samples*sizeof(float));
+    cudaMalloc((void**)&d_yvals,samples*sizeof(float));
+    cudaMemcpy(d_xvals,predictors.data(),noDims*samples*sizeof(float),
+            cudaMemcpyHostToDevice);
+
+    cudaMalloc((void**)&d_surrogate,(dimRes*noDims+pow(dimRes,noDims))*sizeof(
+            float));
+
+    // Get the minimum and maximum X value for each dimension for
+    // each control.
+    computeStateMinMax<<<1,1>>>(1,noDims,samples,&samples,d_xvals,d_xmins,
+            d_xmaxes);
+    cudaDeviceSynchronize();
+
+    // Allocate the k nearest neighbours for each design point in
+    // order to do the regression stage after this. This component is
+    // the slowest component.
+
+    // Use 5% of the nearest points for now
+    // We first need to perform a k nearest neighbour search
+    float *query, *dist;
+    int *ind;
+    query = (float*)malloc(pow(dimRes,noDims)*noDims*sizeof(float));
+    dist = (float*)malloc(pow(dimRes,noDims)*k*sizeof(float));
+    ind = (int*)malloc(pow(dimRes,noDims)*k*sizeof(int));
+
+    float *d_queryPts, *d_dist;
+    int *d_ind;
+    cudaMalloc((void**)&d_queryPts,pow(dimRes,noDims)*noDims*sizeof(float));
+    cudaMalloc((void**)&d_dist,pow(dimRes,noDims)*k*sizeof(float));
+    cudaMalloc((void**)&d_ind,pow(dimRes,noDims)*k*sizeof(int));
+
+    createQueryPoints<<<noBlocks,maxThreadsPerBlock>>>((int)pow(dimRes,noDims),
+            noDims,dimRes,0,1,0,d_xmins,d_xmaxes,d_surrogate,d_queryPts);
+    cudaMemcpy(query,d_queryPts,pow(dimRes,noDims)*noDims*sizeof(float),
+            cudaMemcpyDeviceToHost);
+    cudaFree(d_queryPts);
+
+    // Compute the knn searches
+    knn_cublas_with_indexes::knn(predictors.data(),samples,query,pow(
+            dimRes,noDims)*noDims,noDims,k,dist,ind);
+
+    cudaMemcpy(d_dist,dist,pow(dimRes,noDims)*k*sizeof(float),
+            cudaMemcpyHostToDevice);
+
+    cudaMemcpy(d_ind,ind,pow(dimRes,noDims)*k*sizeof(float),
+            cudaMemcpyHostToDevice);
+
+    free(query);
+    free(dist);
+    free(ind);
+
+    // Mean ///////////////////////////////////////////////////////////////////
+    cudaMemcpy(d_yvals,values.data(),samples*sizeof(float),
+            cudaMemcpyHostToDevice);
+
+    multiLocLinReg<<<noBlocks,maxThreadsPerBlock>>>(samples,noDims,
+            dimRes,1,1,0,0,k,&samples,predictors.data(),values.data(),
+            d_surrogate,d_xmins,d_xmaxes,d_dist,d_ind,d_handles);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(surrogateF.data(),d_surrogate,dimRes*noDims+pow(dimRes,noDims)*
+            sizeof(float),cudaMemcpyDeviceToHost);
+
+    // Save the surrogate to the RoadGA object
+    op->getSurrogateROV()[2*op->getScenario()->getCurrentScenario()][
+            op->getScenario()->getRun()] = surrogateF
+            .cast<double>();
+
+    // Standard deviation /////////////////////////////////////////////////////
+    cudaMemcpy(d_yvals,valuesSD.data(),samples*sizeof(float),
+            cudaMemcpyHostToDevice);
+
+    multiLocLinReg<<<noBlocks,maxThreadsPerBlock>>>(samples,noDims,
+            dimRes,1,1,0,0,k,&samples,predictors.data(),valuesSD.data(),
+            d_surrogate,d_xmins,d_xmaxes,d_dist,d_ind,d_handles);
+    cudaDeviceSynchronize();
+
+    cudaMemcpy(surrogateF.data(),d_surrogate,dimRes*noDims+pow(dimRes,noDims)*
+            sizeof(float),cudaMemcpyDeviceToHost);
+
+    // Save the surrogate to the RoadGA object
+    op->getSurrogateROV()[2*op->getScenario()->getCurrentScenario()+1][
+            op->getScenario()->getRun()] = surrogateF.cast<double>();
+
+    // Free remaining memory
+    destroyHandles<<<1,maxThreadsPerBlock>>>(d_handles,
+            maxThreadsPerBlock);
+    cudaFree(d_xmaxes);
+    cudaFree(d_xmins);
+    cudaFree(d_xvals);
+    cudaFree(d_yvals);
+    cudaFree(d_surrogate);
+}
+
+// HELPER ROUTINES ////////////////////////////////////////////////////////////
+
+// Conversion of dense matrix to sparse for movement and mortality
+void SimulateGPU::dense2Sparse(float* denseIn, int rows, int cols,
+        float* sparseOut, int* elemsPerCol, int* rowIdx, int& totalElements) {
+
+    // We work by column as this is the order in which we will later use the
+    // sparse matrix.
+    int it_1 =0;
+
+    for (int ii = 0; ii < cols; ii++) {
+        int it_2 =0;
+
+        for (int jj = 0; jj < rows; jj++) {
+            // To account for system rounding, we use a small tolerance
+            if (denseIn[ii*rows + jj] > 0.00001) {
+                sparseOut[it_1] = denseIn[ii*rows + jj];
+                rowIdx[it_1] = jj;
+                it_1++;
+                it_2++;
+            }
+        }
+        elemsPerCol[ii] = it_2;
+    }
+
+    totalElements = it_1;
 }

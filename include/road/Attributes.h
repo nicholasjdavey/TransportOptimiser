@@ -59,17 +59,17 @@ public:
     /**
      * Returns the initial animals at risk
      *
-     * @return IAR as Eigen::VectorXd&
+     * @return IAR as Eigen::MatrixXd&
      */
-    Eigen::VectorXd& getIAR() {
+    Eigen::MatrixXd& getIAR() {
         return this->initAAR;
     }
     /**
      * Sets the initial animals at risk
      *
-     * @param iar as Eigen::VectorXd&
+     * @param iar as Eigen::MatrixXd&
      */
-    void setIAR(Eigen::VectorXd& iar) {
+    void setIAR(Eigen::MatrixXd& iar) {
         this->initAAR = iar;
     }
 
@@ -270,7 +270,7 @@ public:
 	
 private:
     std::weak_ptr<Road> road;       /**< Road with these attributes */
-    Eigen::VectorXd initAAR;        /**< Initial animals at risk */
+    Eigen::MatrixXd initAAR;        /**< Initial animals at risk */
     Eigen::VectorXd endPopMTE;      /**< End population if constant full flow */
     Eigen::VectorXd endPopMTESD;    /**< End population mean under full flow */
     double fixedCosts;              /**< Fixed road costs */

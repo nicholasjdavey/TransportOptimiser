@@ -82,11 +82,11 @@ public:
      */
     RoadGA(double mr, double cf, unsigned long gens, unsigned long
             popSize, double stopTol, double confInt, double confLvl, unsigned
-            long habGridRes, std::string solScheme, unsigned long noRuns,
-            Optimiser::Type type, double scale, unsigned long
-            learnPeriod, double surrThresh, unsigned long maxLearnNo, unsigned
-            long minLearnNo, unsigned long sg, RoadGA::Selection selector,
-            RoadGA::Scaling fitscale, double topProp, double
+            long habGridRes, unsigned long surrDimRes, std::string solScheme,
+            unsigned long noRuns, Optimiser::Type type, double scale, unsigned
+            long learnPeriod, double surrThresh, unsigned long maxLearnNo,
+            unsigned long minLearnNo, unsigned long sg, RoadGA::Selection
+            selector, RoadGA::Scaling fitscale, double topProp, double
             maxSurvivalRate, int ts, double msr, bool gpu = false,
             Optimiser::ROVType rovType = Optimiser::ALGO5);
 
@@ -173,11 +173,11 @@ public:
         this->learnPeriod = lp;
     }
 
-    double getSurrogateError() {
+    Eigen::VectorXd& getSurrogateError() {
         return this->surrErr;
     }
 
-    void setSurrogateError(double se) {
+    void setSurrogateError(Eigen::VectorXd& se) {
         this->surrErr = se;
     }
 
@@ -308,6 +308,37 @@ public:
     void setUseSD(Eigen::VectorXd& useSD) {
         this->useSD = useSD;
     }
+
+    Eigen::VectorXd& getValues() {
+        return this->values;
+    }
+
+    void setValues(Eigen::VectorXd& val) {
+        this->values = val;
+    }
+
+    Eigen::VectorXd& getValuesSD() {
+        return this->valuesSD;
+    }
+
+    void setValuesSD(Eigen::VectorXd& valSD) {
+        this->valuesSD = valSD;
+    }
+
+    Eigen::VectorXd getSurrDataValues() {
+        return this->values;
+    }
+
+    void setSurrDataValues(Eigen::VectorXd& sd) {
+        this->values = sd;
+    }
+
+    Eigen::VectorXd getSurrDataValuesSD() {
+        return this->valuesSD;
+    }
+
+    void setSurrDataValuesSD(Eigen::VectorXd& sd) {
+        this->valuesSD = sd;    }
 
     unsigned long getNoSamples() {
         return this->noSamples;
@@ -479,8 +510,10 @@ public:
      *
      * @param road as RoadPtr
      * @return Matrix of data for building surrogate function for MTE
+     * @return Error code as Optimiser::ComputationStatus
      */
-    virtual void surrogateResultsMTE(RoadPtr road, Eigen::MatrixXd &mteResult);
+    virtual Optimiser::ComputationStatus surrogateResultsMTE(RoadPtr road,
+            Eigen::MatrixXd &mteResult);
 
     /**
      * Computes the data from a full simulation of one road for building the
@@ -519,7 +552,7 @@ private:
     Eigen::VectorXd dL;         /**< Lower limits for plane domains */
     double theta;               /**< Cutting plane angle (to x axis) */
     unsigned long learnPeriod;  /**< Maximum period over which to learn surrogate */
-    double surrErr;             /**< Current surrogate standard error */
+    Eigen::VectorXd surrErr;    /**< Current surrogate standard error */
     double surrThresh;          /**< Maximum surrogate error allowed */
     unsigned long maxLearnNo;   /**< Maximum number of roads on which to perform full model */
     unsigned long minLearnNo;   /**< Minimum number of roads on which to perform full model (best roads found) */
@@ -537,8 +570,10 @@ private:
     Eigen::MatrixXd iars;       /**< IARS for surrogate model (each column for each species) */
     Eigen::MatrixXd pops;       /**< Full traffic flow end pops for surrogate model */
     Eigen::MatrixXd popsSD;     /**< Standard deviations of above */
-    Eigen::VectorXd use;        /**< Utilities (ROV) for surrogate models */
+    Eigen::VectorXd use;        /**< Utilities (ROV) for surrogate models (profit per unit traffic per unit exogenous price factor: petro, etc.) */
     Eigen::VectorXd useSD;      /**< Utilities standard deviations */
+    Eigen::VectorXd values;     /**< Mean operating value */
+    Eigen::VectorXd valuesSD;   /**< Operating value standard deviation */
     unsigned long noSamples;    /**< Current number of samples available for building surrogates */
     RoadGA::Selection selector; /**< Parents selection routine */
     RoadGA::Scaling fitScaling; /**< Scaling method used for fitness scaling */
@@ -630,6 +665,15 @@ private:
      */
     void scaling(RoadGA::Scaling scaleType, Eigen::VectorXi& parents,
             Eigen::VectorXd& scaling);
+
+    /**
+     * Enables sharing a shared pointer to the derived object from within it
+     *
+     * @return Shared pointer std::shared_ptr<RoadGA>
+     */
+    std::shared_ptr<RoadGA> meDerived() {
+        return std::static_pointer_cast<RoadGA>(shared_from_this());
+    }
 };
 
 #endif

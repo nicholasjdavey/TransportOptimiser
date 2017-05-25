@@ -1,17 +1,7 @@
 #include "../transportbase.h"
 
 SpeciesRoadPatches::SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr
-        species, RoadPtr road) : Uncertainty(optimiser) {
-    this->species = species;
-    this->road = road;
-    this->initPop = 0.0;
-}
-
-SpeciesRoadPatches::SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr
-        species, RoadPtr road, bool active, double mean, double stdDev, double
-        rev, std::string nm) : Uncertainty(optimiser, nm, mean, stdDev, rev,
-        active) {
-
+        species, RoadPtr road) {
     this->species = species;
     this->road = road;
     this->initPop = 0.0;
@@ -20,35 +10,15 @@ SpeciesRoadPatches::SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr
 SpeciesRoadPatches::~SpeciesRoadPatches() {}
 
 void SpeciesRoadPatches::createSpeciesModel(bool visualise) {
-    clock_t begin = clock();
     this->generateHabitatPatchesGrid(visualise);
-    clock_t end = clock();
-    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-    std::cout << "Patch Build Time: " << elapsed_secs << " s" << std::endl;
-
-    begin = clock();
     this->habitatPatchDistances();
-    end = clock();
-    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-    std::cout << "Patch Distances Time: " << elapsed_secs << " s" << std::endl;
-
-    begin = clock();
     this->roadCrossings();
-    end = clock();
-    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-    std::cout << "Road Crossings Time: " << elapsed_secs << " s" << std::endl;
-
-    begin = clock();
     this->computeTransitionProbabilities();
-    end = clock();
-    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-    std::cout << "Transition Probabilities Time: " << elapsed_secs << " s" << std::endl;
-
-    begin = clock();
+//    begin = clock();
     this->computeSurvivalProbabilities();
-    end = clock();
-    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-    std::cout << "Survival Probabilities Time: " << elapsed_secs << " s" << std::endl;
+//    end = clock();
+//    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//    std::cout << "Survival Probabilities Time: " << elapsed_secs << " s" << std::endl;
 }
 
 void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
@@ -98,7 +68,7 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
 
     this->habPatch = std::vector<HabitatPatchPtr>((pow(res,2)*habTyps.
             size()));
-    this->initPops = Eigen::VectorXd(pow(res,2)*habTyps.size());
+    Eigen::VectorXd initPopsTemp = Eigen::VectorXd(pow(res,2)*habTyps.size());
     // Sub patch area
     double subPatchArea = xspacing(0)*yspacing(0);
 
@@ -153,7 +123,7 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
                 SimulateGPU::buildPatches(W,H,skpx,skpy,xRes,yRes,regions,
                         xspacing(0),yspacing(0),subPatchArea,habTyps[ii],
                         output,this->species->getPopulationMap(),
-                        this->habPatch,this->initPop,this->initPops,patches);
+                        this->habPatch,this->initPop,initPopsTemp,patches);
             } else {
                 // Call the serial code (very slow)
                 // Iterate through every large cell present in the overall
@@ -234,7 +204,7 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
                                 // For now do not store the indices of the
                                 // points
                                 this->habPatch[patches] = hab;
-                                this->initPops(patches) = thisPop;
+                                initPopsTemp(patches) = thisPop;
                                 this->capacities(patches) = hab->getCapacity();
                                 patches++;
                                 this->initPop += thisPop;
@@ -247,8 +217,8 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
         }
     }
     // Remove excess patches in container
-    this->habPatch.resize(--patches);
-    this->initPops.resize(patches);
+    this->habPatch.resize(patches);
+    this->initPops = initPopsTemp.segment(0,patches);
 }
 
 void SpeciesRoadPatches::generateHabitatPatchesBlob() {
@@ -357,14 +327,9 @@ void SpeciesRoadPatches::roadCrossings() {
     // above.
     Eigen::MatrixXi orgs = indices.block(0,0,validCrossings,1);
     Eigen::MatrixXi dests = indices.block(0,1,validCrossings,1);
-    lines.resize(validCrossings,4);
-
-    clock_t begin = clock();
+    lines = lines.block(0,0,validCrossings,4);
     Eigen::VectorXi crossings = Utility::lineSegmentIntersect(lines,
             roadSegsVisible,roadPtrShared->getOptimiser()->getGPU());
-    clock_t end = clock();
-    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-    std::cout << "Line Segment Intersect Time: " << elapsed_secs << " s" << std::endl;
 
     this->crossings = Eigen::MatrixXi::Zero(this->habPatch.size(),
             this->habPatch.size());

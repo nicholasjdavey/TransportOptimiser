@@ -39,19 +39,9 @@ public:
      * Constructs a %Species object with default parent values.
      */
     Species(std::string nm, bool sex, double lm, double lsd, double rcm,
-            double rcsd, double grm, double grsd, double lenm, double lensd,
-            double spm, double spsd, double cpa, bool active, double initPop,
-            double t, std::vector<HabitatTypePtr>& habitat);
-
-    /**
-     * Constructor II
-     *
-     * Constructs a %Species object with assigned values.
-     */
-    Species(std::string nm, bool sex, double lm, double lsd, double rcm,
-            double rcsd, double grm, double grsd, double lenm, double lensd,
-            double spm, double spsd, double cpa, bool active, double initPop,
-            double t, std::vector<HabitatTypePtr> &habitat, double current);
+            double rcsd, UncertaintyPtr gr, double lv, double lenm, double
+            lensd, double spm, double spsd, double cpa, bool active, double
+            initPop, double t, std::vector<HabitatTypePtr>& habitat);
 
     /**
      * Destructor
@@ -180,37 +170,38 @@ public:
     }
 
     /**
-     * Returns the mean population growth rate parameter (p.a.)
+     * Returns the population growth details
      *
-     * @return Mean growth rate as double
+     * @return Mean growth rate as UncertaintyPtr
      */
-    double getGrowthRateMean() {
-        return this->growthRateMean;
+    UncertaintyPtr getGrowthRate() {
+        return this->growthRate;
     }
     /**
-     * Sets the mean population growth rate parameter (p.a.)
+     * Sets the population growth rate details
      *
-     * @param grm as double
+     * @param grm as UncertaintyPtr
      */
-    void setGrowthRateMean(double grm) {
-        this->growthRateMean = grm;
+    void setGrowthRate(UncertaintyPtr gr) {
+        this->growthRate.reset();
+        this->growthRate = gr;
     }
 
     /**
-     * Returns the growth rate standard deviation (p.a.)
+     * Returns the standard deviation of spatial variability of growth rate
      *
-     * @return Growth rate standard deviation as double
+     * @return Local variability as double
      */
-    double getGrowthRateSD() {
-        return this->growthRateSD;
+    double getLocalVariability() {
+        return this->localVariability;
     }
     /**
-     * Sets the growth rate standard deviation (p.a.)
+     * Sets the standard deviation of spatial variability of growth rate
      *
-     * @param grsd as double
+     * @param lv as double
      */
-    void setGrowthRateSD(double grsd) {
-        this->growthRateSD = grsd;
+    void setLocalVariability(double lv) {
+        this->localVariability = lv;
     }
 
     /**
@@ -415,8 +406,8 @@ private:
     double lambdaSD;                    /**< Movement propensity standard deviation */
     double rangingCoeffMean;            /**< Ranging coefficient mean */
     double rangingCoeffSD;              /**< Ranging coefficient standard deviation */
-    double growthRateMean;              /**< Mean growth rate (%p.a.) */
-    double growthRateSD;                /**< Growth rate (%p.a.) standard devation */
+    UncertaintyPtr growthRate;          /**< Growth rate uncertainty details */
+    double localVariability;            /**< Spatial variability of growth rate */
     double lengthMean;                  /**< Mean species length */
     double lengthSD;                    /**< Species length standard deviation */
     double speedMean;                   /**< Mean species road crossing speed */

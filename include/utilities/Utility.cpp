@@ -249,3 +249,70 @@ void Utility::ksrlin_vw(const Eigen::VectorXd& x, const Eigen::VectorXd& y,
     rx = Eigen::VectorXd::LinSpaced(n,x.minCoeff(),x.maxCoeff());
     ry = Eigen::VectorXd::Zero(n);
 }
+
+double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
+        Eigen::VectorXd &predictors, int dimRes) {
+
+    // First find global the upper and lower bounds in each dimension as well
+    // as the index of the lower bound of the regressed value in each
+    // dimension.
+    Eigen::VectorXd lowerVal(predictors.size());
+    Eigen::VectorXd upperVal(predictors.size());
+    Eigen::VectorXd coeffs(pow(2,predictors.size()-1));
+    Eigen::VectorXd lowerIdx(predictors.size());
+
+    for (int ii = 0; ii < predictors.size(); ii++) {
+        lowerVal(ii) = surrogate[ii*dimRes];
+        upperVal(ii) = surrogate[(ii+1)*dimRes - 1];
+        lowerIdx(ii) = (int)(dimRes*(predictors(ii) - lowerVal(ii))/(
+                upperVal(ii) - lowerVal(ii)));
+    }
+
+    // Now that we have all the index requirements, let's interpolate.
+    // Get the uppermost dimension x value
+    double x0 = surrogate(lowerIdx(0));
+    double x1 = surrogate(lowerIdx(0)+1);
+    double xd = (predictors(0) - x0)/(x1 - x0);
+
+    // First, assign the yvalues to the coefficients matrix
+    for (int ii = 0; ii < (int)pow(2,predictors.size()-1); ii++) {
+        // Get the indices of the yvalues of the lower and upper bounding
+        // values on this dimension.
+        int idxL = predictors.size()*dimRes;
+
+        for (int jj = 0; jj < (predictors.size() - 1); jj++) {
+            int rem = ((int)(ii/((int)pow(2,predictors.size()-1-jj))) + 1) -
+                    2*(int)(((int)(ii/((int)pow(2,predictors.size()-1-jj))) +
+                    1)/2);
+
+            if (rem > 0) {
+                idxL += lowerIdx[jj]*(int)pow(dimRes,predictors.size()-1-jj);
+            } else {
+                idxL += (lowerIdx[jj]+1)*(int)pow(dimRes,predictors.size()-1-
+                        jj);
+            }
+        }
+
+        int idxU = idxL + (lowerIdx[0]+1)*(int)pow(dimRes,predictors.size()-1);
+
+        idxL += idxL + lowerIdx[0]*(int)pow(dimRes,predictors.size()-1);
+
+        coeffs[ii] = surrogate(idxL)*(1 - xd) + surrogate(idxU)*xd;
+    }
+
+    // Now we work our way down the dimensions using our computed coefficients
+    // to get the interpolated value.
+    for (int ii = 1; ii < predictors.size(); ii++) {
+        // Get the current dimensions x value
+        x0 = surrogate(lowerIdx[ii] + dimRes*ii);
+        x1 = surrogate(lowerIdx[0]+1 + dimRes*ii);
+        xd = (predictors(0) - x0)/(x1 - x0);
+
+        for (int jj = 0; jj < (int)pow(2,ii); jj++) {
+            int jump = (int)pow(2,predictors.size()-ii-2);
+            coeffs[jj] = coeffs[jj]*(1 - xd) + coeffs[jj+jump]*xd;
+        }
+    }
+
+    return coeffs[0];
+}

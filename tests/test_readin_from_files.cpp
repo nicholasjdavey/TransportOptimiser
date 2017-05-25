@@ -6,8 +6,8 @@ int main(int argc, char **argv) {
     // We will later add the attributes to the Optimiser Object
     std::string solScheme = "GA";
 
-    RoadGAPtr roadGA(new RoadGA(0.4,0.55,500,400,0.1,0.95,0.95,10,solScheme,5,
-            Optimiser::MTE,1.0,50,0.05,50,3,10,RoadGA::TOURNAMENT,
+    RoadGAPtr roadGA(new RoadGA(0.4,0.55,500,400,0.1,0.95,0.95,10,20,solScheme,
+            5,Optimiser::MTE,1.0,50,0.05,50,3,10,RoadGA::TOURNAMENT,
             RoadGA::RANK,0.4,0.8,5,0.1));
 
     // SET THREADER
@@ -137,8 +137,12 @@ int main(int argc, char **argv) {
 
     std::string nm = "species1";
 
-    SpeciesPtr animal(new Species(nm,false,2.52e-3,0.0928e-3,-2.52e-3,0.1014e-3,
-            1.4,0.5,0.7,0.012,2.78,1.39,1e7,true,1000,0.7,habTypes));
+    UncertaintyPtr sp1gr(new Uncertainty(roadGA,nm,1.4,1.4,0.5,0.1,0.1,0.1,
+        true));
+
+    SpeciesPtr animal(new Species(nm,false,2.52e-3,0.0928e-3,-2.52e-3,
+            0.1014e-3,sp1gr,0.5,0.7,0.012,2.78,1.39,1e7,true,1000,0.7,
+            habTypes));
 
     std::vector<SpeciesPtr> species(1);
     species[0] = animal;
@@ -157,13 +161,16 @@ int main(int argc, char **argv) {
     std::string petrolName = "petrol";
     std::string commodityName = "ore";
 
-    CommodityPtr diesel(new Commodity(roadGA,dieselName,1.2,0.01,0.01,true,0,0));
+    CommodityPtr diesel(new Commodity(roadGA,dieselName,1.2,1.2,0.01,0.01,0,0,true,
+            0,0));
     diesel->setCurrent(1.2);
     fuels[0] = diesel;
-    CommodityPtr petrol(new Commodity(roadGA,petrolName,1.05,0.01,0.01,true,0,0));
+    CommodityPtr petrol(new Commodity(roadGA,petrolName,1.05,1.05,0.01,0.01,0,0,
+            true,0,0));
     petrol->setCurrent(1.05);
     fuels[1] = petrol;
-    CommodityPtr ore(new Commodity(roadGA,commodityName,100,0.1,0.01,true,0.8,0.20));
+    CommodityPtr ore(new Commodity(roadGA,commodityName,100,100,0.1,0.01,0,0,true,
+            0.8,0.20));
     ore->setCurrent(120);
     commodities[0] = ore;
 

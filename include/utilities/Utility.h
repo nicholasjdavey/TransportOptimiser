@@ -333,6 +333,18 @@ namespace Utility {
      */
     void ksrlin_vw(const Eigen::VectorXd& x, const Eigen::VectorXd& y, const
             int ww, const int n, Eigen::VectorXd& rx, Eigen::VectorXd& ry);
+
+    /**
+     * Interpolates a surrogate function using provided values for the
+     * predictors.
+     *
+     * @param surrogate as Eigen::VectorXd&
+     * @param predictors as Eigen::VectorXd&
+     * @param dimRes as int
+     * @return Value as double
+     */
+    double interpolateSurrogate(Eigen::VectorXd &surrogate,
+            Eigen::VectorXd& predictors, int dimRes);
 }
 
 #endif

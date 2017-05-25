@@ -19,7 +19,7 @@ typedef std::shared_ptr<HabitatPatch> HabitatPatchPtr;
 /**
  * Class for managing %SpeciesRoadPatches objects
  */
-class SpeciesRoadPatches : public Uncertainty {
+class SpeciesRoadPatches {
 
 public:
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
@@ -31,14 +31,6 @@ public:
      */
     SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr species, RoadPtr road);
 
-    /**
-     * Constructor II
-     *
-     * Constructs a %SpeciesRoadPatches object with assigned values
-     */
-    SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr species, RoadPtr
-            road, bool active, double mean, double stdDev, double rev,
-            std::string nm);
     /**
      * Destructor
      */

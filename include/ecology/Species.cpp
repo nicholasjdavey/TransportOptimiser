@@ -1,34 +1,9 @@
 #include "../transportbase.h"
 
 Species::Species(std::string nm, bool sex, double lm, double lsd, double rcm,
-        double rcsd, double grm, double grsd, double lenm, double lensd,
-        double spm, double spsd, double cpa, bool active, double initPop,
-        double t,std::vector<HabitatTypePtr> &habitat) {
-
-	// Initialise object values
-    this->setName(nm);
-    this->sex = sex;
-    this->lambdaMean = lm;
-    this->lambdaSD = lsd;
-    this->rangingCoeffMean = rcm;
-    this->rangingCoeffSD = rcsd;
-    this->growthRateMean = grm;
-    this->growthRateSD = grsd;
-    this->lengthMean = lenm;
-    this->lengthSD = lensd;
-    this->speedMean = spm;
-    this->speedSD = spsd;
-    this->costPerAnimal = cpa;
-    this->setActive(active);
-    this->habitat = habitat;
-    this->initialPop = initPop;
-    this->threshold = t;
-}
-
-Species::Species(std::string nm, bool sex, double lm, double lsd, double rcm,
-        double rcsd, double grm, double grsd, double lenm, double lensd,
-        double spm, double spsd, double cpa, bool active, double initPop,
-        double t, std::vector<HabitatTypePtr>& habitat, double current) {
+        double rcsd, UncertaintyPtr gr, double lv, double lenm, double lensd,
+        double spm,double spsd, double cpa, bool active, double initPop, double
+        t,std::vector<HabitatTypePtr> &habitat) {
 
     // Initialise object values
     this->setName(nm);
@@ -37,8 +12,8 @@ Species::Species(std::string nm, bool sex, double lm, double lsd, double rcm,
     this->lambdaSD = lsd;
     this->rangingCoeffMean = rcm;
     this->rangingCoeffSD = rcsd;
-    this->growthRateMean = grm;
-    this->growthRateSD = grsd;
+    this->growthRate = gr;
+    this->localVariability = lv;
     this->lengthMean = lenm;
     this->lengthSD = lensd;
     this->speedMean = spm;

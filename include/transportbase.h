@@ -31,6 +31,7 @@
 #include <random>
 #include <assert.h>
 #include <chrono>
+#include <stdexcept>
 #include <execinfo.h>
 #include <signal.h>
 #include <unistd.h>

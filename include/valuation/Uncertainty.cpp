@@ -8,18 +8,22 @@ Uncertainty::Uncertainty(OptimiserPtr optimiser) {
     this->meanP = 0;
     this->standardDev = 0;
     this->reversion = 0;
+    this->poissonJump = 0;
+    this->jumpProb = 0;
     this->active = false;
 }
 
-Uncertainty::Uncertainty(OptimiserPtr optimiser, std::string nm, double mp,
-        double sd, double rev, bool active) {
+Uncertainty::Uncertainty(OptimiserPtr optimiser, std::string nm, double curr,
+        double mp, double sd, double rev, double pj, double jp, bool active) {
 
     this->optimiser = optimiser;
     this->name = nm;
-    this->current = 0;
+    this->current = curr;
     this->meanP = mp;
     this->standardDev = sd;
     this->reversion = rev;
+    this->poissonJump = pj;
+    this->jumpProb = jp;
     this->active = active;
 }
 

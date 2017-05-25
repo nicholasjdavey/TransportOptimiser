@@ -7,7 +7,7 @@ LD = nvcc
 AR = ar
 ARFLAGS =
 RANLIB = ranlib
-DEBUG =
+DEBUG = -g
 DEBUGEXTRA = -rdynamic
 ECHO = echo
 OS := $(shell uname)
@@ -19,10 +19,10 @@ ifeq ($(OS),MINGW32_NT-6.1)
 else
 # For compilation under Linux
 	CFLAGS = -I/usr/local/include
-	LFLAGS = -L/usr/local/cuda/lib64 -dlink
+	LFLAGS = -L/usr/local/lib -L/usr/local/cuda/lib64
 endif
 
-LDLIBS = -lpthread -lboost_iostreams -lboost_system -lboost_filesystem -lcurand -llapacke -lblas -lcublas_static -lcublas_device -lculibos
+LDLIBS = -lpthread -lboost_iostreams -lboost_system -lboost_filesystem -lcurand -lcuda -lblas -lcublas -lcublas_static -lcublas_device -lculibos -lcudadevrt
 # Uncomment the below two lines to enable debugging
 #CXXFLAGS = -std=gnu++11 -pthread -c $(CFLAGS) $(DEBUG)
 #LXXFLAGS = -std=gnu++11 -pthread $(CFLAGS) $(LFLAGS) $(LDLIBS) $(DEBUG)
@@ -33,9 +33,9 @@ LDLIBS = -lpthread -lboost_iostreams -lboost_system -lboost_filesystem -lcurand 
 
 # Uncomment the below three lines to enable CUDA support
 # Depending on the device(s) used, add "-gencode arch=compute_XX,code=sm_XX" for each unique compute capability required. For example, if the device is compute capability 3.5, replace XX with 35
-LXXFLAGS = -std=c++11 -Wno-deprecated-gpu-targets --relocatable-device-code true -gencode arch=compute_35,code=sm_35 -lcudadevrt $(LFLAGS) $(LDLIBS) $(DEBUG)
+LXXFLAGS = -std=c++11 -Wno-deprecated-gpu-targets --relocatable-device-code true -gencode arch=compute_35,code=sm_35 $(LFLAGS) $(LDLIBS) $(DEBUG)
 CXXFLAGS = -std=c++11 -c -Wno-deprecated-gpu-targets $(CFLAGS) $(DEBUG)
-NVCCFLAGS = -std=c++11 -c -Wno-deprecated-gpu-targets -lcudadevrt --relocatable-device-code true -gencode arch=compute_35,code=sm_35 $(CFLAGS) $(DEBUG)
+NVCCFLAGS = -std=c++11 -c -Wno-deprecated-gpu-targets --relocatable-device-code true -gencode arch=compute_35,code=sm_35 $(CFLAGS) $(DEBUG)
 
 SHELL = /bin/sh
 

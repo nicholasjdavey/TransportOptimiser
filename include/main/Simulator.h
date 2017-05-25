@@ -129,8 +129,10 @@ public:
      * path) we pass in a reference to a matrix. If we do not enter a matrix,
      * then we only produce the end metrics but not a realised simulation path
      * that can be visualised via a post-processing routine.
+     *
+     * @return Computation status as Optimiser::ComputationStatus
      */
-    void simulateMTE();
+    Optimiser::ComputationStatus simulateMTE();
 
     /**
      * Overloaded version of the preceding function for storing an entire
@@ -143,6 +145,8 @@ public:
     /**
      * Runs the optimally controlled traffic scenario over the entire design
      * horizon for all species encountered by the road.
+     *
+     * We want to override the parent class function
      *
      * @param policyMap as bool (default = false)
      */
@@ -159,7 +163,7 @@ public:
      * comprehensive method, to visualise a single Monte Carlo chain and the
      * optimal actions taken over time.
      */
-    void simulateROVCR(std::vector<Eigen::MatrixXd>& visualisePops,
+    virtual void simulateROVCR(std::vector<Eigen::MatrixXd>& visualisePops,
             std::vector<int>& visualiseFlows);
 
 private:
