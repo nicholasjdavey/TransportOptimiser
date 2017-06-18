@@ -83,8 +83,13 @@ public:
 
     typedef enum {
         COMPUTATION_FAILED,
-        COMPUTATION_SUCCESS,
+        COMPUTATION_SUCCESS
     } ComputationStatus;
+
+    typedef enum {
+        CUBIC_SPLINE,
+        MULTI_LOC_LIN_REG,
+    } InterpolationRoutine;
 
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
@@ -133,7 +138,8 @@ public:
             long habGridRes, unsigned long surrDimRes, std::string solScheme,
             unsigned long noRuns, Optimiser::Type type, unsigned long sg,
             double msr, bool gpu=false, Optimiser::ROVType method =
-            Optimiser::ALGO5);
+            Optimiser::ALGO5, InterpolationRoutine interp =
+            Optimiser::MULTI_LOC_LIN_REG);
     /**
      * Destructor
      */
@@ -712,12 +718,31 @@ public:
         return this->plothandle;
     }
     /**
+     * Sets the handle for the terrain plots
+     *
+     * @param ph as GnuplotPtr
+     */
+    void setPlotHandle(GnuplotPtr ph) {
+        this->plothandle.reset();
+        this->plothandle = ph;
+    }
+
+    /**
      * Returns the handle to the output interface for Gnuplot (surrogates)
      *
      * @return Handle as GnuplotPtr
      */
     GnuplotPtr getSurrPlotHandle() {
         return this->surrPlotHandle;
+    }
+    /**
+     * Sets the handle for the surrogate models
+     *
+     * @param ph as GnuplotPtr
+     */
+    void setSurrPlotHandle(GnuplotPtr ph) {
+        this->surrPlotHandle.reset();
+        this->surrPlotHandle = ph;
     }
 
     /**
@@ -752,6 +777,23 @@ public:
      */
     void setROVMethod(Optimiser::ROVType method) {
         this->method = method;
+    }
+
+    /**
+     * Returns the type of interpolation routine used in the surrogate models
+     *
+     * @return Interpolation method as Optimiser::InterpolationRoutine
+     */
+    Optimiser::InterpolationRoutine getInterpolationRoutine() {
+        return this->interp;
+    }
+    /**
+     * Sets the type of interpolation routine used in the surrogate models
+     *
+     * @param ir as Optimiser::InterpolationRoutine
+     */
+    void setInterpolationRoutine(Optimiser::InterpolationRoutine ir) {
+        this->interp = ir;
     }
 
     // STATIC ROUTINES ////////////////////////////////////////////////////////
@@ -829,9 +871,15 @@ public:
      * values for the next dimension, and so on. The next 'res*noDims' values
      * are the corresponding predicted values. The way to index is as follows:
      *
+     * Each the of these surrogate models for each run are stored in a
+     * std::vector where each element is an individual surrogate model. For
+     * MTE, there are N 1D surrogates, one for each species. For ROV, there is
+     * but one surrogate of (N+1) dimensions, where N dimensions relate to the
+     * adjusted population of the species and one relates to the unit profit.
+     *
      * 1. Value of predictor ii in dimension jj
      *
-     *    double value = this->surrogateROV[jj*res + ii]
+     *    double value = this->surrogateML[jj*res + ii]
      *
      * 2. Value of corresponding regressed value for coordinate I[jj_0, jj_1,
      *    ..., jj_(noDims-1)]
@@ -842,20 +890,21 @@ public:
      *       idx += I[ii]*res^(noDims - ii - 1);
      *    }
      *
-     *    double value = this->surrogateROV[idx];
+     *    double value = this->surrogateML[idx];
      *
-     * @return Surrogates as std::vector<std::vector<Eigen::VectorXd>>&
+     * @return Surrogates as std::vector<std::vector<std::vector<Eigen::VectorXd>>>&
      */
-    std::vector<std::vector<Eigen::VectorXd>>& getSurrogateROV() {
-        return this->surrogateROV;
+    std::vector<std::vector<std::vector<Eigen::VectorXd>>>& getSurrogateML() {
+        return this->surrogateML;
     }
     /**
      * Sets the surrogate function so that it may be called at a later stage
      *
-     * @param surr as std::vector<std::vector<std::vector<double>>>&
+     * @param std::vector<std::vector<std::vector<Eigen::VectorXd>>>&
      */
-    void setSurrogateROV(std::vector<std::vector<Eigen::VectorXd>>& surr) {
-        this->surrogateROV = surr;
+    void setSurrogateML(std::vector<std::vector<std::vector<Eigen::VectorXd>>>&
+            surr) {
+        this->surrogateML = surr;
     }
 
     /**
@@ -865,10 +914,23 @@ public:
      * For each species, a cubic spline of the BSpline class is evaluated
      *
      * @param (input) road as RoadPtr
-     * @param (output) pops and as Eigen::VectorXd&
+     * @param (output) pops as Eigen::VectorXd&
      * @param (output) popsSD as Eigen::VectorXd&
      */
     void evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd &pops,
+            Eigen::VectorXd &popsSD);
+
+    /**
+     * Evaluates the surrogate model for a given road in the fixed traffic flow
+     * case using a multiple local linear regression surrogate model.
+     *
+     * For each species, a multiple local linear regression is evaluated.
+     *
+     * @param (input) road as RoadPtr
+     * @param (output) pops as Eigen::VectorXd&
+     * @param (output) popsSD as Eigen::VectorXd&
+     */
+    void evaluateSurrogateModelMTEML(RoadPtr road, Eigen::VectorXd &pops,
             Eigen::VectorXd &popsSD);
     /**
      * Evaluates the surrogate model for a given road in the fixed traffic flow
@@ -877,16 +939,14 @@ public:
      * @param (input) road as RoadPtr
      * @param (output) value as double&
      * @param (output) valueSD as double&
-     * @param (output) use as double&
-     * @param (output) use standard deviation as double&
      */
-    void evaluateSurrogateModelROVCR(RoadPtr road, double value, double
-            valueSD);
+    void evaluateSurrogateModelROVCR(RoadPtr road, double &value, double
+            &valueSD);
 
 ///////////////////////////////////////////////////////////////////////////////
 protected:
     std::vector<std::vector<std::vector<alglib::spline1dinterpolant>>> surrogate;   /**< MTE Surrogate model for evaluating road (for each run) stored as a collection of splines (To be deprecated) */
-    std::vector<std::vector<Eigen::VectorXd>> surrogateROV;                         /**< ROV Surrogate model */
+    std::vector<std::vector<std::vector<Eigen::VectorXd>>> surrogateML;             /**< Surrogate models based on multiple local linear regression */
     ExperimentalScenarioPtr scenario;                                               /**< Current experiment */
     Optimiser::Type type;                                                           /**< Type of ecological incorporation */
     Eigen::MatrixXd currentRoadPopulation;                                          /**< Current encoded population of roads */
@@ -924,6 +984,7 @@ protected:
     GnuplotPtr surrPlotHandle;                                                      /**< Pipe for plotting surrogate model results */
     bool gpu;                                                                       /**< If we are using GPUs to assist computing */
     Optimiser::ROVType method;                                                      /**< ROV algorithm */
+    Optimiser::InterpolationRoutine interp;                                         /**< Interpolation routine (only used for MTE) */
 
     // Sharing of derived from base
     template <typename Derived>

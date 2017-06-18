@@ -59,6 +59,10 @@
 // CTPL
 #include <CTPL-master/ctpl_stl.h>
 
+// CUDA
+#include <cuda.h>
+#include <cuda_runtime.h>
+
 // GNUPLOTIOSTREAM
 // Only include in the specific CPP source files where required. The wrapper
 // was written with bad practices including initialising static members in the
@@ -108,6 +112,7 @@
 #include "road/SpeciesRoadPatches.h"
 #include "main/ThreadManager.h"
 #include "gpuCode/SimulateGPU.h"
+#include "gpuCode/knn_cuda_with_indexes.h"
 #include "main/RoadGA.h"
 
 /*

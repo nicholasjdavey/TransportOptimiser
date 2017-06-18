@@ -88,7 +88,9 @@ public:
             unsigned long minLearnNo, unsigned long sg, RoadGA::Selection
             selector, RoadGA::Scaling fitscale, double topProp, double
             maxSurvivalRate, int ts, double msr, bool gpu = false,
-            Optimiser::ROVType rovType = Optimiser::ALGO5);
+            Optimiser::ROVType rovType = Optimiser::ALGO5,
+            Optimiser::InterpolationRoutine interp =
+            Optimiser::MULTI_LOC_LIN_REG);
 
     // ACCESSORS //////////////////////////////////////////////////////////////
 
@@ -531,6 +533,12 @@ public:
     virtual void buildSurrogateModelMTE();
 
     /**
+     * Builds the 2D local linear regressions representing the surrogate model
+     * for the fixed traffic flow case
+     */
+    virtual void buildSurrogateModelMTELocalLinear();
+
+    /**
      * Builds the ND interpolants representing the surrogate model for the
      * controllable traffic flow case
      */
@@ -571,14 +579,14 @@ private:
     Eigen::MatrixXd pops;       /**< Full traffic flow end pops for surrogate model */
     Eigen::MatrixXd popsSD;     /**< Standard deviations of above */
     Eigen::VectorXd use;        /**< Utilities (ROV) for surrogate models (profit per unit traffic per unit exogenous price factor: petro, etc.) */
-    Eigen::VectorXd useSD;      /**< Utilities standard deviations */
+    Eigen::VectorXd useSD;      /**< Utilities standard deviations (to delete) */
     Eigen::VectorXd values;     /**< Mean operating value */
     Eigen::VectorXd valuesSD;   /**< Operating value standard deviation */
     unsigned long noSamples;    /**< Current number of samples available for building surrogates */
     RoadGA::Selection selector; /**< Parents selection routine */
     RoadGA::Scaling fitScaling; /**< Scaling method used for fitness scaling */
     double topProp;             /**< Proportion to consider as top individuals */
-    double maxSurvivalRate;     /**< Maximum survival rate for shifLinearScaling */
+    double maxSurvivalRate;     /**< Maximum survival rate for shiftLinearScaling */
     int tournamentSize;         /**< Number of competitors per tournament */
 
 // PRIVATE ROUTINES ///////////////////////////////////////////////////////////
@@ -674,6 +682,22 @@ private:
     std::shared_ptr<RoadGA> meDerived() {
         return std::static_pointer_cast<RoadGA>(shared_from_this());
     }
+
+    /**
+     * Generates n samples of efficently-spaced samples for computing the full
+     * models to build the surrogate model.
+     *
+     * Current and candidate matrices are arranged as M samples x N dimensions.
+     *
+     * Returns a list of indices corresponding to the selected samples.
+     *
+     * @param (in) current Eigen::MatrixXd&
+     * @param (in) candidates Eigen::MatrixXd&
+     * @param (in) n as int
+     * @param (out) sample as Eigen::VectorXi&
+     */
+    void generateSample(const Eigen::MatrixXd& current, const Eigen::MatrixXd&
+            candidates, int n, Eigen::VectorXi& sample);
 };
 
 #endif

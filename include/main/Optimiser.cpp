@@ -8,7 +8,8 @@ Optimiser::Optimiser(double mr, double cf, unsigned long gens, unsigned
         long popSize, double stopTol, double confInt, double confLvl, unsigned
         long habGridRes, unsigned long surrDimRes, std::string solScheme,
         unsigned long noRuns, Optimiser::Type type, unsigned long sg, double
-        msr, bool gpu, Optimiser::ROVType method) {
+        msr, bool gpu, Optimiser::ROVType method,
+        Optimiser::InterpolationRoutine interp) {
 
 //	std::vector<ProgramPtr>* programs(new std::vector<ProgramPtr>());
     unsigned long const hardware_threads = std::thread::hardware_concurrency();
@@ -31,6 +32,7 @@ Optimiser::Optimiser(double mr, double cf, unsigned long gens, unsigned
     this->gpu = gpu;
     this->method = method;
     this->surrDimRes = surrDimRes;
+    this->interp = interp;
 }
 
 Optimiser::~Optimiser() {
@@ -65,9 +67,15 @@ void Optimiser::initialiseStorage() {
     }
     this->bestRoads = br;
 
-    this->surrogate.resize(noTests,std::vector<std::vector<
-            alglib::spline1dinterpolant>>(noRuns,std::vector<
-            alglib::spline1dinterpolant>(this->getSpecies().size())));
+    if (this->interp == Optimiser::CUBIC_SPLINE) {
+        this->surrogate.resize(noTests,std::vector<std::vector<
+                alglib::spline1dinterpolant>>(noRuns,std::vector<
+                alglib::spline1dinterpolant>(this->getSpecies().size())));
+    } else if (this->interp == Optimiser::MULTI_LOC_LIN_REG) {
+        this->surrogateML.resize(noTests,std::vector<std::vector<
+                Eigen::VectorXd>>(noRuns,std::vector<Eigen::VectorXd>(this->
+                getSpecies().size())));
+    }
 }
 
 void Optimiser::computeHabitatMaps() {
@@ -137,11 +145,11 @@ void Optimiser::optimise(bool plot) {
     }
 }
 
-void Optimiser::evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd
-        &pops, Eigen::VectorXd& popsSD) {
+void Optimiser::evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd &pops,
+        Eigen::VectorXd& popsSD) {
 
-    std::vector<SpeciesRoadPatchesPtr> speciesRoadPatches =
-            road->getSpeciesRoadPatches();
+    std::vector<SpeciesRoadPatchesPtr> speciesRoadPatches = road->
+            getSpeciesRoadPatches();
 
     for (int ii = 0; ii < this->species.size(); ii++) {
 
@@ -157,8 +165,30 @@ void Optimiser::evaluateSurrogateModelMTE(RoadPtr road, Eigen::VectorXd
     }
 }
 
-void Optimiser::evaluateSurrogateModelROVCR(RoadPtr road, double value, double
-        valuesd) {
+void Optimiser::evaluateSurrogateModelMTEML(RoadPtr road, Eigen::VectorXd
+        &pops, Eigen::VectorXd& popsSD) {
+
+    std::vector<SpeciesRoadPatchesPtr> speciesRoadPatches = road->
+            getSpeciesRoadPatches();
+
+    for (int ii = 0; ii < this->species.size(); ii++) {
+
+        Eigen::VectorXd initAAR(1);
+        initAAR(0) = speciesRoadPatches[ii]->getInitAAR()(speciesRoadPatches[
+                ii]->getInitAAR().size()-1);
+
+        // Use our own interpolation routine
+        pops(ii) = Utility::interpolateSurrogate(this->surrogateML[2*this->
+                scenario->getCurrentScenario()][this->scenario->getRun()][ii],
+                initAAR,this->surrDimRes);
+        popsSD(ii) = Utility::interpolateSurrogate(this->surrogateML[2*this->
+                scenario->getCurrentScenario()+1][this->scenario->getRun()][
+                ii],initAAR,this->surrDimRes);
+    }
+}
+
+void Optimiser::evaluateSurrogateModelROVCR(RoadPtr road, double& value,
+        double& valuesd) {
 
     // PREDICTORS /////////////////////////////////////////////////////////////
     Eigen::VectorXd predictors(this->species.size() + 1);
@@ -171,7 +201,8 @@ void Optimiser::evaluateSurrogateModelROVCR(RoadPtr road, double value, double
     }
 
     // INITIAL PERIOD UNIT PROFIT
-    // For now, we use the initial unit profit
+    // For now, we use the initial unit profit. This is saved as a road
+    // attribute.
 
     // Fixed cost per unit traffic
     double unitCost = road->getAttributes()->getUnitVarCosts();
@@ -191,17 +222,18 @@ void Optimiser::evaluateSurrogateModelROVCR(RoadPtr road, double value, double
     // Load per unit traffic
     // double unitRevenue = road->getCosts()->getUnitRevenue();
 
+    road->getAttributes()->setInitialUnitCost(unitCost);
     predictors(species.size()) = unitCost;
 
     // Interpolate the multivariate grid using these values
 
     // MEAN
-    value = Utility::interpolateSurrogate(this->surrogateROV[2*this->scenario->
-            getCurrentScenario()][this->scenario->getRun()],predictors,
+    value = Utility::interpolateSurrogate(this->surrogateML[2*this->scenario->
+            getCurrentScenario()][this->scenario->getRun()][0],predictors,
             this->surrDimRes);
 
     // STANDARD DEVIATION
-    valuesd = Utility::interpolateSurrogate(this->surrogateROV[2*this->
-            scenario->getCurrentScenario()+1][this->scenario->getRun()],
+    valuesd = Utility::interpolateSurrogate(this->surrogateML[2*this->
+            scenario->getCurrentScenario()+1][this->scenario->getRun()][0],
             predictors,this->surrDimRes);
 }

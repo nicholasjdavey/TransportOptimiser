@@ -392,6 +392,15 @@ void Simulator::simulateROVCR(bool policyMap) {
 
         } else {
             // We will always use multiple threads otherwise it is too slow
+            if (gpu) {
+                // Call the external, CUDA-compiled code
+                SimulateGPU::simulateROVCUDA(this->me(),srp,adjPops,
+                        unitProfits,condExp,optCont);
+
+            } else {
+                // Put multi-threaded code without the GPU here
+                // Don't bother for now
+            }
 
             // For completeness, add single-threaded code here
             // Don't bother for now

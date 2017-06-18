@@ -195,6 +195,23 @@ public:
     }
 
     /**
+     * Returns the initial period cost per unit traffic
+     *
+     * @return Initial unit cost as double
+     */
+    double getInitialUnitCost() {
+        return this->initialUnitCost;
+    }
+    /**
+     * Sets the initial period cost per unit traffic
+     *
+     * @param iuc as double
+     */
+    void setInitialUnitCost(double iuc) {
+        this->initialUnitCost = iuc;
+    }
+
+    /**
      * Returns the total value
      *
      * @return Total value as double
@@ -278,6 +295,7 @@ private:
     double unitVarRevenue;          /**< Variable revenue per unit traffic per hour per year (unused) */
     double length;                  /**< Total road length (m) */
     double varProfitIC;             /**< Operating value */
+    double initialUnitCost;         /**< Initial period cost per unit traffic */
     double totalValueMean;          /**< Overall value mean */
     double totalValueSD;            /**< Overall value standard deviation */
     double totalUtilisationROV;     /**< Overall utilisation mean, ROV */

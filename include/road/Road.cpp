@@ -188,8 +188,16 @@ void Road::computeOperating(bool learning) {
                             getSpecies().size());
                     Eigen::VectorXd endPopsSD(this->optimiser.lock()->
                             getSpecies().size());
-                    this->optimiser.lock()->evaluateSurrogateModelMTE(
-                            this->me(),endPops,endPopsSD);
+                    if (this->optimiser.lock()->getInterpolationRoutine() ==
+                            Optimiser::CUBIC_SPLINE) {
+                        this->optimiser.lock()->evaluateSurrogateModelMTE(
+                                this->me(),endPops,endPopsSD);
+                    } else if (this->optimiser.lock()->
+                            getInterpolationRoutine() ==
+                            Optimiser::MULTI_LOC_LIN_REG) {
+                        this->optimiser.lock()->evaluateSurrogateModelMTEML(
+                                this->me(),endPops,endPopsSD);
+                    }
 
                     this->attributes->setEndPopMTE(endPops);
                     this->attributes->setEndPopMTESD(endPopsSD);
@@ -217,7 +225,8 @@ void Road::computeOperating(bool learning) {
                         penalty += (double)(threshold > (roadPopXconf*
                                 endPopsSD(ii) + endPops(ii)))*(threshold -
                                 (roadPopXconf*endPopsSD(ii) + endPops(ii)))*
-                                perAnimalPenalty;
+                                optPtrShared->getSpecies()[ii]->
+                                getInitialPopulation()*perAnimalPenalty;
                     }
                     this->costs->setPenalty(penalty);
                     this->attributes->setTotalValueSD(0.0);
@@ -242,9 +251,11 @@ void Road::computeOperating(bool learning) {
                 // Call the surrogate model or full simulation.
                 if (learning) {
                     // Full simulation
+                    this->computeSimulationPatches();
                     SimulatorPtr simulator(new Simulator(this->me()));
                     this->simulator.reset();
                     this->simulator = simulator;
+
                     this->simulator->simulateROVCR();
                     // We use this to determine the relationships between the
                     // input variables and the expected operating values.
@@ -275,7 +286,7 @@ void Road::computeOperating(bool learning) {
                     this->attributes->setIAR(aar);
 
                     // Compute the road value using the surrogate model
-                    float value, valuesd;
+                    double value, valuesd;
                     this->optimiser.lock()->evaluateSurrogateModelROVCR(this->
                             me(),value,valuesd);
 

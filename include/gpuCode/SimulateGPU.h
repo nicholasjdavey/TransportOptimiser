@@ -121,7 +121,7 @@ namespace SimulateGPU {
             subPatchArea, HabitatTypePtr habTyp, const Eigen::MatrixXi&
             labelledImage, const Eigen::MatrixXd &populations,
             std::vector<HabitatPatchPtr>& patches, double& initPop,
-            Eigen::VectorXd &initPops, int& noPatches);
+            Eigen::VectorXd &initPops, Eigen::VectorXd &capacities, int& noPatches);
 
     /**
      * Runs the simulation for the fixed traffic flow model in CUDA
@@ -161,6 +161,9 @@ namespace SimulateGPU {
      * @note This routine should be faster than simulateMTECUDA as the random
      * variables are generated once at the beginning and used across all
      * sample roads
+     *
+     * @note This routine only computes the local linear version of the
+     * surrogate
      */
     void surrogateMTECUDA();
 
@@ -177,9 +180,10 @@ namespace SimulateGPU {
     /**
      * Builds and returns the surrogate model for the MTE scenario using CUDA
      *
-     * @param
+     * @param op as RoadGAPtr
+     * @param speciesID as int
      */
-    void buildSurrogateMTECUDA();
+    void buildSurrogateMTECUDA(RoadGAPtr op, int speciesID);
 
     /**
      * Builds the ROV surrogate using CUDA
@@ -189,11 +193,25 @@ namespace SimulateGPU {
      */
     void buildSurrogateROVCUDA(RoadGAPtr op);
 
-    //  HELPER ROUTINES (COMPUTED ON CPU) ///////////////////////////////////////////
+    /**
+     * Interpolates a surrogate model at many points using the GPU. This is
+     * used for plotting the surrogate models.
+     *
+     * @param surrogate as Eigen::VectorXd&
+     * @param predictors as Eigen::VectorXd&
+     * @param results as Eigen::VectorXd&
+     * @param dimRes as int
+     * @param noDims as int
+     */
+    void interpolateSurrogateMulti(Eigen::VectorXd& surrogate,
+            Eigen::VectorXd &predictors, Eigen::VectorXd &results, int dimRes,
+            int noDims);
+
+    //  HELPER ROUTINES (COMPUTED ON CPU) /////////////////////////////////////
 
     /**
-     * Converts a dense matrix to a sparse matrix, providing the output values and
-     * corresponding row index of each element.
+     * Converts a dense matrix to a sparse matrix, providing the output values
+     * and corresponding row index of each element.
      *
      * @param denseIn as float*
      * @param rows as int
@@ -203,8 +221,30 @@ namespace SimulateGPU {
      * @param rowIdx as int*
      * @param totalElements as int&
      */
-    void dense2Sparse(float* denseIn, int rows, int cols, float* sparseOut, int*
-            elemsPerCol, int* rowIdx, int &totalElements);
+    void dense2Sparse(float* denseIn, int rows, int cols, float* sparseOut,
+            int* elemsPerCol, int* rowIdx, int &totalElements);
+
+    /**
+     * CPU-based multiple linear regression (global)
+     *
+     * @param noPoints as int
+     * @param noDims as int
+     * @param (in) xvals as float*
+     * @param (in) yvals as float*
+     * @param (out) X as float*
+     */
+    void multiLinReg(int noPoints, int noDims, float *xvals, float *yvals,
+            float *X);
+
+    /**
+     * Solves a system of linear equations
+     *
+     * @param dims as int
+     * @param (in) A as float*
+     * @param (in) B as float*
+     * @param (out) C as float*
+     */
+    void solveLinearSystem(int dims, float *A, float *B, float *C);
 
 //    // CALLING CUSOLVER ///////////////////////////////////////////////////////////
 //    /*******************/

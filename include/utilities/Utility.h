@@ -343,8 +343,8 @@ namespace Utility {
      * @param dimRes as int
      * @return Value as double
      */
-    double interpolateSurrogate(Eigen::VectorXd &surrogate,
-            Eigen::VectorXd& predictors, int dimRes);
+    double interpolateSurrogate(Eigen::VectorXd &surrogate, Eigen::VectorXd&
+            predictors, int dimRes);
 }
 
 #endif

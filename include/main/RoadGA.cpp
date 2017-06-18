@@ -20,9 +20,10 @@ RoadGA::RoadGA(double mr, double cf, unsigned long gens, unsigned long popSize,
     surrThresh, unsigned long maxLearnNo, unsigned long minLearnNo, unsigned
     long sg, RoadGA::Selection selector, RoadGA::Scaling fitscale, double
     topProp, double maxSurvivalRate, int ts, double msr, bool gpu,
-    Optimiser::ROVType rovType): Optimiser(mr, cf, gens, popSize, stopTol,
-            confInt, confLvl, habGridRes, surrDimRes, solScheme, noRuns, type,
-            sg, msr, gpu, rovType) {
+    Optimiser::ROVType rovType, Optimiser::InterpolationRoutine interp) :
+    Optimiser(mr, cf, gens, popSize, stopTol, confInt, confLvl, habGridRes,
+            surrDimRes, solScheme, noRuns, type, sg, msr, gpu, rovType,
+            interp) {
 
     this->theta = 0;
     this->generation = 0;
@@ -893,11 +894,29 @@ void RoadGA::plotResults(bool plot) {
                 std::vector<std::vector<double>> surrModel;
                 surrModel.resize(200,std::vector<double>(2));
 
-                for (int jj = 0; jj < 200; jj++) {
-                    surrModel[jj][0] = iarsTemp(jj);
-                    surrModel[jj][1] = alglib::spline1dcalc(this->surrogate[
-                            2*this->scenario->getCurrentScenario()][
-                            this->scenario->getRun()][ii],iarsTemp(jj));
+                if (this->interp == Optimiser::CUBIC_SPLINE) {
+                    for (int jj = 0; jj < 200; jj++) {
+                        surrModel[jj][0] = iarsTemp(jj);
+
+                        surrModel[jj][1] = alglib::spline1dcalc(this->
+                                surrogate[2*this->scenario->
+                                getCurrentScenario()][this->scenario->getRun()]
+                                [ii],iarsTemp(jj));
+                    }
+
+                } else if (this->interp == Optimiser::MULTI_LOC_LIN_REG) {
+                    Eigen::VectorXd results(200);
+
+                    SimulateGPU::interpolateSurrogateMulti(this->surrogateML[
+                            2*this->scenario->getCurrentScenario()][this->
+                            scenario->getRun()][ii],iarsTemp,results,this->
+                            surrDimRes,1);
+
+                    for (int jj = 0; jj < 200; jj++) {
+                        surrModel[jj][0] = iarsTemp(jj);
+                        surrModel[jj][1] = results(jj);
+//                        std::cout << surrModel[jj][0] << " " << surrModel[jj][1] << std::endl;
+                    }
                 }
 
                 // Plot 4ii (Surrogate Model)
@@ -1010,23 +1029,59 @@ void RoadGA::computeSurrogate() {
     int newSamples = ceil(pFull * this->populationSizeGA);
     Eigen::VectorXi sampleRoads(newSamples);
 
-    // Select individuals for computing learning from the full model
-    // We first sort the roads by cost
-    Eigen::VectorXi sortedIdx(this->populationSizeGA);
-    Eigen::VectorXd sorted(this->populationSizeGA);
-    igl::sort(this->costs,1,true,sorted,sortedIdx);
+//    // Select individuals for computing learning from the full model
+//    // We first sort the roads by cost
+//    Eigen::VectorXi sortedIdx(this->populationSizeGA);
+//    Eigen::VectorXd sorted(this->populationSizeGA);
+//    igl::sort(this->costs,1,true,sorted,sortedIdx);
 
-    // We will always test the three best roads
-    sampleRoads.segment(0,3) = sortedIdx.segment(0,3);
+//    // We will always test the three best roads
+//    sampleRoads.segment(0,3) = sortedIdx.segment(0,3);
 
-    // Now fill up the test road indices
-    // N.B. NEED TO PUT IN A ROUTINE HERE THAT SELECTS ROADS THAT HAVE DESIGN
-    // POINTS THAT ARE MOST DISSIMILAR FROM THE REST OF THE POPULATION
-    // CURRENTLY IN THE LIST OF SURROGATE DATA POINTS.
-    std::random_shuffle(sortedIdx.data()+3,sortedIdx.data() +
-            this->populationSizeGA);
-    sampleRoads.segment(3,newSamples-3) = sortedIdx.segment(3,
-            newSamples-3);
+//    // Now fill up the test road indices
+//    // N.B. NEED TO PUT IN A ROUTINE HERE THAT SELECTS ROADS THAT HAVE DESIGN
+//    // POINTS THAT ARE MOST DISSIMILAR FROM THE REST OF THE POPULATION
+//    // CURRENTLY IN THE LIST OF SURROGATE DATA POINTS.
+//    std::random_shuffle(sortedIdx.data()+3,sortedIdx.data() +
+//            this->populationSizeGA);
+//    sampleRoads.segment(3,newSamples-3) = sortedIdx.segment(3,
+//            newSamples-3);
+
+    if (this->type == Optimiser::MTE) {
+        Eigen::MatrixXd current(this->noSamples,this->species.size());
+        Eigen::MatrixXd candidates(this->populationSizeGA,this->species
+                .size());
+
+        for (int ii = 0; ii < this->species.size(); ii++) {
+            current.block(0,ii,this->noSamples,1) = this->iars.block(0,ii,
+                    this->noSamples,1);
+
+            candidates.block(0,ii,this->populationSizeGA,1) = this->iarsCurr
+                    .block(0,ii,this->populationSizeGA,1);
+        }
+
+        this->generateSample(current,candidates,newSamples,sampleRoads);
+
+    } else if (this->type == Optimiser::CONTROLLED) {
+        Eigen::MatrixXd current(this->noSamples,this->species.size()+1);
+        Eigen::MatrixXd candidates(this->populationSizeGA,this->species
+                .size()+1);
+
+        for (int ii = 0; ii < this->species.size(); ii++) {
+            current.block(0,ii,this->noSamples,1) = this->iars.block(0,ii,
+                    this->noSamples,1);
+
+            candidates.block(0,ii,this->populationSizeGA,1) = this->iarsCurr
+                    .block(0,ii,this->populationSizeGA,1);
+        }
+
+        current.block(0,species.size(),this->noSamples,1) = this->use.segment(
+                0,this->noSamples);
+        candidates.block(0,species.size(),this->populationSizeGA,1) = this->
+                useCurr;
+
+        this->generateSample(current,candidates,newSamples,sampleRoads);
+    }
 
     // Call the thread pool. The computed function and form of the surrogate
     // models are different under each scenario (MTE vs CONTROLLED). The thread
@@ -1099,7 +1154,13 @@ void RoadGA::computeSurrogate() {
         this->noSamples += validCounter;
 
         // Now that we have the results, let's build the new surrogate model!!!
-        this->buildSurrogateModelMTE();
+        if (this->interp == Optimiser::CUBIC_SPLINE) {
+            // Using cubic spline interpolation
+            this->buildSurrogateModelMTE();
+        } else if (this->interp == Optimiser::MULTI_LOC_LIN_REG) {
+            // Using local linear regression
+            this->buildSurrogateModelMTELocalLinear();
+        }
 
     } else if (this->type == Optimiser::CONTROLLED) {
 
@@ -1136,6 +1197,7 @@ void RoadGA::evaluateGeneration() {
             this->species.size());
     this->popsCurr = Eigen::MatrixXd::Zero(this->populationSizeGA,
             this->species.size());
+    this->useCurr = Eigen::VectorXd::Zero(this->populationSizeGA);
 
     if (this->type == Optimiser::CONTROLLED) {
         this->profits = Eigen::VectorXd::Zero(this->populationSizeGA);
@@ -1163,14 +1225,19 @@ void RoadGA::evaluateGeneration() {
 
                 if (this->type > Optimiser::SIMPLEPENALTY) {
                     for (int jj = 0; jj < this->species.size(); jj++) {
-                        this->iarsCurr(ii,jj) = road->getAttributes()->
-                                getIAR()(jj);
-
                         if (this->type == Optimiser::MTE) {
+                            this->iarsCurr(ii,jj) = road->getAttributes()->
+                                    getIAR()(jj);
                             this->popsCurr(ii,jj) = road->getAttributes()->
                                     getEndPopMTE()(jj);
                         } else if (this->type == Optimiser::CONTROLLED) {
-
+                            // We only need the aar at the highest flow rate
+                            int controls = this->programs[this->scenario->
+                                    getProgram()]->getFlowRates().size();
+                            this->iarsCurr(ii,jj) = road->getAttributes()->
+                                    getIAR()(jj,controls-1);
+                            this->useCurr(ii) = road->getAttributes()->
+                                    getInitialUnitCost();
                         }
                     }
                 }
@@ -1186,27 +1253,31 @@ void RoadGA::evaluateGeneration() {
         for (unsigned long ii = 0; ii < roads; ii++) {
             RoadPtr road(new Road(this->me(),
                     this->currentRoadPopulation.row(ii)));
-            clock_t begin = clock();
+//            clock_t begin = clock();
             road->designRoad();
             road->evaluateRoad();
-            clock_t end = clock();
-            double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-            std::cout << "Road Design & Evaluation Time " << ii << ": " << elapsed_secs << " s" << std::endl << std::endl;
+//            clock_t end = clock();
+//            double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//            std::cout << "Road Design & Evaluation Time " << ii << ": " << elapsed_secs << " s" << std::endl << std::endl;
 
             this->costs(ii) = road->getAttributes()->getTotalValueMean();
-
             this->profits(ii) = road->getAttributes()->getVarProfitIC();
 
             if (this->type > Optimiser::SIMPLEPENALTY) {
                 for (int jj = 0; jj < this->species.size(); jj++) {
-                    this->iarsCurr(ii,jj) = road->getAttributes()->
-                            getIAR()(jj);
-
                     if (this->type == Optimiser::MTE) {
+                        this->iarsCurr(ii,jj) = road->getAttributes()->
+                                getIAR()(jj);
                         this->popsCurr(ii,jj) = road->getAttributes()->
                                 getEndPopMTE()(jj);
                     } else if (this->type == Optimiser::CONTROLLED) {
-
+                        // We only need the aar at the highest flow rate
+                        int controls = this->programs[this->scenario->
+                                getProgram()]->getFlowRates().size();
+                        this->iarsCurr(ii,jj) = road->getAttributes()->
+                                getIAR()(jj,controls-1);
+                        this->useCurr(ii) = road->getAttributes()->
+                                getInitialUnitCost();
                     }
                 }
             }
@@ -2008,49 +2079,103 @@ void RoadGA::defaultSurrogate() {
     if (this->type == Optimiser::MTE) {
         // Default is to assume no animals die for any road
 
-        for (int ii = 0; ii < this->species.size(); ii++) {
-            // The default surrogate is a straight line at the initial
-            // population
-            alglib::ae_int_t m = 100;
-            // Amount to penalise non-linearity. We elect small penalisation.
-            double rho = 1.0;
-            // Exit status of spline fitting
-            alglib::ae_int_t info;
+        if (this->interp == Optimiser::CUBIC_SPLINE) {
+            for (int ii = 0; ii < this->species.size(); ii++) {
+                // The default surrogate is a straight line at the initial
+                // population
+                alglib::ae_int_t m = 100;
+                // Amount to penalise non-linearity. We elect small
+                // penalisation.
+                double rho = 1.0;
+                // Exit status of spline fitting
+                alglib::ae_int_t info;
 
-            // Convert sample data to usable form for ALGLIB
-            alglib::real_1d_array inputX;
-            alglib::real_1d_array inputY;
+                // Convert sample data to usable form for ALGLIB
+                alglib::real_1d_array inputX;
+                alglib::real_1d_array inputY;
 
-            Eigen::VectorXd abscissa = Eigen::VectorXd::LinSpaced(11,0,1);
-            Eigen::VectorXd ordinate = Eigen::VectorXd::Constant(11,1.0);
+                Eigen::VectorXd abscissa = Eigen::VectorXd::LinSpaced(11,0,1);
+                Eigen::VectorXd ordinate = Eigen::VectorXd::Constant(11,1.0);
 
-            inputX.setcontent(abscissa.size(),abscissa.data());
-            inputY.setcontent(ordinate.size(),ordinate.data());
+                inputX.setcontent(abscissa.size(),abscissa.data());
+                inputY.setcontent(ordinate.size(),ordinate.data());
 
-            alglib::spline1dfitreport report;
-            alglib::spline1dinterpolant s;
-            this->surrogate[2*this->scenario->getCurrentScenario()][this->
-                    scenario->getRun()][ii] = s;
+                alglib::spline1dfitreport report;
+                alglib::spline1dinterpolant s;
+                this->surrogate[2*this->scenario->getCurrentScenario()][this->
+                        scenario->getRun()][ii] = s;
 
-            // Mean
-            alglib::spline1dfitpenalized(inputX,inputY,m,rho,info,this->surrogate[
-                    2*this->scenario->getCurrentScenario()][this->scenario->
-                    getRun()][ii],report);
-            // Standard deviation
-            ordinate = Eigen::VectorXd::Zero(11);
-            inputY.setcontent(ordinate.size(),ordinate.data());
+                // Mean
+                alglib::spline1dfitpenalized(inputX,inputY,m,rho,info,this->
+                        surrogate[2*this->scenario->getCurrentScenario()][
+                        this->scenario->getRun()][ii],report);
+                // Standard deviation
+                ordinate = Eigen::VectorXd::Zero(11);
+                inputY.setcontent(ordinate.size(),ordinate.data());
 
-            alglib::spline1dinterpolant s2;
-            this->surrogate[2*this->scenario->getCurrentScenario()+1][this->
-                    scenario->getRun()][ii] = s2;
+                alglib::spline1dinterpolant s2;
+                this->surrogate[2*this->scenario->getCurrentScenario()+1][
+                        this->scenario->getRun()][ii] = s2;
 
-            alglib::spline1dfitpenalized(inputX,inputY,m,rho,info,this->surrogate[
-                    2*this->scenario->getCurrentScenario()+1][this->scenario->
-                    getRun()][ii],report);
+                alglib::spline1dfitpenalized(inputX,inputY,m,rho,info,this->
+                        surrogate[2*this->scenario->getCurrentScenario()+1][
+                        this->scenario->getRun()][ii],report);
+            }
+        } else if (this->interp == Optimiser::MULTI_LOC_LIN_REG) {
+            for (int ii = 0; ii < this->species.size(); ii++) {
+                Eigen::VectorXd surrogate(this->surrDimRes*2);
+
+                surrogate.segment(0,this->surrDimRes) =
+                        Eigen::VectorXd::LinSpaced(this->surrDimRes,0,1);
+
+                // Mean
+                surrogate.segment(this->surrDimRes,this->surrDimRes) =
+                        Eigen::VectorXd::Constant(this->surrDimRes,1.0);
+
+                this->surrogateML[2*this->scenario->getCurrentScenario()][
+                        this->scenario->getRun()][ii] = surrogate;
+
+                // Standard deviation
+                surrogate.segment(this->surrDimRes,this->surrDimRes) =
+                        Eigen::VectorXd::Constant(this->surrDimRes,0.0);
+
+                this->surrogateML[2*this->scenario->getCurrentScenario()+1][
+                        this->scenario->getRun()][ii] = surrogate;
+            }
         }
 
     } else if (this->type == Optimiser::CONTROLLED) {
+        // Create the predictors
+        Eigen::VectorXd surrogate(this->surrDimRes*(this->species.size()+1) +
+                (int)pow(this->surrDimRes,this->species.size()+1));
 
+        for (int ii = 0; ii < this->species.size(); ii++) {
+            surrogate.segment(ii*this->surrDimRes,this->surrDimRes) =
+                    Eigen::VectorXd::LinSpaced(this->surrDimRes,0,1);
+        }
+
+        surrogate.segment(this->surrDimRes*this->species.size(),this->
+                surrDimRes) = Eigen::VectorXd::LinSpaced(this->surrDimRes,0,
+                100);
+
+        // Mean
+        surrogate.segment(this->surrDimRes*(this->species.size()+1),
+                (int)pow(this->surrDimRes,this->species.size()+1)) =
+                Eigen::VectorXd::Constant((int)pow(this->surrDimRes,this->
+                species.size()+1),0.0);
+
+        this->surrogateML[2*this->scenario->getCurrentScenario()][this->
+                scenario->getRun()][0] = surrogate;
+
+
+        // Standard deviation
+        surrogate.segment(this->surrDimRes*(this->species.size()+1),
+                (int)pow(this->surrDimRes,this->species.size()+1)) =
+                Eigen::VectorXd::Constant((int)pow(this->surrDimRes,this->
+                species.size()+1),0.0);
+
+        this->surrogateML[2*this->scenario->getCurrentScenario()+1][this->
+                scenario->getRun()][0] = surrogate;
     }
 }
 
@@ -2121,6 +2246,16 @@ void RoadGA::buildSurrogateModelMTE() {
     }
 }
 
+void RoadGA::buildSurrogateModelMTELocalLinear() {
+    // WRAPPER
+    // This function takes in full model data and the generation and computes a
+    // surrogate model for each species
+
+    for (int ii = 0; ii < this->species.size(); ii++) {
+        SimulateGPU::buildSurrogateMTECUDA(this->meDerived(),ii);
+    }
+}
+
 void RoadGA::buildSurrogateModelROVCR() {
     // WRAPPER
     // This function takes in full model data and the generation and computes a
@@ -2138,4 +2273,180 @@ void RoadGA::buildSurrogateModelROVCR() {
     // Mean and standard deviation are done during the same call
 
     SimulateGPU::buildSurrogateROVCUDA(this->meDerived());
+}
+
+void RoadGA::generateSample(const Eigen::MatrixXd &current, const
+        Eigen::MatrixXd &candidates, int n, Eigen::VectorXi &sample) {
+
+    // We first normalise the augmented data
+    Eigen::MatrixXd C(current.rows()+candidates.rows(),candidates.cols());
+    C << current, candidates;
+
+    Eigen::VectorXd maxes = C.colwise().maxCoeff();
+    Eigen::VectorXd mins = C.colwise().minCoeff();
+
+    // Normalise in each dimension
+    for (int ii = 0; ii < candidates.cols(); ii++) {
+        C.col(ii) = (C.col(ii).array() - mins(ii))/(maxes(ii) - mins(ii));
+    }
+
+    // Return the values to the current and candidate matrices
+    Eigen::MatrixXf currf = C.block(0,0,current.rows(),candidates.cols()).
+            cast<float>();
+    Eigen::MatrixXf candf = C.block(current.rows(),0,candidates.rows(),
+            candidates.cols()).cast<float>();
+
+    // If it is the first generation, We start by first selecting the two most
+    // extreme points in the region (the points furthest from each other).
+    if (current.size() == 0) {
+        currf.resize(2,candidates.cols());
+        {
+            Eigen::MatrixXf distsInf(candidates.rows(),candidates.rows());
+
+            // We need to compute all distances (only projected distance here)
+            knn_cuda_with_indexes::computeDistances(candf.data(),candidates.rows(),
+                    candf.data(),candidates.rows(),candidates.cols(),distsInf
+                    .data(),true,-1);
+
+            float maxDist = 0.0f;
+            int P1 = 0;
+            int P2 = 0;
+
+            // Get pair with max distance between them
+            for(int ii = 0; ii < candidates.rows(); ii++) {
+                for(int jj = 0; jj < candidates.rows(); jj++) {
+                    if (distsInf(ii,jj) > maxDist) {
+                        P1 = ii;
+                        P2 = jj;
+                        maxDist = distsInf(ii,jj);
+                    }
+                }
+            }
+
+            sample(0) = P1;
+            sample(1) = P2;
+
+            currf.row(0) = candf.row(P1).cast<float>();
+            currf.row(1) = candf.row(P2).cast<float>();
+        }
+
+        int noSamps = 2;
+
+        // Compute the remaining samples
+        for (int ii = 2; ii < n; ii++) {
+            // We first need to determine which points are in the threshold
+            // region
+            Eigen::MatrixXf distsInf(candidates.rows(),currf.rows());
+            Eigen::MatrixXf dists2(candidates.rows(),currf.rows());
+
+            knn_cuda_with_indexes::computeDistances(currf.data(),noSamps,
+                    candf.data(),candidates.rows(),candidates.cols(),distsInf
+                    .data(),true,-1);
+
+            knn_cuda_with_indexes::computeDistances(currf.data(),noSamps,
+                    candf.data(),candidates.rows(),candidates.cols(),dists2
+                    .data(),false,2);
+
+            // Find the minimum distance in each distance for each candidate
+            Eigen::MatrixXf minDI(1,candidates.rows());
+            Eigen::MatrixXf minD2(1,candidates.rows());
+
+            minDI = distsInf.rowwise().minCoeff();
+            minD2 = dists2.rowwise().minCoeff();
+
+            // Use these to compute the intersite distance
+            float d_min = 2*0.5/(float)noSamps;
+            float best = 0.0f;
+            bool success = false;
+
+            for (int jj = 0; jj < candidates.rows(); jj++) {
+                if (minDI(jj) >= d_min) {
+                    success = true;
+                    if (minD2(jj) > best) {
+                        sample(noSamps) = jj;
+                        best = minD2(jj);
+                    }
+                }
+            }
+
+            // If there are no points over the projected distance threshold we
+            // resort to using the best of the intersite distances.
+            for (int jj = 0; jj < candidates.rows(); jj++) {
+                float val = ((pow(noSamps + 1,1/candidates.cols()) - 1)/2)*
+                        minD2(jj) + ((noSamps + 1)/2)*minDI(jj);
+
+                if (val > best) {
+                    sample(noSamps) = jj;
+                    best = val;
+                }
+            }
+
+            Eigen::MatrixXf currtemp = currf;
+            currf.resize(noSamps+1,candidates.cols());
+            currf.block(0,0,noSamps,candidates.cols()) = currtemp;
+
+            currf.row(noSamps) = candf.row(sample(noSamps)).cast<float>();
+            noSamps++;
+        }
+    } else {
+        // We first compute which points are within the permissible regions and
+        // then take the one with the maximum minimum distance
+        int noSamps = current.rows();
+
+        for (int ii = 0; ii < n; ii++) {
+            // We first need to determine which points are in the threshold
+            // region
+            Eigen::MatrixXf distsInf(candidates.rows(),currf.rows());
+            Eigen::MatrixXf dists2(candidates.rows(),currf.rows());
+
+            knn_cuda_with_indexes::computeDistances(currf.data(),noSamps,
+                    candf.data(),candidates.rows(),candidates.cols(),distsInf
+                    .data(),true,-1);
+
+            knn_cuda_with_indexes::computeDistances(currf.data(),noSamps,
+                    candf.data(),candidates.rows(),candidates.cols(),dists2
+                    .data(),false,2);
+
+            // Find the minimum distance in each distance for each candidate
+            Eigen::MatrixXf minDI(1,candidates.rows());
+            Eigen::MatrixXf minD2(1,candidates.rows());
+
+            minDI = distsInf.rowwise().minCoeff();
+            minD2 = dists2.rowwise().minCoeff();
+
+            // Use these to compute the intersite distance
+            float d_min = 2*0.5/(float)noSamps;
+            float best = 0.0f;
+            bool success = false;
+
+            for (int jj = 0; jj < candidates.rows(); jj++) {
+                if (minDI(jj) >= d_min) {
+                    success = true;
+                    if (minD2(jj) > best) {
+                        sample(ii) = jj;
+                        best = minD2(jj);
+                    }
+                }
+            }
+
+            // If there are no points over the projected distance threshold we
+            // resort to using the best of the intersite distances.
+            for (int jj = 0; jj < candidates.rows(); jj++) {
+                float val = ((pow(noSamps + 1,1/candidates.cols()) - 1)/2)*
+                        minD2(jj) + ((noSamps + 1)/2)*minDI(jj);
+
+                if (val > best) {
+                    sample(ii) = jj;
+                    best = val;
+                }
+            }
+
+            Eigen::MatrixXf currtemp = currf;
+            currf.resize(noSamps+1,candidates.cols());
+            currf.block(0,0,noSamps,candidates.cols()) = currtemp;
+
+            currf.row(noSamps) = candf.row(sample(ii)).cast<float>();
+            noSamps++;
+        }
+    }
 }

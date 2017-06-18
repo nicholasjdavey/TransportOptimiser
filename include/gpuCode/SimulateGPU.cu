@@ -1,4 +1,4 @@
-#include <stdio.h>
+//#include <stdio.h>
 #include <cuda.h>
 #include <curand.h>
 #include <curand_kernel.h>
@@ -6,7 +6,7 @@
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
 #include "../transportbase.h"
-#include "knn_cublas_with_indexes.h"
+#include "knn_cuda_with_indexes.h"
 
 // ERROR CHECKING MACROS //////////////////////////////////////////////////////
 
@@ -23,7 +23,7 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort
     }
 }
 
-static const int max_shared_floats = 8000;
+//static const int max_shared_floats = 8000;
 
 /**
  * Converts a CURAND error code from enum to text
@@ -105,6 +105,72 @@ __device__ float generateNormal(curandState* globalState, const unsigned int
     globalState[ind] = localState;
     //return value
     return rndval;
+}
+
+// This kernel is used for finding the solution to a set of linear equations
+// This is naive in that it assumes the coefficients matrix is non-singular.
+// This should only be used for the linear regressions.
+__device__ void solveLinearSystem(int dims, float *A, float *B, float *C) {
+    // First generate upper triangular matrix for the augmented matrix
+    float *swapRow;
+    swapRow = (float*)malloc((dims+1)*sizeof(float));
+
+    for (int ii = 0; ii < dims; ii++) {
+        C[ii] = B[ii];
+    }
+
+    for (int ii = 0; ii < dims; ii++) {
+        // Search for maximum in this column
+        float maxElem = fabsf(A[ii*dims+ii]);
+        int maxRow = ii;
+
+        for (int jj = (ii+1); jj < dims; jj++) {
+            if (fabsf(A[ii*dims+jj] > maxElem)) {
+                maxElem = fabsf(A[ii*dims+jj]);
+                maxRow = jj;
+            }
+        }
+
+        // Swap maximum row with current row if needed
+        if (maxRow != ii) {
+            for (int jj = ii; jj < dims; jj++) {
+                swapRow[jj] = A[jj*dims+ii];
+                A[jj*dims+ii] = A[jj*dims+maxRow];
+                A[jj*dims+maxRow] = swapRow[jj];
+            }
+
+            swapRow[dims] = C[ii];
+            C[ii] = C[maxRow];
+            C[maxRow] = swapRow[dims];
+        }
+
+        // Make all rows below this one 0 in current column
+        for (int jj = (ii+1); jj < dims; jj++) {
+            float factor = -A[ii*dims+jj]/A[ii*dims+ii];
+
+            // Work across columns
+            for (int kk = ii; kk < dims; kk++) {
+                if (kk == ii) {
+                    A[kk*dims+jj] = 0.0;
+                } else {
+                    A[kk*dims+jj] += factor*A[kk*dims+ii];
+                }
+            }
+
+            // Results vector
+            C[jj] += factor*C[ii];
+        }
+    }
+    free(swapRow);
+
+    // Solve equation for an upper triangular matrix
+    for (int ii = dims-1; ii >= 0; ii--) {
+        C[ii] = C[ii]/A[ii*dims+ii];
+
+        for (int jj = ii-1; jj >= 0; jj--) {
+            C[jj] -= C[ii]*A[ii*dims+jj];
+        }
+    }
 }
 
 // Initialise the states for curand on each kernel
@@ -393,12 +459,21 @@ __global__ void patchComputation(int noCandidates, int W, int H, int skpx, int
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
 
     if (idx < noCandidates) {
-        // Get large grid cell subscripts of thread
-        int blockIdxY = (int)(((int)(idx/uniqueRegions))/xres);
-        int blockIdxX = (int)(idx/uniqueRegions) - blockIdxY*xres;
+        // Dimensions arranged as X->Y->R
+        int rem = idx;
+        int blockIdxY = (int)(idx/(xres*uniqueRegions));
+        rem = rem - blockIdxY*(xres*uniqueRegions);
+        int blockIdxX = (int)(rem/uniqueRegions);
+        rem = rem - blockIdxX*(uniqueRegions);
         // Valid region numbering starts at 1, not 0
-        int regionNo = idx - blockIdxY*xres*uniqueRegions - blockIdxX*
-                uniqueRegions + 1;
+        int regionNo = rem + 1;
+
+//        // Get large grid cell subscripts of thread
+//        int blockIdxY = (int)(((int)(idx/uniqueRegions))/xres);
+//        int blockIdxX = (int)(idx/uniqueRegions) - blockIdxY*xres;
+//        // Valid region numbering starts at 1, not 0
+//        int regionNo = idx - blockIdxY*xres*uniqueRegions - blockIdxX*
+//                uniqueRegions + 1;
 
         int blockSizeX;
         int blockSizeY;
@@ -424,20 +499,31 @@ __global__ void patchComputation(int noCandidates, int W, int H, int skpx, int
 
         for (int ii = 0; ii < blockSizeX; ii++) {
             for (int jj = 0; jj < blockSizeY; jj++) {
-                int subIdx = blockIdxY*xres*skpx*skpy + blockIdxX*skpx
-                        + jj*H + ii;
-                area += (float)(labelledImage[subIdx] == regionNo);
+//                int subIdx = blockIdxY*xres*skpx*skpy + blockIdxX*skpx
+//                        + jj*H + ii;
+                int xCoord = blockIdxX*skpx+ii;
+                int yCoord = blockIdxY*skpy+jj;
+
+                area += (float)(labelledImage[xCoord + yCoord*W] == regionNo);
+//                int subIdx = blockIdxY*skpy*H + jj*H + blockIdxX*skpx + ii;
+//                area += (float)(labelledImage[subIdx] == regionNo);
             }
         }
 
         if (area > 0) {
             for (int ii = 0; ii < blockSizeX; ii++) {
                 for (int jj = 0; jj < blockSizeY; jj++) {
-                    int subIdx = blockIdxY*xres*skpx*skpy + blockIdxX*skpx
-                            + jj*H + ii;
-                    pop += pops[subIdx];
-                    cx += ii*(float)(labelledImage[subIdx] == regionNo);
-                    cy += jj*(float)(labelledImage[subIdx] == regionNo);
+//                    int subIdx = blockIdxY*xres*skpx*skpy + blockIdxX*skpx
+//                            + jj*H + ii;
+                //    int subIdx = blockIdxY*skpy*H + jj*H + blockIdxX*skpx + ii;
+                    int xCoord = blockIdxX*skpx+ii;
+                    int yCoord = blockIdxY*skpy+jj;
+
+                    if (labelledImage[xCoord + yCoord*W] == regionNo) {
+                        pop += (float)pops[xCoord + yCoord*W];
+                        cx += ii;
+                        cy += jj;
+                    }
                 }
             }
             cx = xspacing*(cx/area + blockIdxX*skpx);
@@ -452,6 +538,16 @@ __global__ void patchComputation(int noCandidates, int W, int H, int skpx, int
         results[5*idx+2] = pop;
         results[5*idx+3] = cx;
         results[5*idx+4] = cy;
+
+//        float tempPop = 0;
+
+//        for (int ii = 0; ii < W; ii++) {
+//            for (int jj = 0; jj < H; jj++) {
+//                tempPop += pops[ii + jj*W]*((float)(labelledImage[ii + jj*W] == regionNo));
+//            }
+//        }
+
+//        printf("%d %d %d %d %d %f\n",idx,blockIdxX,blockIdxY, blockSizeX,blockSizeY,tempPop);
 
 //        if (results[5*idx] > 0) {
 //            printf("%4d, %5d, %8.0f, %5.0f, %5.0f, %5.0f, %5.0f\n",idx,blockSizeX,
@@ -615,13 +711,12 @@ __global__ void randControls(int noPaths, int noControls, float* randCont,
 // The kernel for computing forward paths in ROV. This routine considers
 // each patch as containing a certain number of each species.
 __global__ void forwardPathKernel(int start, int noPaths, int nYears, int
-        noSpecies, int noPatches, int noControls, int noFuels, int
-        noUncertainties, float timeStep, float* pops, float* transitions,
-        float* survival, float* speciesParams, float* caps, float* aars,
-        float* uncertParams, int* controls, float* uJumps, float* uBrownian,
-        float* uJumpSizes, float* uJumpsSpecies, float* uBrownianSpecies,
-        float* uJumpSizesSpecies, float* rgr, float* uResults, float*
-        totalPops) {
+        noSpecies, int noPatches, int noControls, int noUncertainties, float
+        timeStep, float* pops, float* transitions, float* survival, float*
+        speciesParams, float* caps, float* aars, float* uncertParams, int*
+        controls, float* uJumps, float* uBrownian, float* uJumpSizes, float*
+        uJumpsSpecies, float* uBrownianSpecies, float* uJumpSizesSpecies,
+        float* rgr, float* uResults, float* totalPops) {
 
     // Global thread index
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -636,6 +731,8 @@ __global__ void forwardPathKernel(int start, int noPaths, int nYears, int
     // machine has CUDA compute compatability 3.5
 
     if (idx < noPaths) {
+        extern __shared__ float tempPops[];
+
         float* grMean;
         grMean = (float*)malloc(noSpecies*sizeof(float));
 
@@ -643,30 +740,30 @@ __global__ void forwardPathKernel(int start, int noPaths, int nYears, int
             grMean[jj] = speciesParams[jj*8];
         }
 
-        for (int ii = start; ii <= nYears; ii++) {
+        for (int ii = start-1; ii < nYears; ii++) {
             // Control to pick
             int control = controls[idx*nYears + ii];
 
             for (int jj = 0; jj < noSpecies; jj++) {
-// I think this code is unnecessary
-//                // Determine the aar under each control
-//                float* tempPops;
-//                tempPops = malloc(noControls*sizeof(float));
+//// I think this code is unnecessary
+////                // Determine the aar under each control
+////                float* tempPops;
+////                tempPops = malloc(noControls*sizeof(float));
 
-//                for (int kk = 0; kk < noControls; kk++) {
-//                    tempPop[kk] = 0;
+////                for (int kk = 0; kk < noControls; kk++) {
+////                    tempPop[kk] = 0;
 
-//                    for (int ll = 0; ll < noPatches; ll++) {
-//                        for (int mm = 0; mm < noPatches; mm++) {
-//                            tempPop[kk] += pops[idx*nYears*noSpecies*
-//                                    noPatches + (ii-1)*noSpecies*noPatches +
-//                                    jj*noPatches + mm]*transitions[jj*noPatches
-//                                    *noPatches + ll*noPatches + mm]*survival[
-//                                    jj*noPatches*noPatches*noControls +
-//                                    kk*noPatches*noPatches + ll*noPatches +mm];
-//                        }
-//                    }
-//                }
+////                    for (int ll = 0; ll < noPatches; ll++) {
+////                        for (int mm = 0; mm < noPatches; mm++) {
+////                            tempPop[kk] += pops[idx*nYears*noSpecies*
+////                                    noPatches + (ii-1)*noSpecies*noPatches +
+////                                    jj*noPatches + mm]*transitions[jj*noPatches
+////                                    *noPatches + ll*noPatches + mm]*survival[
+////                                    jj*noPatches*noPatches*noControls +
+////                                    kk*noPatches*noPatches + ll*noPatches +mm];
+////                        }
+////                    }
+////                }
 
                 // Adjust the global growth rate mean for this species at this
                 // time step for this path.
@@ -686,23 +783,30 @@ __global__ void forwardPathKernel(int start, int noPaths, int nYears, int
                         timeStep + grMean[jj]*brownian + (exp(jumpSize) - 1)*
                         grMean[jj]*jump;
 
-                for (int kk = 0; kk < noControls; kk++) {
-                    aars[jj*nYears*noPaths*noControls + ii*noPaths*
-                            noControls + idx*noControls + kk] = 0;
+                // Initialise temporary populations
+                for (int kk = 0; kk < noPatches; kk++) {
+                    tempPops[threadIdx.x + kk] = pops[idx*(nYears+1)*noSpecies*
+                            noPatches + (ii+1)*noSpecies*noPatches
+                            + jj*noPatches + kk];
                 }
+                __syncthreads();
 
-                float population = 0;
+                float totalPopulation = 0.0f;
+                float population;
 
                 for (int kk = 0; kk < noPatches; kk++) {
+
+                    population = 0.0f;
+
                     for (int ll = 0; ll < noPatches; ll++) {
 
-                        float value = pops[idx*nYears*noSpecies*
-                                noPatches + (ii-1)*noSpecies*noPatches
-                                + jj*noPatches + ll]*transitions[jj*
-                                noPatches*noPatches + kk*noPatches +
-                                ll];
+                        float value = tempPops[threadIdx.x + ll]*transitions[jj
+                                *noPatches*noPatches + kk*noPatches + ll];
 
-                        population += value;
+//                        float value = pops[idx*(nYears+1)*noSpecies*noPatches +
+//                                ii*noSpecies*noPatches + jj*noPatches + kk]
+//                                *transitions[jj*noPatches*noPatches + kk*
+//                                noPatches + ll];
 
                         for (int mm = 0; mm < noControls; mm++) {
                             float valCont = value*survival[jj*noPatches*
@@ -710,14 +814,13 @@ __global__ void forwardPathKernel(int start, int noPaths, int nYears, int
                                     noPatches*control + kk*noPatches + ll];
 
                             if (mm == control) {
-                                // Movement and mortality
-                                pops[idx*nYears*noSpecies*noPatches
-                                        + ii*noSpecies*noPatches + jj*noPatches
-                                        + kk] += valCont;
-                            } else {
-                                aars[jj*nYears*noPaths*noControls + ii*noPaths*
-                                        noControls + idx*noControls + mm] +=
-                                        valCont;
+//                                // Movement and mortality
+//                                pops[idx*(nYears+1)*noSpecies*noPatches
+//                                        + (ii+1)*noSpecies*noPatches + jj*
+//                                        noPatches + kk] += valCont;
+                                tempPops[threadIdx.x + kk] += valCont;
+                                __syncthreads();
+//                                population += valCont;
                             }
                         }
                     }
@@ -730,18 +833,41 @@ __global__ void forwardPathKernel(int start, int noPaths, int nYears, int
                     float gr = rgr[idx*noSpecies*noPatches*nYears + ii*
                             noSpecies*noPatches + jj*noPatches + kk];
 
-                    pops[idx*nYears*noSpecies*noPatches +
-                            ii*noSpecies*noPatches + jj*noPatches + kk] =
-                            pops[idx*nYears*noSpecies*noPatches
-                            + ii*noSpecies*noPatches + jj*noPatches + kk]*(1.0f
-                            + gr*(caps[jj*noPatches + kk] - pops[idx*nYears*
-                            noSpecies*noPatches + ii*noSpecies*noPatches +
-                            jj*noPatches + kk])/caps[jj*noPatches + kk]/100.0);
+//                    pops[idx*(nYears+1)*noSpecies*noPatches +
+//                            (ii+1)*noSpecies*noPatches + jj*noPatches + kk] =
+//                            pops[idx*(nYears+1)*noSpecies*noPatches
+//                            + (ii+1)*noSpecies*noPatches + jj*noPatches + kk]*(
+//                            1.0f + gr*(caps[jj*noPatches + kk] - pops[idx*(
+//                            nYears+1)*noSpecies*noPatches + (ii+1)*noSpecies*
+//                            noPatches + jj*noPatches + kk])/caps[jj*noPatches +
+//                            kk]/100.0);
 
-                    totalPops[ii*noSpecies*noPaths + idx*noSpecies + jj] +=
-                            pops[idx*nYears*noSpecies*noPatches + ii*noSpecies*
-                            noPatches + jj*noPatches + kk];
+                    pops[idx*(nYears+1)*noSpecies*noPatches +
+                            (ii+1)*noSpecies*noPatches + jj*noPatches + kk] =
+                            tempPops[kk]*(1.0f + gr*(caps[jj*noPatches + kk] -
+                            tempPops[kk])/caps[jj*noPatches + kk]/100.0);
+
+//                    pops[idx*(nYears+1)*noSpecies*noPatches + (ii+1)*noSpecies*
+//                            noPatches + jj*noPatches + kk] = population*(1.0f
+//                            + gr*(caps[jj*noPatches + kk] - population)/caps[
+//                            jj*noPatches + kk]/100.0);
+
+//                    population = population*(1.0f + gr*(caps[jj*noPatches + kk]
+//                            - population)/caps[jj*noPatches + kk]/100.0);
+
+//                    pops[idx*(nYears+1)*noSpecies*noPatches +
+//                            (ii+1)*noSpecies*noPatches + jj*noPatches + kk] =
+//                            population;
+
+//                    totalPopulation += population;
+
+                    totalPops[idx*noSpecies*(nYears+1) + (ii+1)*noSpecies + jj] =
+                            pops[idx*(nYears+1)*noSpecies*noPatches + (ii+1)*
+                            noSpecies*noPatches + jj*noPatches + kk];
                 }
+
+//                totalPops[idx*noSpecies*(nYears+1) + (ii+1)*noSpecies + jj]
+//                        = totalPopulation;
             }
 
             // Other uncertainties
@@ -849,10 +975,10 @@ __global__ void computeStateMinMax(int noControls, int noDims, int noPaths,
         for (int jj = 0; jj < dataPoints[ii]; jj++) {
             for (int kk = 0; kk < noDims; kk ++) {
                 float xtemp = xvals[ii*noDims*noPaths + jj*noDims + kk];
-                if (xmin[jj] > xtemp) {
-                    xmin[jj] = xtemp;
-                } else if (xmax[jj] < xtemp) {
-                    xmax[jj] = xtemp;
+                if (xmin[kk] > xtemp) {
+                    xmin[kk] = xtemp;
+                } else if (xmax[kk] < xtemp) {
+                    xmax[kk] = xtemp;
                 }
             }
         }
@@ -860,6 +986,7 @@ __global__ void computeStateMinMax(int noControls, int noDims, int noPaths,
         for (int jj = 0; jj < noDims; jj++) {
             xmins[ii*noDims + jj] = xmin[jj];
             xmaxes[ii*noDims + jj] = xmax[jj];
+//            printf("Xmin = %f Xmax = %f\n",xmin[jj],xmax[jj]);
         }
 
         free(xmin);
@@ -884,21 +1011,24 @@ __global__ void createQueryPoints(int noPoints, int noDims, int dimRes, int
 
         for (int ii = 0; ii < noDims; ii++) {
             int div = (int)(rem/pow(dimRes,noDims-ii-1));
-            dimIdx[noDims - ii - 1] = div;
+            dimIdx[ii] = div;
             rem = rem - div*pow(dimRes,noDims-ii-1);
         }
 
         // Get the query point coordinates
         for (int ii = 0; ii < noDims; ii++) {
-            queryPts[idx*noDims + ii] = ((float)dimIdx[ii]+0.5)*(xmaxes[control
-                    *noDims + ii] - xmins[control*noDims + ii])/(float)dimRes +
-                    xmins[control*noDims + ii];
+            queryPts[idx + ii*noPoints] = ((float)dimIdx[ii])*(xmaxes[
+                    control*noDims + ii] - xmins[control*noDims + ii])/(
+                    float)dimRes + xmins[control*noDims + ii];
+//            queryPts[ii*noDims + idx] = ((float)dimIdx[ii]+0.5)*(xmaxes[control
+//                    *noDims + ii] - xmins[control*noDims + ii])/(float)dimRes +
+//                    xmins[control*noDims + ii];
 
             // Save the X value for the query point
             regression[year*noControls*(dimRes*noDims + (int)pow(dimRes,
                     noDims)*2) + control*(dimRes*noDims + (int)pow(dimRes,
-                    noDims)*2) + ii*dimRes + dimIdx[ii]] = queryPts[idx*noDims
-                    + ii];
+                    noDims)*2) + ii*dimRes + dimIdx[ii]] = queryPts[idx + ii*
+                    noPoints];
         }
 
         free(dimIdx);
@@ -1006,7 +1136,7 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                         + (idx+1)*noControls - 1]/Q[noControls - 1];
             }
 
-            // The previailing unit profit
+            // The prevailing unit profit
             unitProfits[start*noPaths + idx] = unitCost + unitFuel -
                     unitRevenue*orePrice;
 
@@ -1143,7 +1273,7 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                         int idxU = idxL + (lowerInd[0]+1)*(int)pow(dimRes,
                                 noSpecies);
 
-                        idxL += idxL + lowerInd[0]*(int)pow(dimRes,noSpecies);
+                        idxL += lowerInd[0]*(int)pow(dimRes,noSpecies);
 
                         coeffs[jj] = regression[idxL]*(1 - xd) +
                                 regression[idxU]*xd;
@@ -1377,7 +1507,7 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                             int idxU = idxL + (lowerInd[0] + 1)*(int)pow(
                                     dimRes,noSpecies);
 
-                            idxL += idxL + lowerInd[0]*(int)pow(dimRes,
+                            idxL += lowerInd[0]*(int)pow(dimRes,
                                     noSpecies);
 
                             coeffs[kk] = regression[idxL]*(1 - xd) +
@@ -1449,11 +1579,6 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
     }
 }
 
-// Multiple global linear regression
-__global__ void multiLinReg() {
-
-}
-
 // Create cuBlas handles for each thread
 __global__ void createHandles(cublasHandle_t* handles, int noThreads) {
 
@@ -1479,35 +1604,39 @@ __global__ void destroyHandles(cublasHandle_t* handles, int noThreads) {
 // Multiple local linear regression
 __global__ void multiLocLinReg(int noPoints, int noDims, int dimRes, int nYears,
         int noControls, int year, int control, int k, int* dataPoints, float
-        *xvals, float *yvals, float *d_regression, float* xmins, float* xmaxes,
+        *xvals, float *yvals, float *regression, float* xmins, float* xmaxes,
         float *dist, int *ind, cublasHandle_t* handles) {
 
     // Global thread index
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
 
-    // First, deconstruct the index into the index along each dimension
-    int *dimIdx;
-    dimIdx = (int*)malloc(noDims*sizeof(int));
-
-    int rem = idx;
-
-    for (int ii = 0; ii < noDims; ii++) {
-        int div = (int)(rem/pow(dimRes,noDims-ii-1));
-        dimIdx[noDims - ii - 1] = div;
-        rem = rem - div*pow(dimRes,noDims-ii-1);
-    }
-
     if (idx < noPoints) {
+        // First, deconstruct the index into the index along each dimension
+        int *dimIdx;
+        dimIdx = (int*)malloc(noDims*sizeof(int));
+
+        int rem = idx;
+
+        for (int ii = 0; ii < noDims; ii++) {
+            int div = (int)(rem/pow(dimRes,noDims-ii-1));
+            //dimIdx[noDims - ii - 1] = div;
+            dimIdx[ii] = div;
+            rem = rem - div*pow(dimRes,noDims-ii-1);
+        }
+
         // Get the query point coordinates
         float *xQ;
         xQ = (float*)malloc(noDims*sizeof(float));
 
         for (int ii = 0; ii < noDims; ii++) {
-            xQ[ii] = ((float)dimIdx[ii]+0.5)*(xmaxes[control*noDims + ii] -
+            xQ[ii] = ((float)dimIdx[ii])*(xmaxes[control*noDims + ii] -
                     xmins[control*noDims + ii])/(float)dimRes +
                     xmins[control*noDims + ii];
         }
 
+//        printf("%10.6f %10.6f || %10.6f %10.6f | %10.6f %10.6f | %10.6f %10.6f | %10.6f %10.6f | %10.6f %10.6f |\n%d %d %d %d %d |\n",xQ[0],xQ[1],xvals[noDims*(ind[noPoints*0+idx]-1)],xvals[noDims*(ind[noPoints*0+idx]-1)+1],xvals[noDims*(ind[noPoints*1+idx]-1)],xvals[noDims*(ind[noPoints*1+idx]-1)+1],xvals[noDims*(ind[noPoints*2+idx]-1)],xvals[noDims*(ind[noPoints*2+idx]-1)+1],xvals[noDims*(ind[noPoints*3+idx]-1)],xvals[noDims*(ind[noPoints*3+idx]-1)+1],xvals[noDims*(ind[noPoints*4+idx]-1)],xvals[noDims*(ind[noPoints*4+idx]-1)+1],ind[noPoints*0+idx],ind[noPoints*1+idx],ind[noPoints*2+idx],ind[noPoints*3+idx],ind[noPoints*4+idx],ind[noPoints*4+idx]);
+//        printf("%10.6f || %10.6f | %10.6f | %10.6f | %10.6f | %10.6f | %3d %3d %3d %3d %3d |\n",xQ[0],xvals[noDims*(ind[noPoints*0+idx]-1)],xvals[noDims*(ind[noPoints*1+idx]-1)],xvals[noDims*(ind[noPoints*2+idx]-1)],xvals[noDims*(ind[noPoints*3+idx]-1)],xvals[noDims*(ind[noPoints*4+idx]-1)],ind[noPoints*0+idx],ind[noPoints*1+idx],ind[noPoints*2+idx],ind[noPoints*3+idx],ind[noPoints*4+idx]);
+//        printf("%10.6f %10.6f || %d %d %d %d %d |\n",xQ[0],xQ[1],dist[noPoints*0+idx],dist[noPoints*1+idx],dist[noPoints*2+idx],dist[noPoints*3+idx],dist[noPoints*4+idx],dist[noPoints*5+idx]);
         // 1. First find the k nearest neighbours to the query point (already)
         // computed prior).
 
@@ -1515,58 +1644,99 @@ __global__ void multiLocLinReg(int noPoints, int noDims, int dimRes, int nYears,
         // A - Input design matrix
         // B - Input known matrix
         // C - Output matrix of coefficients
-        float *A, *B, *C, *X;
+        float *A, *B, *X;
+//        float *C;
 
         A = (float*)malloc(pow(noDims+1,2)*sizeof(float));
         B = (float*)malloc((noDims+1)*sizeof(float));
-        C = (float*)malloc(pow(noDims+1,2)*sizeof(float));
+//        C = (float*)malloc(pow(noDims+1,2)*sizeof(float));
         X = (float*)malloc((noDims+1)*sizeof(float));
+
+        // Bandwidth
+        float h = dist[noPoints*(k-1) + idx];
+
+//        printf("IDX: %6d X1: %10.6f X2: %10.6f | 1: %10.6f 2: %10.6f 3: %10.6f 4: %10.6f 5: %10.6f\n                                          | 1: %10.6f 2: %10.6f 3: %10.6f 4: %10.6f 5: %10.6f\n",idx,xQ[0],xQ[1],dist[idx],dist[noPoints + idx],dist[2*noPoints + idx],dist[3*noPoints + idx],dist[4*noPoints + idx],dist[2*idx+1],dist[noPoints + 2*idx+1],dist[2*noPoints + 2*idx+1],dist[3*noPoints + 2*idx+1],dist[4*noPoints + 2*idx+1]);
+//        float z = 1;
 
         for (int ii = 0; ii <= noDims; ii++) {
             // We will use a Gaussian kernel and normalise by the distance of
             // the furthest point of the nearest k neighbours.
-            float h = dist[(idx+1)*k - 1];
 
             // Initialise values to zero
             B[ii] = 0.0;
 
             for (int kk = 0; kk < k; kk++) {
-                float d = dist[idx*k + kk];
-                float z = exp(-(d/h)*(d/h)/2)/sqrt(2*M_PI);
+//                float h = d_h[ind[kk]];
+                float d = dist[noPoints*kk + idx];
+                // Gaussian kernel
+//                float z = exp(-(d/h)*(d/h)/2)/sqrt(2*M_PI);
+                // Epanechnikov kernel
+                float z = 0.75*(1-pow(d/h,2));
 
-                B[ii] += yvals[ii]*(xvals[ind[kk]*noDims+ii] - xQ[ii])*z*z;
+                if (ii == 0) {
+                    B[ii] += yvals[ind[noPoints*kk + idx] - 1]*z;
+                } else {
+                    B[ii] += yvals[ind[noPoints*kk + idx] - 1]*(xvals[(ind[noPoints
+                            *kk + idx] - 1)*noDims + ii - 1] - xQ[ii-1])*z;
+                }
             }
 
             for (int jj = 0; jj <= noDims; jj++) {
-                A[ii*(noDims+1)+jj] = 0;
+                A[jj*(noDims+1)+ii] = 0.0;
 
-                for (int kk = 0; kk <= dataPoints[control]; kk++) {
-                    float d = dist[idx*k + kk];
-                    float z = exp(-(d/h)*(d/h)/2)/sqrt(2*M_PI);
+                for (int kk = 0; kk < k; kk++) {
+//                    float h = d_h[ind[kk]];
+                    float d = dist[noPoints*kk + idx];
+//                    float z = exp(-(d/h)*(d/h)/2)/sqrt(2*M_PI);
+                    float z = 0.75*(1-pow(d/h,2));
 
-                    A[ii*(noDims+1)+jj] += (xvals[ind[kk]*noDims+ii]-xQ[ii])*(
-                            xvals[ind[kk]*noDims+jj] - xQ[jj])*z*z;
+                    if ((ii == 0) && (jj == 0)) {
+                        A[jj*(noDims+1)+ii] += 1.0*z;
+                    } else if (ii == 0) {
+                        A[jj*(noDims+1)+ii] += (xvals[(ind[noPoints*kk + idx] - 1
+                                )*noDims + jj - 1] - xQ[jj - 1])*z;
+                    } else if (jj == 0) {
+                        A[jj*(noDims+1)+ii] += (xvals[(ind[noPoints*kk + idx] - 1
+                                )*noDims + ii - 1] - xQ[ii - 1])*z;
+                    } else {
+                        A[jj*(noDims+1)+ii] += (xvals[(ind[noPoints*kk + idx] - 1
+                                )*noDims + jj - 1] - xQ[jj-1])*(xvals[(ind[
+                                noPoints*kk + idx] - 1)*noDims + ii - 1] - xQ[ii
+                                - 1])*z;
+                    }
                 }
             }
         }
 
-        // 3. Use cuBlas to solve the set of linear equations to determine the
-        // coefficients matrix.
+//        for (int ii = 0; ii < pow((noDims+1),2); ii++) {
+//            C[ii] = A[ii];
+//        }
+        // Solve the system using Gaussian elimination
+//        printf("%.8f %.8f %.8f %.8f %.8f %.8f\n",A[0],A[1],A[2],A[3],B[0],B[1]);
+        solveLinearSystem(noDims+1,A,B,X);
+        //printf("%6.3f %6.3f %6.3f %6.3f\n",A[0],A[1],A[2],A[3]);
+//        printf("%12d %12.8f %12.8f\n",idx,xQ[0],X[0]);
+//        printf("%.8f %.8f %.8f %.8f %.8f %.8f %.8f %.8f %.8f\n",C[0],C[1],C[2],C[3],B[0],B[1],X[0],X[1],xQ[0]);
 
-        // a. LU Decomposition
-        // --- Creating the array of pointers needed as input/output to the
-        // batched getrf
-        float **inout_pointers = (float **)malloc(sizeof(float*));
-        inout_pointers[0] = A;
+//        // 3. Use cuBlas to solve the set of linear equations to determine the
+//        // coefficients matrix.
 
-        int *pivotArray;
-        int *infoArray;
-        pivotArray = (int*)malloc((noDims+1)*sizeof(int));
-        infoArray = (int*)malloc(sizeof(int));
-        // The payoffs are always finite and should not be different for the
-        // same inputs. Therefore, we ought not to have any singular matrices.
-        cublasSgetrfBatched(handles[threadIdx.x],noDims+1,inout_pointers,
-                noDims,pivotArray,infoArray,1);
+//        // a. LU Decomposition
+//        // --- Creating the array of pointers needed as input/output to the
+//        // batched getrf
+//        float *inout_pointers[1];
+//        //float **inout_pointers = (float **)malloc(sizeof(float*));
+//        inout_pointers[0] = A;
+
+//        int *pivotArray;
+//        int *infoArray;
+//        pivotArray = (int*)malloc((noDims+1)*sizeof(int));
+//        infoArray = (int*)malloc(sizeof(int));
+
+//        // The payoffs are always finite and should not be different for the
+//        // same inputs. Therefore, we ought not to have any singular matrices.
+//        cublasSgetrfBatched(handles[threadIdx.x],noDims+1,inout_pointers,
+//                noDims+1,pivotArray,infoArray,1);
 
 //        if (infoArray[0] != 0) {
 //            std::cout <<
@@ -1576,47 +1746,129 @@ __global__ void multiLocLinReg(int noPoints, int noDims, int dimRes, int nYears,
 //            exit(EXIT_FAILURE);
 //        }
 
-        // b. Compute the inverse of A
-        // Allocate space for the inverted matrix
-        float **out_pointers = (float**)malloc(sizeof(float*));
-        out_pointers[0] = C;
+//        // b. Compute the inverse of A
+//        // Allocate space for the inverted matrix
+//        float *out_pointers[1];
+//        out_pointers[0] = C;
+//        //float **out_pointers = (float**)malloc(sizeof(float*));
+//        out_pointers[0] = C;
 
-        cublasSgetriBatched(handles[threadIdx.x],noDims+1,(const float**)
-                inout_pointers,
-                noDims+1,pivotArray,out_pointers,noDims+1,infoArray,noDims+1);
+//        cublasSgetriBatched(handles[threadIdx.x],noDims+1,(const float**)
+//                inout_pointers,noDims+1,pivotArray,out_pointers,noDims+1,
+//                infoArray,noDims+1);
 
-//        if (infoArray[0] != 0) {
-//            std::cout <<
-//                    "Factorization of matrix %d Failed: Matrix may be singular"
-//                    << std::endl;
-//            cudaDeviceReset();
-//            exit(EXIT_FAILURE);
-//        }
+////        if (infoArray[0] != 0) {
+////            std::cout <<
+////                    "Factorization of matrix %d Failed: Matrix may be singular"
+////                    << std::endl;
+////            cudaDeviceReset();
+////            exit(EXIT_FAILURE);
+////        }
 
-        // Now multiply to get the coefficients
-        float alpha1 = 1.0f;
-        float beta1 = 0.0f;
+//        // Now multiply to get the coefficients
+//        float alpha1 = 1.0f;
+//        float beta1 = 0.0f;
 
-        cublasSgemv(handles[threadIdx.x],CUBLAS_OP_N,noDims+1,noDims+1,&alpha1,
-                C,noDims+1,B,noDims+1,&beta1,X,1);
+//        cublasSgemv(handles[threadIdx.x],CUBLAS_OP_N,noDims+1,noDims+1,&alpha1,
+//                C,noDims+1,B,noDims+1,&beta1,X,1);
 
         // 4. Compute the y value at the x point of interest using the just-
         //    found regression coefficients. This is simply the y intercept we
         //    just computed and save to the regression matrix.
-        d_regression[year*noControls*(dimRes*noDims + (int)pow(dimRes,
-                noDims)*2) + control*(dimRes*noDims + (int)pow(dimRes,
-                noDims)*2) + noDims*dimRes + idx] = X[0];
+        regression[year*noControls*(dimRes*noDims + (int)pow(dimRes,noDims)*2)
+                + control*(dimRes*noDims + (int)pow(dimRes,noDims)*2) + dimRes*
+                noDims + idx] = X[0];
 
-        // Free memory
+//        // Free memory
         free(A);
         free(B);
-        free(C);
-        free(xQ);
+//        free(C);
         free(X);
-        free(pivotArray);
-        free(infoArray);
+        free(xQ);
+//        free(pivotArray);
+//        free(infoArray);
+        free(dimIdx);
     }
-    free(dimIdx);
+}
+
+// The predictors are arranged by point
+__global__ void interpolateMulti(int points, int noDims, int dimRes, float*
+        surrogate, float* predictors, float* results) {
+
+    // Global thread index
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+    if (idx < points) {
+        float *lower, *upper, *coeffs;
+        int *lowerInd;
+        lower = (float*)malloc((noDims)*sizeof(float));
+        upper = (float*)malloc((noDims)*sizeof(float));
+        coeffs = (float*)malloc(((int)pow(2,noDims-1))*sizeof(float));
+        lowerInd = (int*)malloc((noDims)*sizeof(float));
+
+        for (int jj = 0; jj < noDims; jj++) {
+            lower[jj] = surrogate[jj*dimRes];
+            upper[jj] = surrogate[(jj+1)*dimRes - 1];
+            lowerInd[jj] = (int)((dimRes-1)*(predictors[noDims*idx+jj] -
+                    lower[jj])/(upper[jj] - lower[jj]));
+
+            if (lowerInd[jj] >= (dimRes-1)) {
+                lowerInd[jj] = dimRes-2;
+            } else if (lowerInd[jj] < 0){
+                lowerInd[jj] = 0;
+            }
+        }
+
+        // Let's interpolate
+        // Uppermost dimensions x value
+        float x0 = surrogate[lowerInd[0]];
+        float x1 = surrogate[lowerInd[0]+1];
+        float xd = (predictors[noDims*idx] - x0)/(x1-x0);
+
+//        if (idx == points - 1) {
+//            printf("%5.6f %5.6f %5.6f %d %d",xd,x0,x1,lowerInd[0],dimRes);
+//        }
+
+        // First, assign the yvalues to the coefficients matrix
+        for (int jj = 0; jj < (int)pow(2,noDims-1); jj++) {
+            // Get the indices of the yvalues of the lower and upper bounding
+            // values on this dimension.
+            int idxL = dimRes*noDims;
+
+            for (int kk = 1; kk < noDims; kk++) {
+                int rem = ((int)(jj/((int)pow(2,noDims - kk - 1))) + 1) - 2*
+                        (int)(((int)(jj/((int)pow(2,noDims - kk - 1))) + 1)/2);
+                if(rem > 0) {
+                    idxL += lowerInd[kk]*(int)pow(dimRes,noDims - kk - 1);
+                } else {
+                    idxL += (lowerInd[kk]+1)*(int)pow(dimRes,noDims - kk - 1);
+                }
+            }
+
+            int idxU = idxL + (lowerInd[0]+1)*(int)pow(dimRes,noDims-1);
+
+            idxL += lowerInd[0]*(int)pow(dimRes,noDims-1);
+
+            coeffs[jj] = surrogate[idxL]*(1 - xd) + surrogate[idxU]*xd;
+        }
+
+        // Now we work our way down the dimensions using our computed
+        // coefficients to get the interpolated value.
+        for (int jj = 1; jj < noDims; jj++) {
+            // Get the current dimension x value
+            x0 = surrogate[jj*dimRes + lowerInd[jj]];
+            x1 = surrogate[jj*dimRes + lowerInd[jj] + 1];
+            xd = (predictors[jj] - x0)/(x1-x0);
+
+            for (int kk = 0; kk < (int)pow(2,jj); kk++) {
+                int jump = (int)pow(2,noDims - jj - 2);
+                coeffs[kk] = coeffs[kk]*(1 - xd) + coeffs[kk + jump]*xd;
+            }
+        }
+
+        // Output the result
+        results[idx] = coeffs[0];
+    }
 }
 
 // WRAPPERS ///////////////////////////////////////////////////////////////////
@@ -1626,8 +1878,8 @@ void SimulateGPU::expPV(UncertaintyPtr uncertainty) {
     int device = 0;
     struct cudaDeviceProp properties;
     CUDA_CALL(cudaGetDeviceProperties(&properties, device));
-    maxMultiProcessors = properties.multiProcessorCount;
-    maxThreadsPerBlock = properties.maxThreadsPerBlock;
+//    int maxMultiProcessors = properties.multiProcessorCount;
+    int maxThreadsPerBlock = properties.maxThreadsPerBlock;
 
     OptimiserPtr optimiser = uncertainty->getOptimiser();
     EconomicPtr economic = optimiser->getEconomic();
@@ -1714,8 +1966,8 @@ void SimulateGPU::eMMN(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
     int device = 0;
     struct cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties, device);
-    maxMultiProcessors = properties.multiProcessorCount;
-    maxThreadsPerBlock = properties.maxThreadsPerBlock;
+//    int maxMultiProcessors = properties.multiProcessorCount;
+    int maxThreadsPerBlock = properties.maxThreadsPerBlock;
 
     if (A.cols() != B.rows()) {
         throw "SimulateGPU: matrixMultiplication: Inner dimensions do not match!";
@@ -1773,8 +2025,8 @@ void SimulateGPU::eMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
     int device = 0;
     struct cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties, device);
-    maxMultiProcessors = properties.multiProcessorCount;
-    maxThreadsPerBlock = properties.maxThreadsPerBlock;
+//    int maxMultiProcessors = properties.multiProcessorCount;
+//    int maxThreadsPerBlock = properties.maxThreadsPerBlock;
 
     if (A.cols() != B.rows()) {
         throw "SimulateGPU: matrixMultiplication: Inner dimensions do not match!";
@@ -1826,8 +2078,8 @@ void SimulateGPU::ewMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd &B,
     int device = 0;
     struct cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties, device);
-    maxMultiProcessors = properties.multiProcessorCount;
-    maxThreadsPerBlock = properties.maxThreadsPerBlock;
+//    int maxMultiProcessors = properties.multiProcessorCount;
+//    int maxThreadsPerBlock = properties.maxThreadsPerBlock;
 
     if ((A.cols() != B.cols()) || (A.rows() != B.rows())) {
         throw "SimulateGPU: matrixMultiplication: Matrix dimensions do not match!";
@@ -1877,8 +2129,8 @@ void SimulateGPU::ewMD(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
     int device = 0;
     struct cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties, device);
-    maxMultiProcessors = properties.multiProcessorCount;
-    maxThreadsPerBlock = properties.maxThreadsPerBlock;
+//    int maxMultiProcessors = properties.multiProcessorCount;
+//    int maxThreadsPerBlock = properties.maxThreadsPerBlock;
 
     if ((A.cols() != B.cols()) || (A.rows() != B.rows())) {
         throw "SimulateGPU: matrixMultiplication: Matrix dimensions do not match!";
@@ -2015,14 +2267,15 @@ void SimulateGPU::buildPatches(int W, int H, int skpx, int skpy, int xres,
         subPatchArea, HabitatTypePtr habTyp, const Eigen::MatrixXi&
         labelledImage, const Eigen::MatrixXd& populations,
         std::vector<HabitatPatchPtr>& patches, double& initPop,
-        Eigen::VectorXd& initPops, int& noPatches) {
+        Eigen::VectorXd& initPops, Eigen::VectorXd& capacities, int&
+        noPatches) {
 
     // Get device properties
     int device = 0;
     struct cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties, device);
-    maxMultiProcessors = properties.multiProcessorCount;
-    maxThreadsPerBlock = properties.maxThreadsPerBlock;
+//    int maxMultiProcessors = properties.multiProcessorCount;
+    int maxThreadsPerBlock = properties.maxThreadsPerBlock;
 
     Eigen::MatrixXf popsFloat = populations.cast<float>();
 
@@ -2074,6 +2327,7 @@ void SimulateGPU::buildPatches(int W, int H, int skpx, int skpy, int xres,
             hab->setType(habTyp);
             initPop += (double)results[5*ii+2];
             initPops(noPatches) = (double)results[5*ii+2];
+            capacities(noPatches) = (double)results[5*ii+1];
             patches[noPatches++] = hab;
         }
     }
@@ -2094,8 +2348,8 @@ void SimulateGPU::simulateMTECUDA(SimulatorPtr sim,
     int device = 0;
     struct cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties, device);
-    maxMultiProcessors = properties.multiProcessorCount;
-    maxThreadsPerBlock = properties.maxThreadsPerBlock;
+//    int maxMultiProcessors = properties.multiProcessorCount;
+    int maxThreadsPerBlock = properties.maxThreadsPerBlock;
 
     // We convert all inputs to floats from double as CUDA is much faster in
     // single precision than double precision
@@ -2340,8 +2594,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     int device = 0;
     struct cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties, device);
-    maxMultiProcessors = properties.multiProcessorCount;
-    maxThreadsPerBlock = properties.maxThreadsPerBlock;
+//    int maxMultiProcessors = properties.multiProcessorCount;
+    int maxThreadsPerBlock = properties.maxThreadsPerBlock;
 
     // Get general properties
     OptimiserPtr optimiser = sim->getRoad()->getOptimiser();
@@ -2377,10 +2631,9 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     // Initialise CUDA memory /////////////////////////////////////////////////
 
     // 1. Transition and survival matrices for each species and each control
-    float *transitions, *survival, *initPops, *capacities, *speciesParams,
-            *uncertParams, *d_transitions, *d_survival, *d_initPops,
-            *d_tempPops, *d_capacities, *d_speciesParams, *d_uncertParams,
-            *d_fuelCosts;
+    float *transitions, *survival, *speciesParams, *uncertParams,
+            *d_transitions, *d_survival, *d_initPops, *d_tempPops,
+            *d_capacities, *d_speciesParams, *d_uncertParams, *d_fuelCosts;
 
     int *noPatches, *d_noPatches;
 
@@ -2392,85 +2645,108 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     for (int ii = 0; ii < srp.size(); ii++) {
         noPatches[ii] = srp[ii]->getHabPatches().size();
         patches += noPatches[ii];
-        transition += pow(patches,2);
+        transition += pow(noPatches[ii],2);
     }
 
-    initPops = (float*)malloc(patches*sizeof(float));
-    capacities = (float*)malloc(patches*sizeof(float));
+    Eigen::VectorXf initPops(patches);
+    Eigen::VectorXf capacities(patches);
+//    Eigen::VectorXf transitions(transition);
+//    Eigen::VectorXf survival(transition*noControls);
+//    initPops = (float*)malloc(patches*sizeof(float));
+//    capacities = (float*)malloc(patches*sizeof(float));
     transitions = (float*)malloc(transition*sizeof(float));
     survival = (float*)malloc(transition*noControls*sizeof(float));
     speciesParams = (float*)malloc(srp.size()*8*sizeof(float));
     uncertParams = (float*)malloc(noUncertainties*6*sizeof(float));
 
-    cudaMalloc((void**)&d_noPatches,srp.size()*sizeof(int));
-    cudaMalloc((void**)&d_initPops,patches*sizeof(float));
-    cudaMalloc((void**)&d_capacities,patches*sizeof(float));
-    cudaMalloc((void**)&d_transitions,transition*sizeof(float));
-    cudaMalloc((void**)&d_survival,transition*noControls*sizeof(float));
-    cudaMalloc((void**)&d_speciesParams,srp.size()*8*sizeof(float));
-    cudaMalloc((void**)&d_uncertParams,noUncertainties*6*sizeof(float));
-    cudaMalloc((void**)&d_tempPops,noPaths*nYears*patches*srp.size()*
-            sizeof(float));
-    cudaMalloc((void**)&d_fuelCosts,fuelCosts.size()*sizeof(float));
+    CUDA_CALL(cudaMalloc((void**)&d_noPatches,srp.size()*sizeof(int)));
+    CUDA_CALL(cudaMalloc((void**)&d_initPops,patches*sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_capacities,patches*sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_transitions,transition*sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_survival,transition*noControls*sizeof(
+            float)));
+    CUDA_CALL(cudaMalloc((void**)&d_speciesParams,srp.size()*8*sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_uncertParams,noUncertainties*6*sizeof(
+            float)));
+    CUDA_CALL(cudaMalloc((void**)&d_tempPops,noPaths*(nYears+1)*patches*srp
+            .size()*sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_fuelCosts,fuelCosts.size()*sizeof(float)));
 
+    int counter0 = 0;
     int counter1 = 0;
     int counter2 = 0;
     int counter3 = 0;
 
     // Read in the information into the correct format
     for (int ii = 0; ii < srp.size(); ii++) {
-        memcpy(initPops+counter1,srp[ii]->getInitPops().data(),
-                srp[ii]->getHabPatches().size()*sizeof(float));
-        memcpy(capacities+counter1,srp[ii]->getCapacities().data(),
-                srp[ii]->getHabPatches().size()*sizeof(float));
+        // This routine requires all species to have the same patches so that
+        // there can be species interactions etc. Therefore, the number of
+        // patches is the same.
+//        memcpy(initPops+counter1,srp[ii]->getInitPops().data(),
+//                srp[ii]->getHabPatches().size()*sizeof(float));
+//        memcpy(capacities+counter1,srp[ii]->getCapacities().data(),
+//                srp[ii]->getHabPatches().size()*sizeof(float));
+        initPops.segment(counter0,srp[ii]->getHabPatches().size()) = srp[ii]->
+                getInitPops().cast<float>();
+        capacities.segment(counter0,srp[ii]->getHabPatches().size()) = srp[ii]
+                ->getCapacities().cast<float>();
 
-        speciesParams[counter1] = srp[ii]->getSpecies()->getGrowthRate()->
-                getCurrent()*varParams->getGrowthRatesMultipliers()(scenario->
-                getPopGR());
-        speciesParams[counter1+1] = srp[ii]->getSpecies()->getGrowthRate()->
-                getMean()*varParams->getGrowthRatesMultipliers()(scenario->
-                getPopGR());
-        speciesParams[counter1+2] = srp[ii]->getSpecies()->getGrowthRate()->
-                getNoiseSD()*varParams->getGrowthRateSDMultipliers()(scenario->
-                getPopGRSD());
-        speciesParams[counter1+3] = srp[ii]->getSpecies()->getThreshold()*
-                varParams->getPopulationLevels()(scenario->getPopLevel());
-        speciesParams[counter1+4] = srp[ii]->getSpecies()->getGrowthRate()->
-                getMRStrength()*varParams->getGrowthRateSDMultipliers()(
-                scenario->getPopGRSD());
-        speciesParams[counter1+5] = srp[ii]->getSpecies()->getGrowthRate()->
-                getPoissonJump()*varParams->getGrowthRateSDMultipliers()(
-                scenario->getPopGRSD());
-        speciesParams[counter1+6] = srp[ii]->getSpecies()->getGrowthRate()->
-                getJumpProb()*varParams->getGrowthRateSDMultipliers()(
-                scenario->getPopGRSD());
-        speciesParams[counter1+7] = srp[ii]->getSpecies()->
+        counter0 += srp[ii]->getHabPatches().size();
+
+        speciesParams[counter1] = (float)srp[ii]->getSpecies()->getGrowthRate()
+                ->getCurrent()*varParams->getGrowthRatesMultipliers()(scenario
+                ->getPopGR());
+        speciesParams[counter1+1] = (float)srp[ii]->getSpecies()->
+                getGrowthRate()->getMean()*varParams->
+                getGrowthRatesMultipliers()(scenario->getPopGR());
+        speciesParams[counter1+2] = (float)srp[ii]->getSpecies()->
+                getGrowthRate()->getNoiseSD()*varParams->
+                getGrowthRateSDMultipliers()(scenario->getPopGRSD());
+        speciesParams[counter1+3] = (float)srp[ii]->getSpecies()->
+                getThreshold()*varParams->getPopulationLevels()(scenario->
+                getPopLevel());
+        speciesParams[counter1+4] = (float)srp[ii]->getSpecies()->
+                getGrowthRate()->getMRStrength()*varParams->
+                getGrowthRateSDMultipliers()(scenario->getPopGRSD());
+        speciesParams[counter1+5] = (float)srp[ii]->getSpecies()->
+                getGrowthRate()->getPoissonJump()*varParams->
+                getGrowthRateSDMultipliers()(scenario->getPopGRSD());
+        speciesParams[counter1+6] = (float)srp[ii]->getSpecies()->
+                getGrowthRate()->getJumpProb()*varParams->
+                getGrowthRateSDMultipliers()(scenario->getPopGRSD());
+        speciesParams[counter1+7] = (float)srp[ii]->getSpecies()->
                 getLocalVariability();
 
         counter1 += 8;
 
-        memcpy(transitions+counter2,srp[ii]->getTransProbs().data(),
-                pow(srp[ii]->getHabPatches().size(),2));
-        counter2 += pow(srp[ii]->getHabPatches().size(),2);
+        {
+            Eigen::MatrixXf transitionsF = srp[ii]->getTransProbs().
+                    cast<float>();
+            memcpy(transitions+counter2,transitionsF.data(),pow(srp[ii]->
+                    getHabPatches().size(),2));
+            counter2 += pow(srp[ii]->getHabPatches().size(),2);
+        }
 
         for (int jj = 0; jj < noControls; jj++) {
-            memcpy(survival+counter3,srp[ii]->getSurvivalProbs()[jj].data(),
-                pow(srp[ii]->getHabPatches().size(),2));
+            Eigen::MatrixXf survivalF = srp[ii]->getSurvivalProbs()[jj].cast<
+                    float>();
+            memcpy(survival+counter3,survivalF.data(),pow(srp[ii]->
+                    getHabPatches().size(),2));
             counter3 += pow(srp[ii]->getHabPatches().size(),2);
         }
     }
 
     for (int ii = 0; ii < fuels.size(); ii++) {
-        uncertParams[6*ii] = fuels[ii]->getCurrent();
-        uncertParams[6*ii+1] = fuels[ii]->getMean()*varParams->
+        uncertParams[6*ii] = (float)fuels[ii]->getCurrent();
+        uncertParams[6*ii+1] = (float)fuels[ii]->getMean()*varParams->
                 getCommodityMultipliers()(scenario->getCommodity());
-        uncertParams[6*ii+2] = fuels[ii]->getNoiseSD()*varParams->
+        uncertParams[6*ii+2] = (float)fuels[ii]->getNoiseSD()*varParams->
                 getCommoditySDMultipliers()(scenario->getCommoditySD());
-        uncertParams[6*ii+3] = fuels[ii]->getMRStrength()*varParams->
+        uncertParams[6*ii+3] = (float)fuels[ii]->getMRStrength()*varParams->
                 getCommoditySDMultipliers()(scenario->getCommoditySD());
-        uncertParams[6*ii+4] = fuels[ii]->getPoissonJump()*varParams->
+        uncertParams[6*ii+4] = (float)fuels[ii]->getPoissonJump()*varParams->
                 getCommoditySDMultipliers()(scenario->getCommoditySD());
-        uncertParams[6*ii+5] = fuels[ii]->getJumpProb()*varParams->
+        uncertParams[6*ii+5] = (float)fuels[ii]->getJumpProb()*varParams->
                 getCommoditySDMultipliers()(scenario->getCommoditySD());
     }
 
@@ -2493,44 +2769,44 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     }
 
     for (int ii = 0; ii < commodities.size(); ii++) {
-        uncertParams[fuels.size()*6 + 6*ii] = commodities[ii]->getCurrent();
-        uncertParams[fuels.size()*6 + 6*ii+1] = commodities[ii]->getMean()*
-                varParams->getCommodityMultipliers()(scenario->getCommodity());
-        uncertParams[fuels.size()*6 + 6*ii+2] = commodities[ii]->getNoiseSD()*
-                varParams->getCommoditySDMultipliers()(scenario->
+        uncertParams[fuels.size()*6 + 6*ii] = (float)commodities[ii]->
+                getCurrent();
+        uncertParams[fuels.size()*6 + 6*ii+1] = (float)commodities[ii]->
+                getMean()*varParams->getCommodityMultipliers()(scenario->
+                getCommodity());
+        uncertParams[fuels.size()*6 + 6*ii+2] = (float)commodities[ii]->
+                getNoiseSD()*varParams->getCommoditySDMultipliers()(scenario->
                 getCommoditySD());
-        uncertParams[fuels.size()*6 + 6*ii+3] = commodities[ii]->
+        uncertParams[fuels.size()*6 + 6*ii+3] = (float)commodities[ii]->
                 getMRStrength()*varParams->getCommoditySDMultipliers()(scenario
                 ->getCommoditySD());;
-        uncertParams[fuels.size()*6 + 6*ii+4] = commodities[ii]->
+        uncertParams[fuels.size()*6 + 6*ii+4] = (float)commodities[ii]->
                 getPoissonJump()*varParams->getCommoditySDMultipliers()(
                 scenario->getCommoditySD());
-        uncertParams[fuels.size()*6 + 6*ii+5] = commodities[ii]->
+        uncertParams[fuels.size()*6 + 6*ii+5] = (float)commodities[ii]->
                 getJumpProb()*varParams->getCommoditySDMultipliers()(
                 scenario->getCommoditySD());
     }
 
     // Transfer the data to the device
-    cudaMemcpy(d_noPatches,noPatches,srp.size()*sizeof(int),
-            cudaMemcpyHostToDevice);
-    cudaMemcpy(d_initPops,initPops,patches*sizeof(float),
-            cudaMemcpyHostToDevice);
-    cudaMemcpy(d_transitions,transitions,transition*sizeof(float),
-            cudaMemcpyHostToDevice);
-    cudaMemcpy(d_survival,survival,transition*sizeof(float),
-            cudaMemcpyHostToDevice);
-    cudaMemcpy(d_speciesParams,speciesParams,srp.size()*8*sizeof(float),
-            cudaMemcpyHostToDevice);
-    cudaMemcpy(d_uncertParams,uncertParams,noUncertainties*6*sizeof(float),
-            cudaMemcpyHostToDevice);
-    cudaMemcpy(d_fuelCosts,fuelCosts.data(),fuelCosts.size()*sizeof(float),
-            cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMemcpy(d_noPatches,noPatches,srp.size()*sizeof(int),
+            cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(d_initPops,initPops.data(),patches*sizeof(float),
+            cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(d_transitions,transitions,transition*sizeof(float),
+            cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(d_survival,survival,transition*sizeof(float),
+            cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(d_speciesParams,speciesParams,srp.size()*8*sizeof(
+            float),cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(d_uncertParams,uncertParams,noUncertainties*6*sizeof(
+            float),cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(d_fuelCosts,fuelCosts.data(),fuelCosts.size()*sizeof(
+            float),cudaMemcpyHostToDevice));
 
     // Free the host memory
     free(transitions);
     free(survival);
-    free(initPops);
-    free(capacities);
     free(speciesParams);
     free(uncertParams);
 
@@ -2544,15 +2820,15 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     srand(time(NULL));
     int _seed = rand();
     curandGenerator_t gen;
-    curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT);
-    curandSetPseudoRandomGeneratorSeed(gen, _seed);
+    CURAND_CALL(curandCreateGenerator(&gen, CURAND_RNG_PSEUDO_DEFAULT));
+    CURAND_CALL(curandSetPseudoRandomGeneratorSeed(gen, _seed));
 
-    cudaMalloc((void**)&d_randCont,nYears*noPaths*sizeof(float));
+    CUDA_CALL(cudaMalloc((void**)&d_randCont,nYears*noPaths*sizeof(float)));
 
     // 2. Random matrices for randomised control
-    curandGenerateUniform(gen, d_randCont, nYears*noPaths);
+    CURAND_CALL(curandGenerateUniform(gen, d_randCont, nYears*noPaths));
 
-    cudaMalloc((void**)&d_controls,nYears*noPaths*sizeof(int));
+    CUDA_CALL(cudaMalloc((void**)&d_controls,nYears*noPaths*sizeof(int)));
 
     int noBlocks = (int)(noPaths*nYears % maxThreadsPerBlock) ?
             (int)(noPaths*nYears/maxThreadsPerBlock  + 1) :
@@ -2560,99 +2836,120 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     int noThreadsPerBlock = min(noPaths,maxThreadsPerBlock);
 
     randControls<<<noBlocks,noThreadsPerBlock>>>(noPaths,noControls,
-            d_randCont,d_controls);
+            d_randCont,d_controls);    
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
+
     // The flow rates corresponding to the random controls
     Eigen::MatrixXf flowRatesF = program->getFlowRates().cast<float>();
-    cudaMalloc((void**)&d_flowRates,noControls*sizeof(float));
-    cudaMemcpy(d_flowRates,flowRatesF.data(),noControls*sizeof(float),
-            cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMalloc((void**)&d_flowRates,noControls*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_flowRates,flowRatesF.data(),noControls*sizeof(
+            float),cudaMemcpyHostToDevice));
 
     // We no longer need the floating point random controls vector
-    cudaFree(d_randCont);
+    CUDA_CALL(cudaFree(d_randCont));
 
     // Endogenous uncertainty
-    cudaMalloc((void**)&d_growthRate,nYears*noPaths*patches*srp.size()*
-            sizeof(float));
-    cudaMalloc((void**)&d_uBrownianSpecies,nYears*noPaths*srp.size()*
-            sizeof(float));
-    cudaMalloc((void**)&d_uJumpSizesSpecies,nYears*noPaths*srp.size()*
-            sizeof(float));
-    cudaMalloc((void**)&d_uJumpsSpecies,nYears*noPaths*srp.size()*
-            sizeof(float));
+    CUDA_CALL(cudaMalloc((void**)&d_growthRate,nYears*noPaths*patches*srp
+            .size()*sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_uBrownianSpecies,nYears*noPaths*srp.size()*
+            sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_uJumpSizesSpecies,nYears*noPaths*srp
+            .size()*sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_uJumpsSpecies,nYears*noPaths*srp.size()*
+            sizeof(float)));
 
     // Exogenous uncertainty
-    cudaMalloc((void**)&d_uBrownian,nYears*noPaths*noUncertainties*
-            sizeof(float));
-    cudaMalloc((void**)&d_uJumpSizes,nYears*noPaths*noUncertainties*
-            sizeof(float));
-    cudaMalloc((void**)&d_uJumps,nYears*noPaths*noUncertainties*
-            sizeof(float));
-    cudaMalloc((void**)&d_uResults,noUncertainties*nYears*noPaths*
-            sizeof(float));
-    cudaMalloc((void**)&d_uComposition,nYears*noPaths*(commodities.size())*
-            sizeof(float));
+    CUDA_CALL(cudaMalloc((void**)&d_uBrownian,nYears*noPaths*noUncertainties*
+            sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_uJumpSizes,nYears*noPaths*noUncertainties*
+            sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_uJumps,nYears*noPaths*noUncertainties*
+            sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_uResults,noUncertainties*nYears*noPaths*
+            sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_uComposition,nYears*noPaths*(commodities
+            .size())*sizeof(float)));
 
     // 3. Random matrices for growth rate parameter for species
-    curandGenerateNormal(gen, d_growthRate, nYears*noPaths*patches*srp.size(),
-            0.0f,1.0f);
+    CURAND_CALL(curandGenerateNormal(gen, d_growthRate, nYears*noPaths*patches*
+            srp.size(),0.0f,1.0f));
 
-    curandGenerateNormal(gen, d_uBrownianSpecies, nYears*noPaths*srp.size(),
-            0.0f,1.0f);
+    CURAND_CALL(curandGenerateNormal(gen, d_uBrownianSpecies, nYears*noPaths*
+            srp.size(),0.0f,1.0f));
 
-    curandGenerateNormal(gen, d_uJumpSizesSpecies, nYears*noPaths*srp.size(),
-            0.0f,1.0f);
+    CURAND_CALL(curandGenerateNormal(gen, d_uJumpSizesSpecies, nYears*noPaths*
+            srp.size(),0.0f,1.0f));
 
-    curandGenerateUniform(gen, d_uJumpsSpecies, nYears*noPaths*srp.size());
+    CURAND_CALL(curandGenerateUniform(gen, d_uJumpsSpecies, nYears*noPaths*
+            srp.size()));
 
     // 4. Random matrices for other uncertainties
-    curandGenerateNormal(gen, d_uBrownian, nYears*noPaths*noUncertainties,0.0f,
-            1.0f);
+    CURAND_CALL(curandGenerateNormal(gen, d_uBrownian, nYears*noPaths*
+            noUncertainties,0.0f,1.0f));
 
-    curandGenerateNormal(gen, d_uJumpSizes, nYears*noPaths*noUncertainties,
-            0.0f,1.0f);
+    CURAND_CALL(curandGenerateNormal(gen, d_uJumpSizes, nYears*noPaths*
+            noUncertainties,0.0f,1.0f));
 
-    curandGenerateUniform(gen, d_uJumps, nYears*noPaths*noUncertainties);
+    CURAND_CALL(curandGenerateUniform(gen, d_uJumps, nYears*noPaths*
+            noUncertainties));
 
     // 5. Ore composition paths
     for (int ii = 0; ii < commodities.size(); ii++) {
-        curandGenerateNormal(gen, d_uComposition + ii*nYears*noPaths,
-                nYears*noPaths,commodities[ii]->getOreContent(),
+        CURAND_CALL(curandGenerateNormal(gen, d_uComposition + ii*nYears*
+                noPaths,nYears*noPaths,commodities[ii]->getOreContent(),
                 commodities[ii]->getOreContentSD()*varParams->
-                getCommodityPropSD()(scenario->getOreCompositionSD()));
+                getCommodityPropSD()(scenario->getOreCompositionSD())));
     }
 
     // Destroy generator
-    curandDestroyGenerator(gen);
-    cudaDeviceSynchronize();
+    CURAND_CALL(curandDestroyGenerator(gen));
 
     // Finally, allocate space on the device for the path results. This is what
     // we use in our policy map.
-    float *d_totalPops, *d_aars, *d_mcPops;
-    cudaMalloc(&d_totalPops,srp.size()*(nYears+1)*noPaths*sizeof(float));
-    cudaMalloc(&d_mcPops,(nYears+1)*noPaths*patches*sizeof(float));
-    cudaMalloc((void**)&d_aars,srp.size()*(nYears+1)*noPaths*noControls*
-            sizeof(float));
+    float *d_totalPops, *d_aars;
+    CUDA_CALL(cudaMalloc(&d_totalPops,srp.size()*(nYears+1)*noPaths*sizeof(
+            float)));
+    CUDA_CALL(cudaMalloc(&d_aars,srp.size()*(nYears+1)*noPaths*noControls*
+            sizeof(float)));
+
+    // We will only use up to 32kB of shared memory at a time
+    int maxElems = *std::max_element(noPatches,noPatches+srp.size());
+    int maxThreadsPerBlock1 = (int)(32000/(maxElems*sizeof(float)));
 
     // Compute forward paths (CUDA kernel)
-    noBlocks = (int)(noPaths % maxThreadsPerBlock) ?
-            (int)(noPaths/maxThreadsPerBlock + 1) :
-            (int)(noPaths/maxThreadsPerBlock);
+    noBlocks = (int)(noPaths % maxThreadsPerBlock1) ?
+            (int)(noPaths/maxThreadsPerBlock1 + 1) :
+            (int)(noPaths/maxThreadsPerBlock1);
 
-    forwardPathKernel<<<noBlocks,noThreadsPerBlock>>>(1,noPaths,nYears,
-            srp.size(),patches,noControls,fuels.size(),noUncertainties,
+    // Allocate shared memory
+    int shared = maxElems*maxThreadsPerBlock1;
+
+    time_t begin = clock();
+
+//    float* tempPops;
+//    tempPops = (float*)malloc(noPatches*sizeof(float));
+
+    forwardPathKernel<<<noBlocks,maxThreadsPerBlock1,shared*sizeof(float)>>>(1,
+            noPaths,nYears,srp.size(),patches,noControls,noUncertainties,
             stepSize,d_tempPops,d_transitions,d_survival,d_speciesParams,
-            d_capacities,d_aars,d_uncertParams,d_controls,d_uJumps,
-            d_uBrownian,d_uJumpSizes,d_uJumpsSpecies,d_uBrownianSpecies,
+            d_capacities,d_aars,d_uncertParams,d_controls,d_uJumps,d_uBrownian,
+            d_uJumpSizes,d_uJumpsSpecies,d_uBrownianSpecies,
             d_uJumpSizesSpecies,d_growthRate,d_uResults,d_totalPops);
-    cudaDeviceSynchronize();
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
+
+    time_t end = clock();
+    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+    std::cout << "Survival Probabilities Time: " << elapsed_secs << " s" << std::endl;
 
     // Free device memory that is no longer needed
-    cudaFree(d_uBrownian);
-    cudaFree(d_uJumpSizes);
-    cudaFree(d_uJumps);
-    cudaFree(d_uBrownianSpecies);
-    cudaFree(d_uJumpSizesSpecies);
-    cudaFree(d_uJumpsSpecies);
+    CUDA_CALL(cudaFree(d_uBrownian));
+    CUDA_CALL(cudaFree(d_uJumpSizes));
+    CUDA_CALL(cudaFree(d_uJumps));
+    CUDA_CALL(cudaFree(d_uBrownianSpecies));
+    CUDA_CALL(cudaFree(d_uJumpSizesSpecies));
+    CUDA_CALL(cudaFree(d_uJumpsSpecies));
 
     // Determine the number of uncertainties. The uncertainties are the unit
     // payoff of the road (comprised of commodity and fuel prices, which are
@@ -2666,9 +2963,9 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     // Prepare the index of the fuel use by each vehicle class
     int *d_fuelIdx;
 
-    cudaMalloc(&d_fuelIdx,fuelIdx.size()*sizeof(int));
-    cudaMemcpy(d_fuelIdx,fuelIdx.data(),fuelIdx.size()*sizeof(int),
-            cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMalloc(&d_fuelIdx,fuelIdx.size()*sizeof(int)));
+    CUDA_CALL(cudaMemcpy(d_fuelIdx,fuelIdx.data(),fuelIdx.size()*sizeof(int),
+            cudaMemcpyHostToDevice));
 
     // Where to copy the results back to the host in floating point ready to
     // copy to the double precision outputs.
@@ -2682,16 +2979,18 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     Eigen::MatrixXf unitProfitsF(nYears+1,noPaths);
 
     float *d_unitProfits;
-    cudaMalloc((void**)&d_unitProfits,unitProfitsF.rows()*unitProfitsF.
-            cols()*sizeof(float));
+    CUDA_CALL(cudaMalloc((void**)&d_unitProfits,unitProfitsF.rows()*
+            unitProfitsF.cols()*sizeof(float)));
 
     // 3. Optimal profit-to-go outputs matrix (along each path)
     Eigen::MatrixXf condExpF(noPaths,nYears);
 
-    cudaMalloc((void**)&d_condExp,condExp.rows()*condExp.cols()*sizeof(float));
+    CUDA_CALL(cudaMalloc((void**)&d_condExp,condExp.rows()*condExp.cols()*
+            sizeof(float)));
 
     int* d_optCont;
-    cudaMalloc((void**)&d_optCont,optCont.rows()*optCont.cols()*sizeof(int));
+    CUDA_CALL(cudaMalloc((void**)&d_optCont,optCont.rows()*optCont.cols()*
+            sizeof(int)));
 
     // Choose the appropriate method for backwards induction
     switch (optimiser->getROVMethod()) {
@@ -2737,43 +3036,47 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
             int dimRes = sim->getRoad()->getOptimiser()->getOtherInputs()->
                     getDimRes();
 
-            cudaMalloc((void**)&d_regression,nYears*noControls*(dimRes*noDims +
-                    pow(dimRes,noDims)*2)*sizeof(float));
-            cudaMalloc((void**)&d_adjPops,adjPops[0].rows()*adjPops[0].cols()*
-                    sizeof(float));
+            CUDA_CALL(cudaMalloc((void**)&d_regression,nYears*noControls*(
+                    dimRes*noDims + pow(dimRes,noDims)*2)*sizeof(float)));
+            CUDA_CALL(cudaMalloc((void**)&d_adjPops,adjPops[0].rows()*
+                    adjPops[0].cols()*sizeof(float)));
 
             // --- CUBLAS initialization
             cublasHandle_t *d_handles;
-            cudaMalloc((void**)&d_handles,maxThreadsPerBlock*sizeof(
-                    cublasHandle_t));
+            CUDA_CALL(cudaMalloc((void**)&d_handles,maxThreadsPerBlock*sizeof(
+                    cublasHandle_t)));
             createHandles<<<1,maxThreadsPerBlock>>>(d_handles,
                     maxThreadsPerBlock);
-            cudaDeviceSynchronize();
+            CUDA_CALL(cudaPeekAtLastError());
+            CUDA_CALL(cudaDeviceSynchronize());
 
             // The last step is simply the valid control with the highest
             // single period payoff
-            optimalForwardPaths<<<noBlocks,noThreadsPerBlock>>>(nYears,noPaths,
-                    nYears,srp.size(),patches,noControls,noUncertainties,
-                    stepSize,unitCost,unitRevenue,rrr,fuelCosts.size(),
-                    commodities.size(),dimRes,d_flowRates,d_fuelCosts,
+            optimalForwardPaths<<<noBlocks,maxThreadsPerBlock1>>>(nYears,
+                    noPaths,nYears,srp.size(),patches,noControls,
+                    noUncertainties,stepSize,unitCost,unitRevenue,rrr,fuelCosts
+                    .size(),commodities.size(),dimRes,d_flowRates,d_fuelCosts,
                     d_tempPops,d_totalPops,d_transitions,d_survival,
                     d_speciesParams,d_growthRate,d_capacities,d_aars,
                     d_regression,d_uComposition,d_uResults,d_fuelIdx,d_condExp,
                     d_optCont,d_adjPops,d_unitProfits);
-            cudaDeviceSynchronize();
+            CUDA_CALL(cudaPeekAtLastError());
+            CUDA_CALL(cudaDeviceSynchronize());
 
             // Copy the adjusted populations to the output variable. This is
             // only provided for completeness. The algorithm does not use the
             // results as they pertain to the very last time step.
-            cudaMemcpy(adjPopsF[nYears].data(),d_adjPops,srp.size()*noPaths*
-                    sizeof(float),cudaMemcpyDeviceToHost);
+            CUDA_CALL(cudaMemcpy(adjPopsF[nYears].data(),d_adjPops,srp.size()*
+                    noPaths*sizeof(float),cudaMemcpyDeviceToHost));
 
             // Find the maximum and minimum x value along each path for the
             // dependant variables. This allocates space for the input
             // variables for the regressions.
             float *d_xmaxes, *d_xmins;
-            cudaMalloc((void**)&d_xmaxes,noControls*noDims*sizeof(float));
-            cudaMalloc((void**)&d_xmins,noControls*noDims*sizeof(float));
+            CUDA_CALL(cudaMalloc((void**)&d_xmaxes,noControls*noDims*sizeof(
+                    float)));
+            CUDA_CALL(cudaMalloc((void**)&d_xmins,noControls*noDims*sizeof(
+                    float)));
 
             // For each backward step not including the last period, we need to
             // determine the adjusted population for each species and the unit
@@ -2792,11 +3095,14 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 // The data points are arranged so that the number of rows
                 // equals the number of dimensions and the number of columns
                 // equals the number of data points.
-                cudaMalloc((void**)&d_xin,noDims*noPaths*sizeof(float));
-                cudaMalloc((void**)&d_xvals,noControls*noDims*noPaths*
-                        sizeof(float));
-                cudaMalloc((void**)&d_yvals,noControls*noPaths*sizeof(float));
-                cudaMalloc((void**)&d_dataPoints,noControls*sizeof(int));
+                CUDA_CALL(cudaMalloc((void**)&d_xin,noDims*noPaths*sizeof(
+                        float)));
+                CUDA_CALL(cudaMalloc((void**)&d_xvals,noControls*noDims*
+                        noPaths*sizeof(float)));
+                CUDA_CALL(cudaMalloc((void**)&d_yvals,noControls*noPaths*
+                        sizeof(float)));
+                CUDA_CALL(cudaMalloc((void**)&d_dataPoints,noControls*sizeof(
+                        int)));
 
                 // Compute the state values
                 computePathStates<<<noBlocks,noThreadsPerBlock>>>(noPaths,
@@ -2804,6 +3110,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                         d_controls,fuels.size(),d_fuelCosts,d_uResults,
                         d_uComposition,noUncertainties,d_fuelIdx,
                         commodities.size(),d_aars,d_totalPops,d_xin);
+                CUDA_CALL(cudaPeekAtLastError());
+                CUDA_CALL(cudaDeviceSynchronize());
 
                 // This kernel does not take advantage of massive parallelism.
                 // It is simply to allow us to call data that is already on
@@ -2811,20 +3119,23 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 allocateXYRegressionData<<<1,1>>>(noPaths,noControls,noDims,
                         ii,d_controls,d_xin,d_condExp,d_dataPoints,d_xvals,
                         d_yvals);
-                cudaDeviceSynchronize();
+                CUDA_CALL(cudaPeekAtLastError());
+                CUDA_CALL(cudaDeviceSynchronize());
 
                 // Get the minimum and maximum X value for each dimension for
                 // each control.
                 computeStateMinMax<<<1,1>>>(noControls,noDims,noPaths,
                         d_dataPoints,d_xvals,d_xmins,d_xmaxes);
+                CUDA_CALL(cudaPeekAtLastError());
+                CUDA_CALL(cudaDeviceSynchronize());
 
                 // Allocate the k nearest neighbours for each design point in
                 // order to do the regression stage after this. This component is
                 // the slowest component.
                 int *dataPoints;
                 dataPoints = (int*)malloc(noControls*sizeof(int));
-                cudaMemcpy(dataPoints,&d_dataPoints,noControls*sizeof(int),
-                        cudaMemcpyDeviceToHost);
+                CUDA_CALL(cudaMemcpy(dataPoints,&d_dataPoints,noControls*
+                        sizeof(int),cudaMemcpyDeviceToHost));
 
                 for (int jj = 0; jj < noControls; jj++) {
                     // Use 5% of the nearest points for now
@@ -2841,33 +3152,38 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
                     float *d_queryPts, *d_dist;
                     int *d_ind;
-                    cudaMalloc((void**)&d_queryPts,pow(dimRes,noDims)*noDims*
-                            sizeof(float));
-                    cudaMalloc((void**)&d_dist,pow(dimRes,noDims)*k*sizeof(
-                            float));
-                    cudaMalloc((void**)&d_ind,pow(dimRes,noDims)*k*sizeof(
-                            int));
+                    CUDA_CALL(cudaMalloc((void**)&d_queryPts,pow(dimRes,noDims)
+                            *noDims*sizeof(float)));
+                    CUDA_CALL(cudaMalloc((void**)&d_dist,pow(dimRes,noDims)*k*
+                            sizeof(float)));
+                    CUDA_CALL(cudaMalloc((void**)&d_ind,pow(dimRes,noDims)*k*
+                            sizeof(int)));
 
                     createQueryPoints<<<noBlocks2,maxThreadsPerBlock2>>>((int)
                             pow(dimRes,noDims),noDims,dimRes,jj,noControls,ii,
                             d_xmins,d_xmaxes,d_regression,d_queryPts);
-                    cudaMemcpy(query,d_queryPts,pow(dimRes,noDims)*noDims*
-                            sizeof(float),cudaMemcpyDeviceToHost);
-                    cudaFree(d_queryPts);
+                    CUDA_CALL(cudaPeekAtLastError());
+                    CUDA_CALL(cudaDeviceSynchronize());
 
-                    cudaMemcpy(ref,d_xvals + jj*noPaths*noDims,
+                    CUDA_CALL(cudaMemcpy(query,d_queryPts,pow(dimRes,noDims)*
+                            noDims*sizeof(float),cudaMemcpyDeviceToHost));
+                    CUDA_CALL(cudaFree(d_queryPts));
+
+                    CUDA_CALL(cudaMemcpy(ref,d_xvals + jj*noPaths*noDims,
                             dataPoints[jj]*noDims*sizeof(float),
-                            cudaMemcpyDeviceToHost);
+                            cudaMemcpyDeviceToHost));
 
                     // Compute the knn searches
-                    knn_cublas_with_indexes::knn(ref,dataPoints[jj],query,pow(
+                    knn_cuda_with_indexes::knn(ref,dataPoints[jj],query,pow(
                             dimRes,noDims)*noDims,noDims,k,dist,ind);
+                    CUDA_CALL(cudaPeekAtLastError());
+                    CUDA_CALL(cudaDeviceSynchronize());
 
-                    cudaMemcpy(d_dist,dist,pow(dimRes,noDims)*k*sizeof(float),
-                            cudaMemcpyHostToDevice);
+                    CUDA_CALL(cudaMemcpy(d_dist,dist,pow(dimRes,noDims)*k*
+                            sizeof(float),cudaMemcpyHostToDevice));
 
-                    cudaMemcpy(d_ind,ind,pow(dimRes,noDims)*k*sizeof(float),
-                            cudaMemcpyHostToDevice);
+                    CUDA_CALL(cudaMemcpy(d_ind,ind,pow(dimRes,noDims)*k*
+                            sizeof(float),cudaMemcpyHostToDevice));
 
                     free(ref);
                     free(query);
@@ -2880,10 +3196,11 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                             noControls,ii,jj,k,d_dataPoints,d_xvals,d_yvals,
                             d_regression,d_xmins,d_xmaxes,d_dist,d_ind,
                             d_handles);
-                    cudaDeviceSynchronize();
+                    CUDA_CALL(cudaPeekAtLastError());
+                    CUDA_CALL(cudaDeviceSynchronize());
 
-                    cudaFree(d_dist);
-                    cudaFree(d_ind);
+                    CUDA_CALL(cudaFree(d_dist));
+                    CUDA_CALL(cudaFree(d_ind));
                 }
 
                 free(dataPoints);
@@ -2897,27 +3214,30 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                         d_speciesParams,d_growthRate,d_capacities,d_aars,
                         d_regression,d_uComposition,d_uResults,d_fuelIdx,
                         d_condExp,d_optCont,d_adjPops,d_unitProfits);
-                cudaDeviceSynchronize();
+                CUDA_CALL(cudaPeekAtLastError());
+                CUDA_CALL(cudaDeviceSynchronize());
 
                 // Copy the adjusted populations for this time step to the
                 // output variables. The conditional expectations, optimal
                 // controls and unit profits are copied as well if we are
                 // producing the policy map for the optimal road.
-                cudaMemcpy(adjPopsF[ii].data(),d_adjPops,srp.size()*noPaths*
-                        sizeof(float),cudaMemcpyDeviceToHost);
+                CUDA_CALL(cudaMemcpy(adjPopsF[ii].data(),d_adjPops,srp.size()*
+                        noPaths*sizeof(float),cudaMemcpyDeviceToHost));
 
-                cudaFree(d_xvals);
-                cudaFree(d_yvals);
-                cudaFree(d_dataPoints);
+                CUDA_CALL(cudaFree(d_xvals));
+                CUDA_CALL(cudaFree(d_yvals));
+                CUDA_CALL(cudaFree(d_dataPoints));
             }
 
             // Free memory
             destroyHandles<<<1,maxThreadsPerBlock>>>(d_handles,
                     maxThreadsPerBlock);
-            cudaFree(d_regression);
-            cudaFree(d_xmaxes);
-            cudaFree(d_xmins);
-            cudaFree(d_adjPops);
+            CUDA_CALL(cudaPeekAtLastError());
+            CUDA_CALL(cudaDeviceSynchronize());
+            CUDA_CALL(cudaFree(d_regression));
+            CUDA_CALL(cudaFree(d_xmaxes));
+            CUDA_CALL(cudaFree(d_xmins));
+            CUDA_CALL(cudaFree(d_adjPops));
         }
         break;
 
@@ -2942,40 +3262,240 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     // Copy the conditional expectations, optimal controls and unit profits for
     // to the output variables to host memory and then to double precision
     // to the output variables (where needed).
-    cudaMemcpy(optCont.data(),d_optCont,optCont.rows()*optCont.cols()*sizeof(
-            int),cudaMemcpyDeviceToHost);
+    CUDA_CALL(cudaMemcpy(optCont.data(),d_optCont,optCont.rows()*optCont.cols()
+            *sizeof(int),cudaMemcpyDeviceToHost));
 
-    cudaMemcpy(condExpF.data(),d_condExp,condExp.rows()*condExp.cols()*sizeof(
-            float),cudaMemcpyDeviceToHost);
+    CUDA_CALL(cudaMemcpy(condExpF.data(),d_condExp,condExp.rows()*condExp
+            .cols()*sizeof(float),cudaMemcpyDeviceToHost));
     condExp = condExpF.cast<double>();
 
-    cudaMemcpy(unitProfitsF.data(),d_unitProfits,unitProfitsF.rows()*
-            unitProfitsF.cols()*sizeof(float),cudaMemcpyDeviceToHost);
+    CUDA_CALL(cudaMemcpy(unitProfitsF.data(),d_unitProfits,unitProfitsF.rows()*
+            unitProfitsF.cols()*sizeof(float),cudaMemcpyDeviceToHost));
     unitProfits = unitProfitsF.cast<double>();
 
     // Free remaining device memory
-    cudaFree(d_unitProfits);
-    cudaFree(d_transitions);
-    cudaFree(d_survival);
-    cudaFree(d_initPops);
-    cudaFree(d_tempPops);
-    cudaFree(d_capacities);
-    cudaFree(d_speciesParams);
-    cudaFree(d_fuelCosts);
-    cudaFree(d_growthRate);
-    cudaFree(d_uResults);
-    cudaFree(d_uComposition);
-    cudaFree(d_flowRates);
-    cudaFree(d_controls);
+    CUDA_CALL(cudaFree(d_unitProfits));
+    CUDA_CALL(cudaFree(d_transitions));
+    CUDA_CALL(cudaFree(d_survival));
+    CUDA_CALL(cudaFree(d_initPops));
+    CUDA_CALL(cudaFree(d_tempPops));
+    CUDA_CALL(cudaFree(d_capacities));
+    CUDA_CALL(cudaFree(d_speciesParams));
+    CUDA_CALL(cudaFree(d_fuelCosts));
+    CUDA_CALL(cudaFree(d_growthRate));
+    CUDA_CALL(cudaFree(d_uResults));
+    CUDA_CALL(cudaFree(d_uComposition));
+    CUDA_CALL(cudaFree(d_flowRates));
+    CUDA_CALL(cudaFree(d_controls));
 
-    cudaFree(d_condExp);
-    cudaFree(d_optCont);
-    cudaFree(d_fuelIdx);
+    CUDA_CALL(cudaFree(d_condExp));
+    CUDA_CALL(cudaFree(d_optCont));
+    CUDA_CALL(cudaFree(d_fuelIdx));
 
     // Remove these here?
-    cudaFree(d_totalPops);
-    cudaFree(d_aars);
-    cudaFree(d_mcPops);
+    CUDA_CALL(cudaFree(d_totalPops));
+    CUDA_CALL(cudaFree(d_aars));
+}
+
+void SimulateGPU::buildSurrogateMTECUDA(RoadGAPtr op, int speciesID) {
+
+    // Get device properties
+    int device = 0;
+    struct cudaDeviceProp properties;
+    cudaGetDeviceProperties(&properties, device);
+//    int maxMultiProcessors = properties.multiProcessorCount;
+    int maxThreadsPerBlock = properties.maxThreadsPerBlock;
+
+    // Pertinent parameters
+    int dimRes = op->getSurrDimRes();
+    int samples = op->getNoSamples();
+    // Use the 10 nearest points for now
+    int k;
+    if (samples < 50) {
+        k = 5;
+    } else if (samples < 100) {
+        k = 7;
+    } else if (samples < 500) {
+        k = (int)ceil(0.02*(samples-100)+7);
+    } else {
+        k = (int)ceil(log(samples)+8);
+    }
+
+    // MEAN VALUES ////////////////////////////////////////////////////////////
+    // Convert to floating point
+    Eigen::VectorXf surrogateF(dimRes*2);
+    Eigen::VectorXf predictors(samples);
+    Eigen::VectorXf population = op->getPops().block(0,speciesID,samples,1)
+            .cast<float>();
+    Eigen::VectorXf populationSD = op->getPopsSD().block(0,speciesID,samples,
+            1).cast<float>();
+
+    predictors = op->getIARS().block(0,speciesID,samples,1).cast<float>();
+
+    // Call regression kernel for computing the mean and standard deviation
+    int noBlocks = (int)(dimRes % maxThreadsPerBlock) ? (int)(dimRes/
+            maxThreadsPerBlock + 1) : (int)(dimRes/maxThreadsPerBlock);
+    maxThreadsPerBlock = min(dimRes,maxThreadsPerBlock);
+
+    // --- CUBLAS initialization
+    cublasHandle_t *d_handles;
+    CUDA_CALL(cudaMalloc((void**)&d_handles,maxThreadsPerBlock*sizeof(
+            cublasHandle_t)));
+    createHandles<<<1,maxThreadsPerBlock>>>(d_handles,
+            maxThreadsPerBlock);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
+
+    // Arrange the incoming information
+    float *d_xmin, *d_xmax, *d_xvals, *d_yvals, *d_surrogate;
+    float xmin = predictors.minCoeff();
+    float xmax = predictors.maxCoeff();
+    int *d_samples;
+    CUDA_CALL(cudaMalloc((void**)&d_samples,sizeof(int)));
+    CUDA_CALL(cudaMalloc((void**)&d_xmin,sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_xmax,sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_xmin,&xmin,sizeof(float),cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(d_xmax,&xmax,sizeof(float),cudaMemcpyHostToDevice));
+
+    CUDA_CALL(cudaMalloc((void**)&d_xvals,samples*sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_yvals,samples*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_xvals,predictors.data(),samples*sizeof(float),
+            cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(d_samples,&samples,sizeof(int),
+            cudaMemcpyHostToDevice));
+
+    CUDA_CALL(cudaMalloc((void**)&d_surrogate,dimRes*2*sizeof(float)));
+
+    // Allocate the k nearest neighbours for each design point in order to do
+    // the regression stage after this. This component is the slowest routine.
+    // K nearest neighbours search
+    float *query, *dist;
+    int *ind;
+    query = (float*)malloc(dimRes*sizeof(float));
+    dist = (float*)malloc(dimRes*k*sizeof(float));
+    ind = (int*)malloc(dimRes*k*sizeof(float));
+
+    float *d_queryPts, *d_dist;
+    int *d_ind;
+    CUDA_CALL(cudaMalloc((void**)&d_queryPts,dimRes*sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_dist,dimRes*k*sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_ind,dimRes*k*sizeof(int)));
+
+    createQueryPoints<<<noBlocks,maxThreadsPerBlock>>>(dimRes,1,dimRes,0,1,0,
+            d_xmin,d_xmax,d_surrogate,d_queryPts);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
+
+    CUDA_CALL(cudaMemcpy(query,d_queryPts,dimRes*sizeof(float),
+            cudaMemcpyDeviceToHost));
+    CUDA_CALL(cudaFree(d_queryPts));
+
+    // Compute the knn searches
+    if (samples < k) {
+        // We cannot have more nearest neighbours than are data points
+        k = samples;
+    }
+//    float *distH, *d_h, *d_distH;
+//    int *ind2;
+//    distH = (float*)malloc(samples*k*sizeof(float));
+//    d_h = (float*)malloc(samples*sizeof(float));
+//    ind2 = (int*)malloc(samples*k*sizeof(float));
+//    CUDA_CALL(cudaMalloc((void**)&d_distH,samples*sizeof(float)));
+
+//    knn_cuda_with_indexes::knn(predictors.data(),samples,predictors.data(),
+//            samples,1,k,distH,ind2);
+//    CUDA_CALL(cudaPeekAtLastError());
+//    CUDA_CALL(cudaDeviceSynchronize());
+
+//    for (int ii = 0; ii < samples; ii++) {
+//        d_h[ii] = distH[(ii+1)*k -1];
+//    }
+
+//    CUDA_CALL(cudaMemcpy(d_distH,d_h,samples*sizeof(float),
+//            cudaMemcpyHostToDevice));
+
+//    free(distH);
+//    free(d_h);
+//    free(ind2);
+
+    knn_cuda_with_indexes::knn(predictors.data(),samples,query,dimRes,1,k,
+            dist,ind);
+
+//    for (int ii = 0; ii < dimRes; ii++) {
+//        printf("xQ = %f | %f %f %f %f %f\n",query[ii],predictors[ind[0*dimRes+ii]-1],predictors[ind[1*dimRes+ii]-1],predictors[ind[2*dimRes+ii]-1],predictors[ind[3*dimRes+ii]-1],predictors[ind[4*dimRes+ii]-1]);
+//    }
+
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
+
+    CUDA_CALL(cudaMemcpy(d_dist,dist,dimRes*k*sizeof(float),
+            cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(d_ind,ind,dimRes*k*sizeof(int),
+            cudaMemcpyHostToDevice));
+
+    free(query);
+    free(dist);
+    free(ind);
+
+    // Mean ///////////////////////////////////////////////////////////////////
+    CUDA_CALL(cudaMemcpy(d_yvals,population.data(),samples*sizeof(float),
+            cudaMemcpyHostToDevice));
+
+    multiLocLinReg<<<noBlocks,maxThreadsPerBlock>>>(dimRes,1,dimRes,1,1,0,0,k,
+            d_samples,d_xvals,d_yvals,d_surrogate,d_xmin,d_xmax,d_dist,d_ind,
+            d_handles);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
+
+    CUDA_CALL(cudaMemcpy(surrogateF.data(),d_surrogate,2*dimRes*sizeof(float),
+            cudaMemcpyDeviceToHost));
+
+//    // Compute global regression
+//    Eigen::VectorXf X(2);
+//    SimulateGPU::multiLinReg(samples,1,predictors.data(),population.data(),
+//            X.data());
+
+//    for (int ii = 0; ii < dimRes; ii++) {
+//        surrogateF(dimRes+ii) = X(0) + surrogateF(ii)*X(1);
+//    }
+
+    // Save the surrogate to the RoadGA object
+    op->getSurrogateML()[2*op->getScenario()->getCurrentScenario()][
+            op->getScenario()->getRun()][speciesID] = surrogateF
+            .cast<double>();
+
+    // Standard deviation /////////////////////////////////////////////////////
+    CUDA_CALL(cudaMemcpy(d_yvals,populationSD.data(),samples*sizeof(float),
+            cudaMemcpyHostToDevice));
+
+    multiLocLinReg<<<noBlocks,maxThreadsPerBlock>>>(dimRes,1,dimRes,1,1,0,0,k,
+            d_samples,d_xvals,d_yvals,d_surrogate,d_xmin,d_xmax,d_dist,d_ind,
+            d_handles);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
+
+    CUDA_CALL(cudaMemcpy(surrogateF.data(),d_surrogate,2*dimRes*sizeof(float),
+            cudaMemcpyDeviceToHost));
+
+    // Save the surrogate to the RoadGA object
+    op->getSurrogateML()[2*op->getScenario()->getCurrentScenario()+1][
+            op->getScenario()->getRun()][speciesID] = surrogateF
+            .cast<double>();
+
+    // Free remaining memory
+    destroyHandles<<<1,maxThreadsPerBlock>>>(d_handles,maxThreadsPerBlock);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
+
+    CUDA_CALL(cudaFree(d_xmax));
+    CUDA_CALL(cudaFree(d_dist));
+//    CUDA_CALL(cudaFree(d_distH));
+    CUDA_CALL(cudaFree(d_ind));
+    CUDA_CALL(cudaFree(d_xmin));
+    CUDA_CALL(cudaFree(d_xvals));
+    CUDA_CALL(cudaFree(d_yvals));
+    CUDA_CALL(cudaFree(d_surrogate));
+    CUDA_CALL(cudaFree(d_samples));
 }
 
 void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
@@ -2984,23 +3504,39 @@ void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
     int device = 0;
     struct cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties, device);
-    maxMultiProcessors = properties.multiProcessorCount;
-    maxThreadsPerBlock = properties.maxThreadsPerBlock;
+//    int maxMultiProcessors = properties.multiProcessorCount;
+    int maxThreadsPerBlock = properties.maxThreadsPerBlock;
 
     // --- CUBLAS initialization
     cublasHandle_t *d_handles;
-    cudaMalloc((void**)&d_handles,maxThreadsPerBlock*sizeof(
-            cublasHandle_t));
+    CUDA_CALL(cudaMalloc((void**)&d_handles,maxThreadsPerBlock*sizeof(
+            cublasHandle_t)));
     createHandles<<<1,maxThreadsPerBlock>>>(d_handles,
             maxThreadsPerBlock);
-    cudaDeviceSynchronize();
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
 
     // Pertinent parameters
     int dimRes = op->getSurrDimRes();
     int noDims = op->getSpecies().size()+1;
     int samples = op->getNoSamples();
     // Use 5% of the nearest points for now
-    int k = samples/5;
+//    int k = samples/20;
+    // Use the 10 nearest points for now
+    int k;
+    if (samples < 50) {
+        k = 5;
+    } else if (samples < 100) {
+        k = 7;
+    } else if (samples < 500) {
+        k = (int)ceil(0.02*(samples-100)+5);
+    } else {
+//        k = (int)ceil(0.01*(samples-500)+15);
+        k = (int)ceil(log(samples)+8);
+    }
+
+    // Adjust for the number of dimensions
+    k = k*pow(2,noDims-1);
 
     // Convert to floating point
     Eigen::VectorXf surrogateF(dimRes*noDims+pow(dimRes,noDims));
@@ -3011,11 +3547,17 @@ void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
 
     // We also need to transpose the data so that the individual observations
     // are in columns
-    for (int ii = 0; ii < samples; ii++) {
-        predictors.segment(ii*noDims,noDims-1) = op->getIARS().block(ii,0,
-                1,noDims-1).cast<float>();
-        predictors((ii+1)*noDims-1) = (float)op->getUse()(ii);
+//    for (int ii = 0; ii < samples; ii++) {
+//        predictors.segment(ii*noDims,noDims-1) = op->getIARS().block(ii,0,
+//                1,noDims-1).cast<float>();
+//        predictors((ii+1)*noDims-1) = (float)op->getUse()(ii);
+//    }
+    for (int ii = 0; ii < noDims-1; ii++) {
+        predictors.segment(ii*samples,samples) = op->getIARS().block(0,ii,
+                samples,1).cast<float>();
     }
+    predictors.segment(samples*(noDims-1),samples) = op->getUse().segment(0,
+            samples).transpose().cast<float>();
 
     // Call regression kernel for computing the mean and standard
     // deviation
@@ -3026,22 +3568,27 @@ void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
 
     // Arrange the incoming information
     float *d_xmaxes, *d_xmins, *d_xvals, *d_yvals, *d_surrogate;
-    cudaMalloc((void**)&d_xmaxes,noDims*sizeof(float));
-    cudaMalloc((void**)&d_xmins,noDims*sizeof(float));
+    int *d_samples;
+    CUDA_CALL(cudaMalloc((void**)&d_xmaxes,noDims*sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_xmins,noDims*sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_samples,sizeof(int)));
 
-    cudaMalloc((void**)&d_xvals,noDims*samples*sizeof(float));
-    cudaMalloc((void**)&d_yvals,samples*sizeof(float));
-    cudaMemcpy(d_xvals,predictors.data(),noDims*samples*sizeof(float),
-            cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMalloc((void**)&d_xvals,noDims*samples*sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_yvals,samples*sizeof(float)));
+    CUDA_CALL(cudaMemcpy(d_xvals,predictors.data(),noDims*samples*sizeof(
+            float),cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(d_samples,&samples,sizeof(int),
+            cudaMemcpyHostToDevice));
 
-    cudaMalloc((void**)&d_surrogate,(dimRes*noDims+pow(dimRes,noDims))*sizeof(
-            float));
+    CUDA_CALL(cudaMalloc((void**)&d_surrogate,(dimRes*noDims+pow(dimRes,
+            noDims))*sizeof(float)));
 
     // Get the minimum and maximum X value for each dimension for
     // each control.
-    computeStateMinMax<<<1,1>>>(1,noDims,samples,&samples,d_xvals,d_xmins,
+    computeStateMinMax<<<1,1>>>(1,noDims,samples,d_samples,d_xvals,d_xmins,
             d_xmaxes);
-    cudaDeviceSynchronize();
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
 
     // Allocate the k nearest neighbours for each design point in
     // order to do the regression stage after this. This component is
@@ -3052,76 +3599,142 @@ void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
     float *query, *dist;
     int *ind;
     query = (float*)malloc(pow(dimRes,noDims)*noDims*sizeof(float));
-    dist = (float*)malloc(pow(dimRes,noDims)*k*sizeof(float));
-    ind = (int*)malloc(pow(dimRes,noDims)*k*sizeof(int));
+    dist = (float*)malloc(pow(dimRes,noDims)*noDims*k*sizeof(float));
+    ind = (int*)malloc(pow(dimRes,noDims)*noDims*k*sizeof(int));
 
     float *d_queryPts, *d_dist;
     int *d_ind;
-    cudaMalloc((void**)&d_queryPts,pow(dimRes,noDims)*noDims*sizeof(float));
-    cudaMalloc((void**)&d_dist,pow(dimRes,noDims)*k*sizeof(float));
-    cudaMalloc((void**)&d_ind,pow(dimRes,noDims)*k*sizeof(int));
+    CUDA_CALL(cudaMalloc((void**)&d_queryPts,pow(dimRes,noDims)*noDims*sizeof(
+            float)));
+    CUDA_CALL(cudaMalloc((void**)&d_dist,pow(dimRes,noDims)*noDims*k*sizeof(
+            float)));
+    CUDA_CALL(cudaMalloc((void**)&d_ind,pow(dimRes,noDims)*noDims*k*sizeof(
+            int)));
 
     createQueryPoints<<<noBlocks,maxThreadsPerBlock>>>((int)pow(dimRes,noDims),
             noDims,dimRes,0,1,0,d_xmins,d_xmaxes,d_surrogate,d_queryPts);
-    cudaMemcpy(query,d_queryPts,pow(dimRes,noDims)*noDims*sizeof(float),
-            cudaMemcpyDeviceToHost);
-    cudaFree(d_queryPts);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
+
+    CUDA_CALL(cudaMemcpy(query,d_queryPts,pow(dimRes,noDims)*noDims*sizeof(
+            float),cudaMemcpyDeviceToHost));
+    CUDA_CALL(cudaFree(d_queryPts));
 
     // Compute the knn searches
-    knn_cublas_with_indexes::knn(predictors.data(),samples,query,pow(
-            dimRes,noDims)*noDims,noDims,k,dist,ind);
 
-    cudaMemcpy(d_dist,dist,pow(dimRes,noDims)*k*sizeof(float),
-            cudaMemcpyHostToDevice);
+//    for (int ii = 0; ii < pow(dimRes,noDims); ii++) {
+//        printf("X[%d]: %f Y[%d]: %f\n",ii,query[ii],ii,query[(int)pow(dimRes,noDims) + ii]);
+//    }
 
-    cudaMemcpy(d_ind,ind,pow(dimRes,noDims)*k*sizeof(float),
-            cudaMemcpyHostToDevice);
+    knn_cuda_with_indexes::knn(predictors.data(),samples,query,pow(
+            dimRes,noDims),noDims,k,dist,ind);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
+
+    CUDA_CALL(cudaMemcpy(d_dist,dist,pow(dimRes,noDims)*k*sizeof(float),
+            cudaMemcpyHostToDevice));
+
+    CUDA_CALL(cudaMemcpy(d_ind,ind,pow(dimRes,noDims)*k*sizeof(float),
+            cudaMemcpyHostToDevice));
 
     free(query);
     free(dist);
     free(ind);
 
     // Mean ///////////////////////////////////////////////////////////////////
-    cudaMemcpy(d_yvals,values.data(),samples*sizeof(float),
-            cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMemcpy(d_yvals,values.data(),samples*sizeof(float),
+            cudaMemcpyHostToDevice));
 
-    multiLocLinReg<<<noBlocks,maxThreadsPerBlock>>>(samples,noDims,
-            dimRes,1,1,0,0,k,&samples,predictors.data(),values.data(),
-            d_surrogate,d_xmins,d_xmaxes,d_dist,d_ind,d_handles);
-    cudaDeviceSynchronize();
+    multiLocLinReg<<<noBlocks,maxThreadsPerBlock>>>(pow(dimRes,noDims),noDims,
+            dimRes,1,1,0,0,k,d_samples,d_xvals,d_yvals,d_surrogate,d_xmins,
+            d_xmaxes,d_dist,d_ind,d_handles);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
 
-    cudaMemcpy(surrogateF.data(),d_surrogate,dimRes*noDims+pow(dimRes,noDims)*
-            sizeof(float),cudaMemcpyDeviceToHost);
+    CUDA_CALL(cudaMemcpy(surrogateF.data(),d_surrogate,(dimRes*noDims+pow(
+            dimRes,noDims))*sizeof(float),cudaMemcpyDeviceToHost));
 
     // Save the surrogate to the RoadGA object
-    op->getSurrogateROV()[2*op->getScenario()->getCurrentScenario()][
-            op->getScenario()->getRun()] = surrogateF
+    op->getSurrogateML()[2*op->getScenario()->getCurrentScenario()][
+            op->getScenario()->getRun()][0] = surrogateF
             .cast<double>();
 
     // Standard deviation /////////////////////////////////////////////////////
-    cudaMemcpy(d_yvals,valuesSD.data(),samples*sizeof(float),
-            cudaMemcpyHostToDevice);
+    CUDA_CALL(cudaMemcpy(d_yvals,valuesSD.data(),samples*sizeof(float),
+            cudaMemcpyHostToDevice));
 
-    multiLocLinReg<<<noBlocks,maxThreadsPerBlock>>>(samples,noDims,
-            dimRes,1,1,0,0,k,&samples,predictors.data(),valuesSD.data(),
-            d_surrogate,d_xmins,d_xmaxes,d_dist,d_ind,d_handles);
-    cudaDeviceSynchronize();
+    multiLocLinReg<<<noBlocks,maxThreadsPerBlock>>>(pow(dimRes,noDims),noDims,
+            dimRes,1,1,0,0,k,d_samples,d_xvals,d_yvals,d_surrogate,d_xmins,
+            d_xmaxes,d_dist,d_ind,d_handles);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
 
-    cudaMemcpy(surrogateF.data(),d_surrogate,dimRes*noDims+pow(dimRes,noDims)*
-            sizeof(float),cudaMemcpyDeviceToHost);
+    CUDA_CALL(cudaMemcpy(surrogateF.data(),d_surrogate,dimRes*noDims+pow(
+            dimRes,noDims)*sizeof(float),cudaMemcpyDeviceToHost));
 
     // Save the surrogate to the RoadGA object
-    op->getSurrogateROV()[2*op->getScenario()->getCurrentScenario()+1][
-            op->getScenario()->getRun()] = surrogateF.cast<double>();
+    op->getSurrogateML()[2*op->getScenario()->getCurrentScenario()+1][
+            op->getScenario()->getRun()][0] = surrogateF.cast<double>();
 
     // Free remaining memory
     destroyHandles<<<1,maxThreadsPerBlock>>>(d_handles,
             maxThreadsPerBlock);
-    cudaFree(d_xmaxes);
-    cudaFree(d_xmins);
-    cudaFree(d_xvals);
-    cudaFree(d_yvals);
-    cudaFree(d_surrogate);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
+
+    CUDA_CALL(cudaFree(d_xmaxes));
+    CUDA_CALL(cudaFree(d_xmins));
+    CUDA_CALL(cudaFree(d_xvals));
+    CUDA_CALL(cudaFree(d_yvals));
+    CUDA_CALL(cudaFree(d_surrogate));
+}
+
+void SimulateGPU::interpolateSurrogateMulti(Eigen::VectorXd& surrogate,
+        Eigen::VectorXd &predictors, Eigen::VectorXd &results, int dimRes,
+        int noDims) {
+
+    // Get device properties
+    int device = 0;
+    struct cudaDeviceProp properties;
+    cudaGetDeviceProperties(&properties, device);
+//    int maxMultiProcessors = properties.multiProcessorCount;
+    int maxThreadsPerBlock = properties.maxThreadsPerBlock;
+
+    int noBlocks = (int)((int)results.size() % maxThreadsPerBlock) ?
+            (int)((int)results.size()/maxThreadsPerBlock + 1) : (int)((int)
+            results.size()/maxThreadsPerBlock);
+    maxThreadsPerBlock = min((int)results.size(),maxThreadsPerBlock);
+
+    // Assign memory to the GPU
+    Eigen::VectorXf surrogateF = surrogate.cast<float>();
+    Eigen::VectorXf predictorsF = predictors.cast<float>();
+    Eigen::VectorXf resultsF = results.cast<float>();
+
+    float *d_surrogate, *d_predictors, *d_results;
+
+    CUDA_CALL(cudaMalloc((void**)&d_surrogate,surrogate.size()*sizeof(float)));
+    CUDA_CALL(cudaMalloc((void**)&d_predictors,predictors.size()*sizeof(
+            float)));
+    CUDA_CALL(cudaMalloc((void**)&d_results,results.size()*sizeof(float)));
+
+    CUDA_CALL(cudaMemcpy(d_surrogate,surrogateF.data(),surrogateF.size()*
+            sizeof(float),cudaMemcpyHostToDevice));
+    CUDA_CALL(cudaMemcpy(d_predictors,predictorsF.data(),predictorsF.size()*
+            sizeof(float),cudaMemcpyHostToDevice));
+
+    interpolateMulti<<<noBlocks,maxThreadsPerBlock>>>(results.size(),noDims,
+            dimRes,d_surrogate,d_predictors,d_results);
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
+
+    CUDA_CALL(cudaMemcpy(resultsF.data(),d_results,results.size()*sizeof(
+            float),cudaMemcpyDeviceToHost));
+
+    CUDA_CALL(cudaFree(d_surrogate));
+    CUDA_CALL(cudaFree(d_predictors));
+    CUDA_CALL(cudaFree(d_results));
+
+    results = resultsF.cast<double>();
 }
 
 // HELPER ROUTINES ////////////////////////////////////////////////////////////
@@ -3150,4 +3763,113 @@ void SimulateGPU::dense2Sparse(float* denseIn, int rows, int cols,
     }
 
     totalElements = it_1;
+}
+
+// Multiple global linear regression
+void SimulateGPU::multiLinReg(int noPoints, int noDims, float *xvals, float
+        *yvals, float *X) {
+
+    float *A, *B;
+    A = (float*)malloc(pow(noDims+1,2)*sizeof(float));
+    B = (float*)malloc((noDims+1)*sizeof(float));
+
+    for (int ii = 0; ii <= noDims; ii++) {
+        // Initialise values to zero
+        B[ii] = 0.0;
+
+        for (int jj = 0; jj < noPoints; jj++) {
+            if (ii == 0) {
+                B[ii] += yvals[jj];
+            } else {
+                B[ii] += yvals[jj]*xvals[jj*noDims+ii-1];
+            }
+        }
+
+        for (int jj = 0; jj <= noDims; jj++) {
+            A[jj*(noDims+1)+ii] = 0.0;
+
+            for (int kk = 0; kk < noPoints; kk++) {
+
+                if ((ii == 0) && (jj == 0)) {
+                    A[jj*(noDims+1)+ii] += 1.0;
+                } else if (ii == 0) {
+                    A[jj*(noDims+1)+ii] += (xvals[kk*noDims+ii-1]);
+                } else if (jj == 0) {
+                    A[jj*(noDims+1)+ii] += (xvals[kk*noDims+jj-1]);
+                } else {
+                    A[jj*(noDims+1)+ii] += (xvals[kk*noDims+ii-1])*
+                            (xvals[kk*noDims+jj-1]);
+                }
+            }
+        }
+    }
+
+    SimulateGPU::solveLinearSystem(noDims+1,A,B,X);
+
+    free(A);
+    free(B);
+}
+
+// Solve a set of linear equations. (Assumes non-singular coefficient matrix)
+void SimulateGPU::solveLinearSystem(int dims, float *A, float *B, float *C) {
+    // First generate upper triangular matrix for the augmented matrix
+    float *swapRow;
+    swapRow = (float*)malloc((dims+1)*sizeof(float));
+
+    for (int ii = 0; ii < dims; ii++) {
+        C[ii] = B[ii];
+    }
+
+    for (int ii = 0; ii < dims; ii++) {
+        // Search for maximum in this column
+        float maxElem = fabsf(A[ii*dims+ii]);
+        int maxRow = ii;
+
+        for (int jj = (ii+1); jj < dims; jj++) {
+            if (fabsf(A[ii*dims+jj] > maxElem)) {
+                maxElem = fabsf(A[ii*dims+jj]);
+                maxRow = jj;
+            }
+        }
+
+        // Swap maximum row with current row if needed
+        if (maxRow != ii) {
+            for (int jj = ii; jj < dims; jj++) {
+                swapRow[jj] = A[jj*dims+ii];
+                A[jj*dims+ii] = A[jj*dims+maxRow];
+                A[jj*dims+maxRow] = swapRow[jj];
+            }
+
+            swapRow[dims] = C[ii];
+            C[ii] = C[maxRow];
+            C[maxRow] = swapRow[dims];
+        }
+
+        // Make all rows below this one 0 in current column
+        for (int jj = (ii+1); jj < dims; jj++) {
+            float factor = -A[ii*dims+jj]/A[ii*dims+ii];
+
+            // Work across columns
+            for (int kk = ii; kk < dims; kk++) {
+                if (kk == ii) {
+                    A[kk*dims+jj] = 0.0;
+                } else {
+                    A[kk*dims+jj] += factor*A[kk*dims+ii];
+                }
+            }
+
+            // Results vector
+            C[jj] += factor*C[ii];
+        }
+    }
+    free(swapRow);
+
+    // Solve equation for an upper triangular matrix
+    for (int ii = dims-1; ii >= 0; ii--) {
+        C[ii] = C[ii]/A[ii*dims+ii];
+
+        for (int jj = ii-1; jj >= 0; jj--) {
+            C[jj] -= C[ii]*A[ii*dims+jj];
+        }
+    }
 }

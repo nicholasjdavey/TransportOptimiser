@@ -26,6 +26,9 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
     // more than n x y where n is the number of habitat patches and y is the
     // number of grid cells.
 
+    // Need to modify this so that future tests have the same patches for every
+    // species
+
     RoadPtr roadPtrShared = this->road.lock();
     RegionPtr region = roadPtrShared->getOptimiser()->getRegion();
     const Eigen::MatrixXd& X = region->getX();
@@ -69,6 +72,7 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
     this->habPatch = std::vector<HabitatPatchPtr>((pow(res,2)*habTyps.
             size()));
     Eigen::VectorXd initPopsTemp = Eigen::VectorXd(pow(res,2)*habTyps.size());
+    Eigen::VectorXd capsTemp = Eigen::VectorXd(pow(res,2)*habTyps.size());
     // Sub patch area
     double subPatchArea = xspacing(0)*yspacing(0);
 
@@ -90,10 +94,8 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
     Eigen::MatrixXi output = Eigen::MatrixXi::Zero(W,H);
     Eigen::MatrixXi tempGrid = Eigen::MatrixXi::Zero(W,H);
     Eigen::MatrixXi tempGrid2 = Eigen::MatrixXi::Zero(W,H);
-    Eigen::VectorXi xidx =
-            Eigen::VectorXi::LinSpaced(W,1,W);
-    Eigen::VectorXi yidx =
-            Eigen::VectorXi::LinSpaced(H,1,H);
+    Eigen::VectorXi xidx = Eigen::VectorXi::LinSpaced(W,1,W);
+    Eigen::VectorXi yidx = Eigen::VectorXi::LinSpaced(H,1,H);
 
     this->initPop = 0.0;
 
@@ -123,7 +125,8 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
                 SimulateGPU::buildPatches(W,H,skpx,skpy,xRes,yRes,regions,
                         xspacing(0),yspacing(0),subPatchArea,habTyps[ii],
                         output,this->species->getPopulationMap(),
-                        this->habPatch,this->initPop,initPopsTemp,patches);
+                        this->habPatch,this->initPop,initPopsTemp,capsTemp,
+                        patches);
             } else {
                 // Call the serial code (very slow)
                 // Iterate through every large cell present in the overall
@@ -205,7 +208,7 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
                                 // points
                                 this->habPatch[patches] = hab;
                                 initPopsTemp(patches) = thisPop;
-                                this->capacities(patches) = hab->getCapacity();
+                                capsTemp(patches) = hab->getCapacity();
                                 patches++;
                                 this->initPop += thisPop;
                                 // Find distance to road here?
@@ -219,6 +222,7 @@ void SpeciesRoadPatches::generateHabitatPatchesGrid(bool visualise) {
     // Remove excess patches in container
     this->habPatch.resize(patches);
     this->initPops = initPopsTemp.segment(0,patches);
+    this->capacities = capsTemp.segment(0,patches);
 }
 
 void SpeciesRoadPatches::generateHabitatPatchesBlob() {
