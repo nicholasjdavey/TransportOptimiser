@@ -246,6 +246,23 @@ namespace SimulateGPU {
      */
     void solveLinearSystem(int dims, float *A, float *B, float *C);
 
+//    /**
+//     * Allocates data to the different regression data based on the contrl
+//     *
+//     * @param noPaths as int
+//     * @param Controls as int
+//     * @param noDims as int
+//     * @param controls as int*
+//     * @param xin as float*
+//     * @param condExp as float*
+//     * @param dataPoints as int*
+//     * @param xvals as float*
+//     * @param yvals as float*
+//     */
+//    void allocateXYRegressionData(int noPaths, int noControls, int noDims, int*
+//            controls, float* xin, float* condExp, int* dataPoints, float*
+//            xvals, float* yvals);
+
 //    // CALLING CUSOLVER ///////////////////////////////////////////////////////////
 //    /*******************/
 //    /* iDivUp FUNCTION */

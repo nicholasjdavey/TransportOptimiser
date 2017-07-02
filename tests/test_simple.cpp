@@ -224,8 +224,8 @@ int main(int argc, char **argv) {
     std::string orf = "Output Data/output_data_file.csv";
     std::string itf = "Input Data/input_terrain_file.csv";
     std::string erf = "Input Data/existing_roads_file.csv";
-    OtherInputsPtr otherInputs(new OtherInputs(idf,orf,itf,erf,0,1,0,1,1000,
-            20000,20,2000,100));
+    OtherInputsPtr otherInputs(new OtherInputs(idf,orf,itf,erf,0,1,0,1,20,
+            20,20,10000,100));
 
     // EARTHWORK COSTS
     Eigen::VectorXd cd(6);
@@ -254,7 +254,7 @@ int main(int argc, char **argv) {
     Eigen::VectorXd pgrsd(3);
     pgrsd << 1,2,3;
     Eigen::VectorXd c(1);
-    c << 100;
+    c << 1;
     Eigen::VectorXd csd(3);
     csd << 1,2,3;
     Eigen::VectorXd cpsd(3);
