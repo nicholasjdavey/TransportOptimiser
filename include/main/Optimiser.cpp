@@ -111,6 +111,26 @@ void Optimiser::optimise(bool plot) {
     // Compute using surrogate function, which we learn at each iteration.
     // Perform sampling to ensure a good distribution of AARs.
 
+    int commSD = this->getScenario()->getCommoditySD();
+
+    if ((this->getVariableParams()
+            ->getCommoditySDMultipliers()(commSD) != 0.0)) {
+        // Find the expected present value of each commodity
+        std::vector<CommodityPtr> commodities = this->economic->
+                getCommodities();
+        std::vector<CommodityPtr> fuels = this->economic->getFuels();
+
+        for (int ii = 0; ii < commodities.size(); ii++) {
+            commodities[ii]->computeExpPV();
+        }
+
+        for (int ii = 0; ii < fuels.size(); ii++) {
+            fuels[ii]->computeExpPV();
+        }
+    }
+
+    Costs::computeUnitRevenue(this->me());
+
     switch (this->type) {
     case Optimiser::CONTROLLED:
         {
@@ -121,25 +141,7 @@ void Optimiser::optimise(bool plot) {
 
     default:
         {
-            int commSD = this->getScenario()->getCommoditySD();
-
-            if ((this->getVariableParams()
-                    ->getCommoditySDMultipliers()(commSD) != 0.0)) {
-                // Find the expected present value of each commodity
-                std::vector<CommodityPtr> commodities = this->economic->
-                        getCommodities();
-                std::vector<CommodityPtr> fuels = this->economic->getFuels();
-
-                for (int ii = 0; ii < commodities.size(); ii++) {
-                    commodities[ii]->computeExpPV();
-                }
-
-                for (int ii = 0; ii < fuels.size(); ii++) {
-                    fuels[ii]->computeExpPV();
-                }
-            }
-
-            Costs::computeUnitRevenue(this->me());
+            // Nothing special to do
         }
         break;
     }

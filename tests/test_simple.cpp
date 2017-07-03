@@ -21,13 +21,13 @@ int main(int argc, char **argv) {
     std::string solScheme = "GA";
 
     RoadGAPtr roadGA(new RoadGA(0.6,0.375,500,50,1e-6,0.95,0.95,10,30,
-            solScheme,5, Optimiser::CONTROLLED,1.0,15,0.05,10,3,10,
+            solScheme,5, Optimiser::MTE,1.0,15,0.05,10,3,10,
             RoadGA::TOURNAMENT,RoadGA::RANK,0.4,0.65,5,0.1,true,
             Optimiser::ALGO6,Optimiser::MULTI_LOC_LIN_REG));
 
     // SET THREADER
-//    ThreadManagerPtr threader(new ThreadManager(8));
-//    roadGA->setThreadManager(threader);
+    ThreadManagerPtr threader(new ThreadManager(8));
+    roadGA->setThreadManager(threader);
 
     // Initialise the input classes
     // REGION (not used for now)
@@ -225,7 +225,7 @@ int main(int argc, char **argv) {
     std::string itf = "Input Data/input_terrain_file.csv";
     std::string erf = "Input Data/existing_roads_file.csv";
     OtherInputsPtr otherInputs(new OtherInputs(idf,orf,itf,erf,0,1,0,1,20,
-            20,20,10000,100));
+            20,20,10000,20));
 
     // EARTHWORK COSTS
     Eigen::VectorXd cd(6);
