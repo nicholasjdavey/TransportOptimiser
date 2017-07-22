@@ -300,24 +300,41 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
         // values on this dimension.
         int idxL = predictors.size()*dimRes;
 
+        int div = ii;
         for (int jj = 0; jj < (predictors.size() - 1); jj++) {
-            int rem = ((int)(ii/((int)pow(2,predictors.size()-1-jj))) + 1) -
-                    2*(int)(((int)(ii/((int)pow(2,predictors.size()-1-jj))) +
-                    1)/2);
+            int rem = div - 2*((int)div/2);
+            div = (int)(div/2);
 
-            if (rem > 0) {
-                idxL += lowerIdx[jj]*(int)pow(dimRes,predictors.size()-1-jj);
+            if (rem == 0) {
+                idxL += lowerIdx[predictors.size() - 2 - jj]*(int)pow(
+                        dimRes,jj + 1);
             } else {
-                idxL += (lowerIdx[jj]+1)*(int)pow(dimRes,predictors.size()-1-
-                        jj);
+                idxL += (lowerIdx[predictors.size() - 2 - jj] + 1)*(int)pow(
+                        dimRes,jj + 1);
             }
         }
 
-        int idxU = idxL + (lowerIdx[0]+1)*(int)pow(dimRes,predictors.size()-1);
+        coeffs[ii] = surrogate(idxL)*(1 - xd) + surrogate(idxL + 1)*xd;
 
-        idxL += lowerIdx[0]*(int)pow(dimRes,predictors.size()-1);
+        // OLD
+//        for (int jj = 0; jj < (predictors.size() - 1); jj++) {
+//            int rem = ((int)(ii/((int)pow(2,predictors.size()-1-jj))) + 1) -
+//                    2*(int)(((int)(ii/((int)pow(2,predictors.size()-1-jj))) +
+//                    1)/2);
 
-        coeffs[ii] = surrogate(idxL)*(1 - xd) + surrogate(idxU)*xd;
+//            if (rem > 0) {
+//                idxL += lowerIdx[jj]*(int)pow(dimRes,predictors.size()-1-jj);
+//            } else {
+//                idxL += (lowerIdx[jj]+1)*(int)pow(dimRes,predictors.size()-1-
+//                        jj);
+//            }
+//        }
+
+//        int idxU = idxL + (lowerIdx[0]+1)*(int)pow(dimRes,predictors.size()-1);
+
+//        idxL += lowerIdx[0]*(int)pow(dimRes,predictors.size()-1);
+
+//        coeffs[ii] = surrogate(idxL)*(1 - xd) + surrogate(idxU)*xd;
     }
 
     // Now we work our way down the dimensions using our computed coefficients
@@ -326,7 +343,13 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
         // Get the current dimensions x value
         x0 = surrogate(lowerIdx[ii] + dimRes*ii);
         x1 = surrogate(lowerIdx[0]+1 + dimRes*ii);
-        xd = (predictors(0) - x0)/(x1 - x0);
+
+        if ((fabs(x1 - x0) < std::numeric_limits<double>::epsilon()) ||
+                x0 == x1) {
+            xd = 0.0;
+        } else {
+            xd = (predictors(ii) - x0)/(x1 - x0);
+        }
 
         for (int jj = 0; jj < (int)pow(2,ii); jj++) {
             int jump = (int)pow(2,predictors.size()-ii-2);

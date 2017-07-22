@@ -416,7 +416,7 @@ private:
     std::vector<HabitatTypePtr> habitat;/**< Habitat types */
     Eigen::MatrixXi habitatMap;         /**< Breakdown of region into the four base habitat types */
     Eigen::MatrixXd populationMap;      /**< Population of animals in each cell */
-    double threshold;                   /**< Target threshold as proportion of initial population */
+    double threshold;                   /**< Target threshold (absolute value) */
     double initialPop;                  /**< Initial population of animals in region */
     SpeciesPtr me();                    /**< Enables sharing from this */
 };

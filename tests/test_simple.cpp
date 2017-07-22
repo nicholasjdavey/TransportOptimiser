@@ -21,7 +21,7 @@ int main(int argc, char **argv) {
     std::string solScheme = "GA";
 
     RoadGAPtr roadGA(new RoadGA(0.6,0.375,500,50,1e-6,0.95,0.95,10,30,
-            solScheme,5, Optimiser::MTE,1.0,15,0.05,10,3,10,
+            solScheme,5, Optimiser::CONTROLLED,1.0,15,0.05,10,3,10,
             RoadGA::TOURNAMENT,RoadGA::RANK,0.4,0.65,5,0.1,true,
             Optimiser::ALGO6,Optimiser::MULTI_LOC_LIN_REG));
 
@@ -156,7 +156,7 @@ int main(int argc, char **argv) {
         true));
 
     SpeciesPtr animal(new Species(nm,false,2.52e-3,0.0928e-3,-2.52e-3,
-            0.1014e-3,sp1gr,0.5,0.7,0.012,2.78,1.39,1e7,true,1000,1,
+            0.1014e-3,sp1gr,0.5,0.7,0.012,2.78,1.39,1e7,true,1000,1000,
             habTypes));
 
     std::vector<SpeciesPtr> species(1);
@@ -176,17 +176,17 @@ int main(int argc, char **argv) {
     std::string petrolName = "petrol";
     std::string commodityName = "ore";
 
-    CommodityPtr diesel(new Commodity(roadGA,dieselName,1.2,1.2,0.01,0.01,0,0,true,
+    CommodityPtr diesel(new Commodity(roadGA,dieselName,1.2,1.2,0.0,0.05,0.05,0.05,true,
             0,0));
     diesel->setCurrent(1.2);
     fuels[0] = diesel;
-    CommodityPtr petrol(new Commodity(roadGA,petrolName,1.05,1.05,0.01,0.01,0,0,
+    CommodityPtr petrol(new Commodity(roadGA,petrolName,1.05,1.05,0.0,0.05,0.05,0.05,
             true,0,0));
     petrol->setCurrent(1.05);
     fuels[1] = petrol;
-    CommodityPtr ore(new Commodity(roadGA,commodityName,100,100,0.1,0.01,0,0,true,
-            0.8,0.20));
-    ore->setCurrent(120);
+    CommodityPtr ore(new Commodity(roadGA,commodityName,30,30,0.05,0.05,0,0.05,true,
+            1,0));
+    ore->setCurrent(30);
     commodities[0] = ore;
 
     // ECONOMIC
@@ -225,7 +225,7 @@ int main(int argc, char **argv) {
     std::string itf = "Input Data/input_terrain_file.csv";
     std::string erf = "Input Data/existing_roads_file.csv";
     OtherInputsPtr otherInputs(new OtherInputs(idf,orf,itf,erf,0,1,0,1,20,
-            20,20,10000,20));
+            20,20,50000,40));
 
     // EARTHWORK COSTS
     Eigen::VectorXd cd(6);
@@ -239,8 +239,8 @@ int main(int argc, char **argv) {
             1.42*1.71,1.42*3.05,1.42*0.12));
 
     // VARIABLE PARAMETERS
-    Eigen::VectorXd popLevels(6);
-    popLevels << 0.50,0.60,0.70,0.80,0.90,0.100;
+    Eigen::VectorXd popLevels(3);
+    popLevels << /*0.50,0.60,0.70,*/0.80,0.90,1.00;
     Eigen::VectorXi bridge(1);
     bridge << 0;
     Eigen::VectorXd hp(1);
