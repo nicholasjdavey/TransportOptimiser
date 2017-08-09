@@ -1,5 +1,19 @@
 #include "../transportbase.h"
 
+VariableParameters::VariableParameters() {
+    // Default constructor
+    this->populationLevels = Eigen::VectorXd::Zero(0);
+    this->animalBridge = Eigen::VectorXi::Zero(0);
+    this->habPref = Eigen::VectorXd::Zero(0);
+    this->lambda = Eigen::VectorXd::Zero(0);
+    this->beta = Eigen::VectorXd::Zero(0);
+    this->popGR = Eigen::VectorXd::Zero(0);
+    this->popGRSD = Eigen::VectorXd::Zero(0);
+    this->commoditySD = Eigen::VectorXd::Zero(0);
+    this->commodity = Eigen::VectorXd::Zero(0);
+    this->commodityPropSD = Eigen::VectorXd::Zero(0);
+}
+
 VariableParameters::VariableParameters(const Eigen::VectorXd& popLevels, const
         Eigen::VectorXi& bridge, const Eigen::VectorXd& hp, const
         Eigen::VectorXd& l, const Eigen::VectorXd& b, const Eigen::VectorXd&

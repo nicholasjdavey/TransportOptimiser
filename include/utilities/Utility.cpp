@@ -264,8 +264,8 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
     for (int ii = 0; ii < predictors.size(); ii++) {
         lowerVal(ii) = surrogate[ii*dimRes];
         upperVal(ii) = surrogate[(ii+1)*dimRes - 1];
-        lowerIdx(ii) = (int)(dimRes*(predictors(ii) - lowerVal(ii))/(upperVal(
-                ii) - lowerVal(ii)));
+        lowerIdx(ii) = (int)((dimRes-1)*(predictors(ii) - lowerVal(ii))/(
+                upperVal(ii) - lowerVal(ii)));
         if (lowerIdx(ii) < 0) {
             lowerIdx(ii) = 0;
         } else if (lowerIdx(ii) >= dimRes) {
@@ -298,20 +298,24 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
     for (int ii = 0; ii < (int)pow(2,predictors.size()-1); ii++) {
         // Get the indices of the yvalues of the lower and upper bounding
         // values on this dimension.
-        int idxL = predictors.size()*dimRes;
+        int idxL = (int)(predictors.size()*dimRes);
 
-        int div = ii;
-        for (int jj = 0; jj < (predictors.size() - 1); jj++) {
-            int rem = div - 2*((int)div/2);
-            div = (int)(div/2);
+        if (predictors.size() > 1) {
+            int div = ii;
+            for (int jj = 0; jj < (predictors.size() - 1); jj++) {
+                int rem = div - 2*((int)div/2);
+                div = (int)(div/2);
 
-            if (rem == 0) {
-                idxL += lowerIdx[predictors.size() - 2 - jj]*(int)pow(
-                        dimRes,jj + 1);
-            } else {
-                idxL += (lowerIdx[predictors.size() - 2 - jj] + 1)*(int)pow(
-                        dimRes,jj + 1);
+                if (rem == 0) {
+                    idxL += lowerIdx(predictors.size() - 2 - jj)*(int)pow(
+                            dimRes,jj + 1);
+                } else {
+                    idxL += (lowerIdx(predictors.size() - 2 - jj) + 1)*(int)
+                            pow(dimRes,jj + 1);
+                }
             }
+        } else {
+             idxL += (int)(lowerIdx(0)*pow(dimRes,predictors.size() - 1));
         }
 
         coeffs[ii] = surrogate(idxL)*(1 - xd) + surrogate(idxL + 1)*xd;
@@ -358,4 +362,22 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
     }
 
     return coeffs[0];
+}
+
+std::vector<std::string> Utility::getDictionary(std::string s,std::string
+        del) {
+    size_t pos = 0;
+    std::string token;
+
+    std::vector<std::string> values;
+
+    while ((pos = s.find(del)) != std::string::npos) {
+        token = s.substr(0,pos);
+        values.push_back(std::regex_replace(token, std::regex(
+                "^ +| +$|( ) +"), "$1"));
+        s.erase(0,pos + del.length());
+    }
+    values.push_back(std::regex_replace(s, std::regex("^ +| +$|( ) +"), "$1"));
+
+    return values;
 }

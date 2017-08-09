@@ -13,210 +13,210 @@ typedef std::shared_ptr<RoadSegments> RoadSegmentsPtr;
 class RoadSegments : public std::enable_shared_from_this<RoadSegments> {
 
 public:
-	// ENUMERATIONS ///////////////////////////////////////////////////////////
-	typedef enum {
-		ROAD,
-		BRIDGE,
-		TUNNEL
-	} Type;
-	// CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
+    // ENUMERATIONS ///////////////////////////////////////////////////////////
+    typedef enum {
+        ROAD,
+        BRIDGE,
+        TUNNEL
+    } Type;
+    // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
-	/**
-	 * Constructor
-	 *
-	 * Constructs a %RoadSegments object with default values
-	 */
-	RoadSegments(RoadPtr road);
+    /**
+     * Constructor
+     *
+     * Constructs a %RoadSegments object with default values
+     */
+    RoadSegments(RoadPtr road);
 
-	/**
-	 * Destructor
-	 */
-	~RoadSegments();
+    /**
+     * Destructor
+     */
+    ~RoadSegments();
 
-	// ACCESSORS //////////////////////////////////////////////////////////////
+    // ACCESSORS //////////////////////////////////////////////////////////////
 
-	/**
-	 * Returns the road
-	 *
-	 * @return Road as RoadPtr
-	 */
-	RoadPtr getRoad() {
+    /**
+     * Returns the road
+     *
+     * @return Road as RoadPtr
+     */
+    RoadPtr getRoad() {
         return this->road.lock();
-	}
-	/**
-	 * Sets the road
-	 *
-	 * @param road as RoadPtr
-	 */
-	void setRoad(RoadPtr road) {
+    }
+    /**
+     * Sets the road
+     *
+     * @param road as RoadPtr
+     */
+    void setRoad(RoadPtr road) {
         this->road.reset();
-		this->road = road;
-	}
+        this->road = road;
+    }
 
-	/**
-	 * Returns the X coordinates
-	 *
+    /**
+     * Returns the X coordinates
+     *
      * @return X coordinates as const Eigen::VectorXd&
-	 */
+     */
     const Eigen::VectorXd& getX() {
         return this->x;
-	}
-	/**
-	 * Sets the X coordinates
-	 *
+    }
+    /**
+     * Sets the X coordinates
+     *
      * @param x as const Eigen::VectorXd&
-	 */
+     */
     void setX(const Eigen::VectorXd& x) {
         this->x = x;
-	}
+    }
 
-	/**
-	 * Returns the Y coordinates
-	 *
+    /**
+     * Returns the Y coordinates
+     *
      * @return Y coordinates as const Eigen::VectorXd&
-	 */
+     */
     const Eigen::VectorXd& getY() {
         return this->y;
-	}
-	/**
-	 * Sets the Y coordinates
-	 *
+    }
+    /**
+     * Sets the Y coordinates
+     *
      * @param y as const Eigen::VectorXd&
-	 */
+     */
     void setY(const Eigen::VectorXd& y) {
         this->y = y;
-	}
+    }
 
-	/**
-	 * Returns the natural elevation
-	 *
+    /**
+     * Returns the natural elevation
+     *
      * @return Natural elevation as const Eigen::VectorXd&
-	 */
+     */
     const Eigen::VectorXd& getE() {
         return this->e;
-	}
-	/**
-	 * Sets the natural elevation
-	 *
+    }
+    /**
+     * Sets the natural elevation
+     *
      * @param e as const Eigen::VectorXd&
-	 */
+     */
     void setE(const Eigen::VectorXd& e) {
         this->e = e;
-	}
+    }
 
-	/**
-	 * Returns the Z coordinates
-	 *
+    /**
+     * Returns the Z coordinates
+     *
      * @return Z coordinates as const Eigen::VectorXd&
-	 */
+     */
     const Eigen::VectorXd& getZ() {
         return this->z;
-	}
-	/**
-	 * Sets the Z coordinates
-	 *
+    }
+    /**
+     * Sets the Z coordinates
+     *
      * @param z as const Eigen::VectorXd&
-	 */
+     */
     void setZ(const Eigen::VectorXd& z) {
         this->z = z;
-	}
+    }
 
-	/**
-	 * Returns the parametrised distance along the curve
-	 *
+    /**
+     * Returns the parametrised distance along the curve
+     *
      * @return Distances as const Eigen::VectorXd&
-	 */
+     */
     const Eigen::VectorXd& getDists() {
         return this->s;
-	}
-	/**
-	 * Sets the parametrised distance along the curve
-	 *
+    }
+    /**
+     * Sets the parametrised distance along the curve
+     *
      * @param s as const Eigen::VectorXd&
-	 */
+     */
     void setDists(const Eigen::VectorXd& s) {
         this->s = s;
-	}
+    }
 
-	/**
-	 * Returns the widths
-	 *
+    /**
+     * Returns the widths
+     *
      * @return Widths as const Eigen::VectorXd&
-	 */
+     */
     const Eigen::VectorXd& getWidths() {
         return this->w;
-	}
-	/**
-	 * Sets the segment widths
-	 *
+    }
+    /**
+     * Sets the segment widths
+     *
      * @param w as const Eigen::VectorXd&
-	 */
+     */
     void setWidths(const Eigen::VectorXd& w) {
         this->w = w;
-	}
+    }
 
-	/**
-	 * Returns the velocities
-	 *
+    /**
+     * Returns the velocities
+     *
      * @return Velocities as const Eigen::VectorXd&
-	 */
+     */
     const Eigen::VectorXd& getVelocities() {
         return this->v;
-	}
-	/**
-	 * Sets the velocities
-	 *
+    }
+    /**
+     * Sets the velocities
+     *
      * @param v as const Eigen::VectorXd&
-	 */
+     */
     void setVelocities(const Eigen::VectorXd& v) {
         this->v = v;
-	}
+    }
 
-	/**
-	 * Returns the distances to curve points
-	 *
+    /**
+     * Returns the distances to curve points
+     *
      * @return Distances as const Eigen::VectorXd&
-	 */
+     */
     const Eigen::VectorXd& getSPC() {
         return this->spc;
-	}
-	/**
-	 * Sets the distances to curve points
-	 *
+    }
+    /**
+     * Sets the distances to curve points
+     *
      * @param spc as const Eigen::VectorXd&
-	 */
+     */
     void setSPC(const Eigen::VectorXd& spc) {
         this->spc = spc;
-	}
+    }
 
-	/**
-	 * Returns the type of road
+    /**
+     * Returns the type of road
      *
      * Although there is an enum for the three different types (ROAD,
      * BRIDGE and TUNNEL), we cast them as ints so that we may store
      * them in a matrix for easy use.
-	 *
+     *
      * @return Road type as const Eigen::VectorXi&
-	 */
+     */
     const Eigen::VectorXi& getType() {
         return this->typ;
-	}
-	/**
-	 * Sets the type of road
-	 *
+    }
+    /**
+     * Sets the type of road
+     *
      * @param typ as const Eigen::VectorXi&
-	 */
+     */
     void setType(const Eigen::VectorXi& typ) {
         this->typ = typ;
-	}
+    }
 
-	// STATIC ROUTINES ////////////////////////////////////////////////////////
+    // STATIC ROUTINES ////////////////////////////////////////////////////////
 
-	// CALCULATION ROUTINES ///////////////////////////////////////////////////
+    // CALCULATION ROUTINES ///////////////////////////////////////////////////
 
-	/**
-	 * Computes the road segments for a road
-	 */
+    /**
+     * Computes the road segments for a road
+     */
     void computeSegments();
 
     /**

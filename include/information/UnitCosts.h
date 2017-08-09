@@ -13,7 +13,12 @@ public:
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
     /**
-     * Constructor
+     * Constructor I
+     */
+    UnitCosts();
+
+    /**
+     * Constructor II
      *
      * Constructs a %UnitCosts object with assigned values.
      */

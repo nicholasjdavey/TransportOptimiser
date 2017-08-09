@@ -91,6 +91,12 @@ public:
         MULTI_LOC_LIN_REG,
     } InterpolationRoutine;
 
+    typedef enum {
+        COMPLETE,
+        STALLED,
+        MAX_GENS
+    } StoppingCriterion;
+
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
     /**
@@ -796,6 +802,193 @@ public:
         this->interp = ir;
     }
 
+    /**
+     * Returns the relative path of the root folder
+     *
+     * @return Root folder path (relative to program root) as std::string
+     */
+    const std::string getRootFolder() {
+        return this->rootFolder;
+    }
+    /**
+     * Sets the relative path of the root folder
+     *
+     * @param rf as std::string
+     */
+    void setRootFolder(std::string rf) {
+        this->rootFolder = rf;
+    }
+
+    /**
+     * Returns the X values file path
+     *
+     * @return X values file as std::string
+     */
+    const std::string getXValuesFile() {
+        return this->xValuesFile;
+    }
+    /**
+     * Sets the X values file path
+     *
+     * @param xvf as std::string
+     */
+    void setXValuesFile(std::string xvf) {
+        this->xValuesFile = xvf;
+    }
+
+    /**
+     * Returns the Y values file path
+     *
+     * @return Y values file path as std::string
+     */
+    const std::string getYValuesFile() {
+        return this->yValuesFile;
+    }
+    /**
+     * Sets the Y values file path
+     *
+     * @param yvf as std::string
+     */
+    void setYValuesFile(std::string yvf) {
+        this->yValuesFile = yvf;
+    }
+
+    /**
+     * Returns the Z values file path
+     *
+     * @return Z values file path as std::string
+     */
+    const std::string getZValuesFile() {
+        return this->zValuesFile;
+    }
+    /**
+     * Sets the Z values file path
+     *
+     * @param zvf as std::string
+     */
+    void setZValuesFile(std::string zvf) {
+        this->zValuesFile = zvf;
+    }
+
+    /**
+     * Returns the vegetation data file path
+     *
+     * @return Vegetation data file path as std::string
+     */
+    const std::string getVegetationFile() {
+        return this->vegetationFile;
+    }
+    /**
+     * Sets the vegetation data file path
+     *
+     * @param vf as std::string
+     */
+    void setVegetationFile(std::string vf) {
+        this->vegetationFile = vf;
+    }
+
+    /**
+     * Returns the acquisition data file path
+     *
+     * @return Acquisition data file path as std::string
+     */
+    const std::string getAcquisitionFile() {
+        return this->acquisitionFile;
+    }
+    /**
+     * Sets the acquisition data file path
+     *
+     * @param af as std::string
+     */
+    void setAcquisitionFile(std::string af) {
+        this->acquisitionFile = af;
+    }
+
+    /**
+     * Returns the soil data file path
+     *
+     * @return Soil data file path as std::string
+     */
+    const std::string getSoilFile() {
+        return this->soilFile;
+    }
+    /**
+     * Sets the soil data file path
+     *
+     * @param sf as std::string
+     */
+    void setSoilFile(std::string sf) {
+        this->soilFile = sf;
+    }
+
+    /**
+     * Returns the commodities data files
+     *
+     * @return Commodities data files as std::vector<std::string>
+     */
+    const std::vector<std::string> getCommoditiesFiles() {
+        return this->commoditiesFiles;
+    }
+    /**
+     * Sets the commodities data files
+     *
+     * @param cf as std::vector<std::string>
+     */
+    void setCommoditiesFiles(std::vector<std::string>& cf) {
+        this->commoditiesFiles = cf;
+    }
+
+    /**
+     * Returns the fuels data files
+     *
+     * @return Fuels data files as std::vector<std::string>&
+     */
+    const std::vector<std::string> getFuelsFiles() {
+        return this->fuelsFiles;
+    }
+    /**
+     * Sets the fuels data files
+     *
+     * @param ff as std::vector<std::string>&
+     */
+    void setFuelsFiles(std::vector<std::string>& ff) {
+        this->fuelsFiles = ff;
+    }
+
+    /**
+     * Returns the vehicles data files
+     *
+     * @return Vehicles data files as std::vector<std::string>
+     */
+    const std::vector<std::string> getVehiclesFiles() {
+        return this->vehiclesFiles;
+    }
+    /**
+     * Sets the vehicles data files
+     *
+     * @param vf as std::vector<std::string>&
+     */
+    void setVehiclesFiles(std::vector<std::string>& vf) {
+        this->vehiclesFiles = vf;
+    }
+
+    /**
+     * Returns the species data files
+     *
+     * @return Species data files as std::vector<std::string>
+     */
+    const std::vector<std::string> getSpeciesFiles() {
+        return this->speciesFiles;
+    }
+    /**
+     * Sets the species data files
+     *
+     * @param sf as std::vector<std::string>&
+     */
+    void setSpeciesFiles(std::vector<std::string>& sf) {
+        this->speciesFiles = sf;
+    }
+
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -943,12 +1136,40 @@ public:
     void evaluateSurrogateModelROVCR(RoadPtr road, double &value, double
             &valueSD);
 
+    /**
+     * Initialises the program with input data
+     *
+     * @param inputfile as std::string
+     */
+    void initialiseFromTextInput(std::string inputfile);
+
+    /**
+     * Saves the results for an experimental scenario
+     */
+    void saveExperimentalResults();
+
+    /**
+     * Saves the best road data by recomputing all important aspects and saving
+     * the data to an external source (on disk).
+     *
+     * @note This function is used to save all best road data as text. A
+     * routine to save the data in binary format is currently in development.
+     */
+    void saveBestRoadResults();
+
+    /**
+     * Computes the results of the best road for reporting and visualisation
+     * purposes.
+     */
+    void computeBestRoadResults();
+
 ///////////////////////////////////////////////////////////////////////////////
 protected:
     std::vector<std::vector<std::vector<alglib::spline1dinterpolant>>> surrogate;   /**< MTE Surrogate model for evaluating road (for each run) stored as a collection of splines (To be deprecated) */
     std::vector<std::vector<std::vector<Eigen::VectorXd>>> surrogateML;             /**< Surrogate models based on multiple local linear regression */
     ExperimentalScenarioPtr scenario;                                               /**< Current experiment */
     Optimiser::Type type;                                                           /**< Type of ecological incorporation */
+    Optimiser::StoppingCriterion stop;                                              /**< Reason for ending optimisation process */
     Eigen::MatrixXd currentRoadPopulation;                                          /**< Current encoded population of roads */
     std::vector< std::vector<RoadPtr> > bestRoads;                                  /**< Best roads */
     std::vector<TrafficProgramPtr> programs;                                        /**< Operational programs */
@@ -985,6 +1206,17 @@ protected:
     bool gpu;                                                                       /**< If we are using GPUs to assist computing */
     Optimiser::ROVType method;                                                      /**< ROV algorithm */
     Optimiser::InterpolationRoutine interp;                                         /**< Interpolation routine (only used for MTE) */
+    std::string rootFolder;                                                         /**< Root folder of the experiments (Input file location) */
+    std::string xValuesFile;                                                        /**< X values file used for terrain */
+    std::string yValuesFile;                                                        /**< Y values file used for terrain */
+    std::string zValuesFile;                                                        /**< Z values file used for terrain */
+    std::string vegetationFile;                                                     /**< Vegetation data file */
+    std::string acquisitionFile;                                                    /**< Acquisition costs file */
+    std::string soilFile;                                                           /**< Soil stabilisation data file */
+    std::vector<std::string> commoditiesFiles;                                      /**< Commodities data files */
+    std::vector<std::string> fuelsFiles;                                            /**< Fuels data files */
+    std::vector<std::string> vehiclesFiles;                                         /**< Vehicles data files */
+    std::vector<std::string> speciesFiles;                                          /**< Species data files */
 
     // Sharing of derived from base
     template <typename Derived>

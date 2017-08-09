@@ -345,6 +345,15 @@ namespace Utility {
      */
     double interpolateSurrogate(Eigen::VectorXd &surrogate, Eigen::VectorXd&
             predictors, int dimRes);
+
+    /**
+     * Returns the name of an input as well as the values
+     *
+     * @param s as std::string
+     * @param del as std::string
+     * @return Labels and input values as std::vector<std::string>
+     */
+    std::vector<std::string> getDictionary(std::string s, std::string del);
 }
 
 #endif

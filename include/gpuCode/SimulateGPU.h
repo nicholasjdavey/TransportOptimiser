@@ -148,11 +148,41 @@ namespace SimulateGPU {
      * @param unitProfits Eigen::MatrixXd&
      * @param condExp as Eigen::MatrixXd&
      * @param optCont as Eigen::MatrixXi&
+     * @param regressions as Eigen::VectorXd&
+     * @param plotResults as bool
+     *
+     * The shape of the regressions is as follows:
+     *
+     * For each year (from zero to nYears)
+     *     For each control
+     *         XVALUES ========================================================
+     *         X_dim_1: AARs_Species_1 (Lowest to highest)
+     *         X_dim_2: AARs_Species_2
+     *         ...
+     *         X_dim_N: AARs_Species_N
+     *         X_dim_N+1: Unit_Profits
+     *         YVALUES ========================================================
+     *         Y-values for every possible combination given by the X-values
+     *         listed with the the heirarchy of the nesting in the same order
+     *         as the order of the dimensions above.
      */
     void simulateROVCUDA(SimulatorPtr sim,
             std::vector<SpeciesRoadPatchesPtr>& srp,
             std::vector<Eigen::MatrixXd> &adjPops, Eigen::MatrixXd &
-            unitProfits, Eigen::MatrixXd& condExp, Eigen::MatrixXi& optCont);
+            unitProfits, Eigen::MatrixXd& condExp, Eigen::MatrixXi& optCont,
+            Eigen::VectorXd& regressions, bool plotResults);
+
+//    /**
+//     * Simulates a single ROV path for the road using the optimal control map
+//     *
+//     * @param sim as SimulatorPtr
+//     * @param visualisePops as std::vector<Eigen::MatrixXd>&
+//     * @param visualiseFlows as Eigen::VectorXi&
+//     * @param visualiseUnitProfits as Eigen::VectorXd&
+//     */
+//    void simulateSingleROVPath(SimulatorPtr sim, std::vector<Eigen::MatrixXd>&
+//            visualisePops, Eigen::VectorXi &visualiseFlows, Eigen::VectorXd&
+//            visualiseUnitProfits);
 
     /**
      * Performs MTE simulations for all sample roads used to build the

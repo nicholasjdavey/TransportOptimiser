@@ -20,7 +20,7 @@ public:
      *
      * Constructs an empty %PolicyMapYear object
      */
-    PolicyMapYear();
+    PolicyMapYear(unsigned long noDims, unsigned long noPaths);
 
     /**
      * Constructor II
@@ -29,7 +29,8 @@ public:
      */
     PolicyMapYear(const std::vector<PolicyMapFrontierPtr>& frontiers,
             const Eigen::MatrixXd& stateLevels,
-            const Eigen::VectorXd& expectedProfit);
+            const Eigen::VectorXd& expectedProfit,
+            const Eigen::VectorXi& optimalControls);
 
     /**
      * Destructor
@@ -60,7 +61,7 @@ public:
      *
      * @return State levels as const Eigen::MatrixXd&
      */
-    const Eigen::MatrixXd& getPopulations() {
+    const Eigen::MatrixXd& getStateLevels() {
         return this->stateLevels;
     }
     /**
@@ -68,7 +69,7 @@ public:
      *
      * @param pops as const Eigen::MatrixXd&
      */
-    void setPopulations(const Eigen::MatrixXd& sl) {
+    void setStateLevels(const Eigen::MatrixXd& sl) {
         this->stateLevels = sl;
     }
 
@@ -88,6 +89,24 @@ public:
     void setProfits(const Eigen::VectorXd& profs) {
         this->expectedProfit = profs;
     }
+
+    /**
+     * Returns the corresponding optimal controls for each path
+     *
+     * @return Optimal controls vector as Eigen::VectorXi&
+     */
+    const Eigen::VectorXi& getOptConts() {
+        return this->optimalControl;
+    }
+    /**
+     * Sets the corresponding optimal controls for each path
+     *
+     * @param oc as Eigen::VectorXi&
+     */
+    void setOptConts(const Eigen::VectorXi& oc) {
+        this->optimalControl = oc;
+    }
+
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -96,6 +115,7 @@ private:
     std::vector<PolicyMapFrontierPtr> frontiers;    /**< Frontiers produced */
     Eigen::MatrixXd stateLevels;                    /**< State values */
     Eigen::VectorXd expectedProfit;                 /**< Corresponding E(Profit) */
+    Eigen::VectorXi optimalControl;                 /**< Corresponding Optimal Control */
 };
 
 #endif

@@ -1,0 +1,13 @@
+###################################################################################################
+#################################### INPUT FILE FOR COMMODITY #####################################
+###################################################################################################
+Name                                        : ore
+Current Value                               : 30
+Mean Value                                  : 30
+Standard Deviation                          : 0.05
+Reversion                                   : 0.05
+Jump Probability                            : 0.05
+Poisson Parameter                           : 0.05
+Mean Contribution to Transported Ore        : 1
+Standard Deviation of Contribution          : 0
+

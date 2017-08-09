@@ -16,6 +16,8 @@
 #include <limits>
 #include <iostream>
 #include <iomanip>
+#include <fstream>
+#include <iomanip>
 #include <stdlib.h>
 #include <vector>
 #include <cmath>
@@ -115,12 +117,14 @@
 #include "gpuCode/knn_cuda_with_indexes.h"
 #include "main/RoadGA.h"
 
+// BOOST
+#include <boost/filesystem.hpp>
 /*
 #include <gnuplot-iostream-master/gnuplot-iostream.h>
 #include <boost/iostreams/device/file_descriptor.hpp>
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/filesystem.hpp>
+
 #include <boost/filesystem/path.hpp>
 #include <boost/math/distributions.hpp>
 #include <boost/math/distributions/normal.hpp>

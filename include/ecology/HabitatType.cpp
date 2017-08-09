@@ -11,8 +11,8 @@ HabitatType::HabitatType() {
 HabitatType::HabitatType(HabitatType::habType typ, double maxPop,
         const Eigen::VectorXi &vegetations, double habPrefMean, double
        habPrefSD, double cost) {
-	this->type = typ;
-	this->maxPop = maxPop;
+    this->type = typ;
+    this->maxPop = maxPop;
     this->cost = cost;
     this->vegetations = vegetations;
     this->habPrefMean = habPrefMean;

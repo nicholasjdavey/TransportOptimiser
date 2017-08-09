@@ -117,7 +117,7 @@ public:
      *
      * @param lambda as int
      */
-    void setLambdaS(int lambda) {
+    void setLambda(int lambda) {
         this->lambda = lambda;
     }
 

@@ -180,7 +180,7 @@ public:
      *
      * @return Lengths of curvature as const Eigen::VectorXd&
      */
-    const Eigen::VectorXd& getLenghts() {
+    const Eigen::VectorXd& getLengths() {
         return this->Ls;
     }
     /**

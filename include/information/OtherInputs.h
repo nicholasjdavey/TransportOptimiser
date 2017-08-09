@@ -10,7 +10,12 @@ public:
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
 
     /**
-     * Constructor
+     * Constructor I
+     */
+    OtherInputs();
+
+    /**
+     * Constructor II
      *
      * Constructs an %OtherInputs object with default values.
      */

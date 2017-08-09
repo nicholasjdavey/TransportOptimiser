@@ -7,6 +7,7 @@ ThreadManager::ThreadManager(unsigned long max_threads) {
     // handle and what we want
     this->noThreads = std::min(hardware_threads != 0 ? hardware_threads : 2,
             max_threads);
+    this->max_threads = noThreads;
 
     PoolPtr pool(new ctpl::thread_pool(this->noThreads));
     this->pool = pool;

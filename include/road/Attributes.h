@@ -289,7 +289,7 @@ private:
     std::weak_ptr<Road> road;       /**< Road with these attributes */
     Eigen::MatrixXd initAAR;        /**< Initial animals at risk */
     Eigen::VectorXd endPopMTE;      /**< End population if constant full flow */
-    Eigen::VectorXd endPopMTESD;    /**< End population mean under full flow */
+    Eigen::VectorXd endPopMTESD;    /**< End population standard deviation under full flow */
     double fixedCosts;              /**< Fixed road costs */
     double unitVarCosts;            /**< Variable costs per unit traffic per hour per year (excl. stochastic factors) */
     double unitVarRevenue;          /**< Variable revenue per unit traffic per hour per year (unused) */

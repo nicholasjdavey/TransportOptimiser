@@ -13,7 +13,12 @@ public:
     // CONSTRUCTORS AND DESTRUCTORS //////////////////////////////////////////////
 
     /**
-     * Constructor
+     * Constructor I
+     */
+    VariableParameters();
+
+    /**
+     * Constructor II
      *
      * Constructs a %VariableParameters object with default values.
      */

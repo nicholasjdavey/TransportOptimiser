@@ -1,5 +1,24 @@
 #include "../transportbase.h"
 
+Species::Species() {
+    // Default values
+    this->setName("nm""");
+    this->sex = true;
+    this->lambdaMean = 0;
+    this->lambdaSD = 0;
+    this->rangingCoeffMean = 0;
+    this->rangingCoeffSD = 0;
+    this->localVariability = 0;
+    this->lengthMean = 0;
+    this->lengthSD = 0;
+    this->speedMean = 0;
+    this->speedSD = 0;
+    this->costPerAnimal = 0;
+    this->setActive(true);
+    this->initialPop = 0;
+    this->threshold = 0;
+}
+
 Species::Species(std::string nm, bool sex, double lm, double lsd, double rcm,
         double rcsd, UncertaintyPtr gr, double lv, double lenm, double lensd,
         double spm,double spsd, double cpa, bool active, double initPop, double

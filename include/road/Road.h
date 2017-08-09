@@ -360,7 +360,7 @@ public:
      * TRUE
      * @param learning as bool (default = false)
      */
-    void evaluateRoad(bool learning = false);
+    void evaluateRoad(bool learning = false, bool saveResults = false);
 
     /**
      * Builds the road alignment using the points of intersection. In order,
@@ -385,7 +385,7 @@ public:
      * Otherwise, the default of using the surrogate function contained in
      * Optimiser->ExperimentalScenario is used.
      */
-    void computeOperating(bool learning = false);
+    void computeOperating(bool learning = false, bool saveResults = false);
 
     /**
      * Adds simulation patches for a given Species

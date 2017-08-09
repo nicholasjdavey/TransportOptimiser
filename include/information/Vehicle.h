@@ -15,7 +15,12 @@ class Vehicle : public std::enable_shared_from_this<Vehicle> {
 public:
     // CONSTRUCTORS AND DESTRUCTORS ///////////////////////////////////////////
     /**
-     * Constructor
+     * Constructor I
+     */
+    Vehicle();
+
+    /**
+     * Constructor II
      *
      * Constructs a %Vehicle object
      */
@@ -129,7 +134,7 @@ public:
      *
      * @param load as double
      */
-    void setMaxLoad(double load) {
+    void setMaximumLoad(double load) {
         this->maxLoad = load;
     }
 

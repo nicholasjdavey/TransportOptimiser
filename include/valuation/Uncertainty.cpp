@@ -70,14 +70,14 @@ void Uncertainty::computeExpPV() {
             finalResults(ii) = this->singlePathValue();
             total += finalResults(ii);
         }
+
+        this->expPV = total/paths;
+        this->expPVSD = sqrt(((finalResults.array() - expPV).square()).sum());
     }
 
 
     //std::chrono::steady_clock::time_point endTime = std::chrono::steady_clock::now();
     //std::cout << "Time difference = " << std::chrono::duration_cast<std::chrono::microseconds>(endTime - beginTime).count() <<std::endl;
-
-    this->expPV = total/paths;
-    this->expPVSD = sqrt(((finalResults.array() - expPV).square()).sum());
 }
 
 double Uncertainty::singlePathValue() {

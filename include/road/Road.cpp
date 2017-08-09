@@ -59,14 +59,14 @@ void Road::designRoad() {
     AttributesPtr att(new Attributes(this->me()));
     this->attributes = att;
     this->computeAlignment();
-    this->plotRoadPath();    
+    this->plotRoadPath();
     const Eigen::VectorXd& s = this->segments->getDists();
     this->attributes->setLength(s(s.size()-1));
     this->computeRoadCells();
     this->computeCostElements();
 }
 
-void Road::evaluateRoad(bool learning) {
+void Road::evaluateRoad(bool learning, bool saveResults) {
     // Compute unit cost and revenue
     // Compute the following line only once
     this->attributes->setFixedCosts(1.05*(this->getCosts()->getEarthwork()
@@ -110,7 +110,7 @@ void Road::evaluateRoad(bool learning) {
 //        std::cout << "Invalid unit var rev" << std::endl;
 //    }
 
-    this->computeOperating(learning);
+    this->computeOperating(learning,saveResults);
 
     this->attributes->setTotalValueMean(this->attributes->
             getVarProfitIC() + this->attributes->getFixedCosts());
@@ -120,7 +120,7 @@ void Road::evaluateRoad(bool learning) {
 //    }
 }
 
-void Road::computeOperating(bool learning) {
+void Road::computeOperating(bool learning, bool saveResults) {
 
     OptimiserPtr optPtrShared = this->optimiser.lock();
     ExperimentalScenarioPtr sc = this->optimiser.lock()->getScenario();
@@ -150,7 +150,7 @@ void Road::computeOperating(bool learning) {
                 if (learning) {
                     // Animal penalty component
                     // Full simulation
-                    this->computeSimulationPatches();
+                    this->computeSimulationPatches(saveResults);
                     SimulatorPtr simulator(new Simulator(this->me()));
                     this->simulator.reset();
                     this->simulator = simulator;
@@ -251,12 +251,12 @@ void Road::computeOperating(bool learning) {
                 // Call the surrogate model or full simulation.
                 if (learning) {
                     // Full simulation
-                    this->computeSimulationPatches();
+                    this->computeSimulationPatches(saveResults);
                     SimulatorPtr simulator(new Simulator(this->me()));
                     this->simulator.reset();
                     this->simulator = simulator;
 
-                    this->simulator->simulateROVCR();
+                    this->simulator->simulateROVCR(saveResults);
                     // We use this to determine the relationships between the
                     // input variables and the expected operating values.
 

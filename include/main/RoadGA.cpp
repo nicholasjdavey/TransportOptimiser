@@ -67,15 +67,15 @@ void RoadGA::initialiseStorage() {
     this->surrFit = Eigen::VectorXd::Zero(this->generations);
 
     this->iars = Eigen::MatrixXd::Zero(this->generations*this->
-            populationSizeGA*this->maxSampleRate,noSpecies);
+            populationSizeGA*this->maxLearnNo,noSpecies);
     this->pops = Eigen::MatrixXd::Zero(this->generations*this->
-            populationSizeGA*this->maxSampleRate,noSpecies);
+            populationSizeGA*this->maxLearnNo,noSpecies);
     this->use = Eigen::VectorXd::Zero(this->generations*this->populationSizeGA*
-            this->maxSampleRate);
+            this->maxLearnNo);
     this->popsSD = Eigen::MatrixXd::Zero(this->generations*this->
-            populationSizeGA*this->maxSampleRate,noSpecies);
+            populationSizeGA*this->maxLearnNo,noSpecies);
     this->useSD = Eigen::VectorXd::Zero(this->generations*this->
-            populationSizeGA*this->maxSampleRate);
+            populationSizeGA*this->maxLearnNo);
 }
 
 void RoadGA::creation() {
@@ -582,7 +582,7 @@ void RoadGA::optimise(bool plot) {
 
     // Initially, the surrogate model is simply a straight line for all
     // AAR values (100% survival)
-    //this->defaultSurrogate();
+    this->defaultSurrogate();
     // Evaluate once to initialise the surrogate if we are using MTE or ROV
 //    if (this->type > Optimiser::SIMPLEPENALTY) {
 //        this->evaluateGeneration();
@@ -630,7 +630,7 @@ void RoadGA::optimise(bool plot) {
 
         // Print important results to console
         std::cout << "Generation: " << this->generation << "\t Average Cost: "
-                << this->costs(this->generation) << "\t Best Road: " <<
+                << this->av(this->generation) << "\t Best Road: " <<
                 this->best(this->generation);
 
         if (this->type > Optimiser::SIMPLEPENALTY) {
@@ -674,9 +674,12 @@ void RoadGA::optimise(bool plot) {
 
         this->generation++;
     }
+    // Compute the best road in its entirety.
+    this->computeBestRoadResults();
+    this->saveBestRoadResults();
 
-    std::cout << "Press any key to end..." << std::endl;
-    std::cin.get();
+    // Save the results of the run.
+    this->saveExperimentalResults();
 }
 
 void RoadGA::plotResults(bool plot) {
@@ -803,6 +806,55 @@ void RoadGA::plotResults(bool plot) {
             genCostsAv[ii][1] = this->av(ii);
         }
 
+        double minY = genCostsBest[0][1];
+        double maxY = minY;
+
+        for (int ii = 0; ii <= this->generation; ii++) {
+            // Convert to a log scale on both sides
+            if (genCostsBest[ii][1] < 0) {
+                genCostsBest[ii][1] = -log10(-genCostsBest[ii][1]);
+            } else if (genCostsBest[ii][1] > 0) {
+                genCostsBest[ii][1] = log10(genCostsBest[ii][1]);
+            }
+
+            if (genCostsAv[ii][1] < 0) {
+                genCostsAv[ii][1] = -log10(-genCostsAv[ii][1]);
+            } else if (genCostsAv[ii][1] > 0) {
+                genCostsAv[ii][1] = log10(genCostsAv[ii][1]);
+            }
+
+            // Get the Y values range
+            if (genCostsBest[ii][1] > maxY) {
+                maxY = genCostsBest[ii][1];
+            } else if (genCostsBest[ii][1] < minY) {
+                minY = genCostsBest[ii][1];
+            }
+
+            if (genCostsAv[ii][1] > maxY) {
+                maxY = genCostsAv[ii][1];
+            } else if (genCostsAv[ii][1] < minY) {
+                minY = genCostsAv[ii][1];
+            }
+        }
+
+        // Take log
+        if (minY > 0) {
+            minY = log10(minY);
+        } else if (minY < 0) {
+            minY = -log10(-minY);
+        }
+
+        if (maxY > 0) {
+            maxY = log10(maxY);
+        } else if (minY < 0) {
+            maxY = -log10(-maxY);
+        }
+
+        if (minY == maxY) {
+            minY = minY/1.2;
+            maxY = maxY*1.2;
+        }
+
         // PLOTS //////////////////////////////////////////////////////////////
         // Clear Previous plot
         if (this->type > Optimiser::SIMPLEPENALTY) {
@@ -817,7 +869,7 @@ void RoadGA::plotResults(bool plot) {
         (*this->plothandle) << "set title '3D View of Terrain'\n";
         (*this->plothandle) << "set grid\n";
         (*this->plothandle) << "set hidden3d\n";
-        //(*this->plothandle) << "unset logscale y\n";
+        (*this->plothandle) << "unset logscale y\n";
         (*this->plothandle) << "unset key\n";
         (*this->plothandle) << "unset view\n";
         (*this->plothandle) << "unset pm3d\n";
@@ -843,18 +895,16 @@ void RoadGA::plotResults(bool plot) {
         // Plot 3 (Stopping Criteria/Best and Average)
         // Best and Average Option
         (*this->plothandle) << "set title 'Best and Average Roads'\n";
+        (*this->plothandle) << "unset pm3d\n";
         (*this->plothandle) << "unset key\n";
         (*this->plothandle) << "set grid\n";
         (*this->plothandle) << "set xlabel 'Generation'\n";
-        (*this->plothandle) << "set ylabel 'Cost (AUD)'\n";
-        //(*this->plothandle) << "set logscale y\n";
-        (*this->plothandle) << "set xrange [0:" + std::to_string(
-                this->generations) + "]\n";
-        //(*this->plothandle) << "set logscale y\n";
-        (*this->plothandle) << "set yrange [" + std::to_string(this->best
-                .segment(0,this->noSamples).minCoeff()/2) + ":" +
-                std::to_string(this->av.maxCoeff()) + "]\n";
-        //(*this->plothandle) << xrange;
+        (*this->plothandle) << "set ylabel 'Cost (AUD x10^Y)'\n";
+        (*this->plothandle) << "set xrange [1:" + std::to_string(
+                this->generations+1) + "]\n";
+        // We use our custom bi-directional logscale
+        (*this->plothandle) << "set yrange [" + std::to_string(minY) + ":"
+                + std::to_string(maxY) + "]\n";
         (*this->plothandle) << "plot '-' with points pointtype 5, '-' with points pointtype 7 \n";
         (*this->plothandle).send1d(genCostsBest);
         (*this->plothandle).send1d(genCostsAv);
@@ -881,7 +931,7 @@ void RoadGA::plotResults(bool plot) {
 
                 // Surrogate error data
                 for (int jj = 0; jj <= this->generation; jj++) {
-                    surrErrData[jj][0] = jj;
+                    surrErrData[jj][0] = jj+1;
                     surrErrData[jj][1] = this->surrFit(jj,ii);
                 }
 
@@ -923,6 +973,7 @@ void RoadGA::plotResults(bool plot) {
                 (*this->surrPlotHandle) << "set title 'Surrogate Model, Species"
                         << ii+1 << "'\n";
                 (*this->surrPlotHandle) << "unset key\n";
+                (*this->surrPlotHandle) << "unset logscale y\n";
                 (*this->surrPlotHandle) << "set grid\n";
                 (*this->surrPlotHandle) << "set xlabel 'IAR'\n";
                 (*this->surrPlotHandle) << "set ylabel 'End Population'\n";
@@ -937,22 +988,28 @@ void RoadGA::plotResults(bool plot) {
                 // Plot 5ii (Surrogate Model Error)
                 (*this->surrPlotHandle) << "set title 'Surrogate Error'\n";
                 (*this->surrPlotHandle) << "unset key\n";
+                (*this->surrPlotHandle) << "set logscale y\n";
                 (*this->surrPlotHandle) << "set grid\n";
                 (*this->surrPlotHandle) << "set xlabel 'Generation'\n";
                 (*this->surrPlotHandle) << "set ylabel 'Model Error'\n";
                 //(*this->surrPlotHandle) << "set logscale y\n";
-                (*this->surrPlotHandle) << "set xrange [0:" + std::to_string(
-                        this->generations) + "]\n";
-                (*this->surrPlotHandle) << "set yrange [" + std::to_string(this
-                        ->surrFit.block(0,ii,this->noSamples,1).minCoeff()/2) +
-                        ":" + std::to_string(this->surrFit.col(ii).maxCoeff())
-                        + "]\n";
+                (*this->surrPlotHandle) << "set xrange [1:" + std::to_string(
+                        this->generations+1) + "]\n";
+                double minVal = this->surrFit.block(0,ii,this->generation+1,1).
+                        minCoeff()/2;
+                if (minVal == 0) {
+                    minVal = 1e-3;
+                }
+                (*this->surrPlotHandle) << "set yrange [" + std::to_string(
+                        minVal) + ":" + std::to_string(this->surrFit.col(ii).
+                        maxCoeff()) + "]\n";
                 (*this->surrPlotHandle) << "plot '-' with points pointtype 7 \n";
                 (*this->surrPlotHandle).send1d(surrErrData);
             }
         }
 
         (*this->plothandle) << "unset multiplot\n";
+        (*this->surrPlotHandle) << "unset logscale y\n";
     }
 }
 
@@ -978,7 +1035,9 @@ void RoadGA::output() {
 
     this->best(this->generation) = this->costs.minCoeff();
     this->av(this->generation) = this->costs.mean();
-    this->surrFit.row(this->generation) = this->surrErr.transpose();
+    if (this->type > Optimiser::SIMPLEPENALTY) {
+        this->surrFit.row(this->generation) = this->surrErr.transpose();
+    }
     // Include code to plot using gnuplot utilising POSIX pipes to plot the
     // best road
 }
@@ -990,6 +1049,11 @@ void RoadGA::computeSurrogate() {
     // We always wish to select some samples at each iteration to keep
     // testing the effectiveness of the algorithm.
     double pFull;
+    if (this->generation == 0) {
+        this->surrErr = Eigen::VectorXd::Constant(1,this->species.size());
+    } else {
+        this->surrErr = this->surrFit.row(this->generation-1);
+    }
 
     if (this->type == Optimiser::MTE) {
         // MTE can support around 50 roads per generation at maximum learning,
@@ -1148,7 +1212,8 @@ void RoadGA::computeSurrogate() {
             currErr(ii) = sqrt(currErr(ii)/validCounter);
         }
 
-        this->surrFit.block(this->generation,0,1,currErr.cols()) =currErr
+        this->surrErr = currErr;
+        this->surrFit.block(this->generation,0,1,currErr.cols()) = currErr
                 .transpose();
 
         this->noSamples += validCounter;
@@ -1208,10 +1273,11 @@ void RoadGA::evaluateGeneration() {
     ThreadManagerPtr threader = this->getThreadManager();
     unsigned long roads = this->getGAPopSize();
 
+    // If multithreading is enabled
     std::vector<std::future<void>> results(roads);
 
     if (threader != nullptr) {
-        // If multithreading is enabled
+
         for (unsigned long ii = 0; ii < roads; ii++) {
             // Push onto the pool with a lambda expression
             results[ii] = threader->push([this,ii](int id){
@@ -1663,10 +1729,11 @@ void RoadGA::selection(Eigen::VectorXi& pc, Eigen::VectorXi& pm,
 }
 
 int RoadGA::stopCheck() {
-    if (this->generation >= this->generations) {
+    if (this->generation >= (this->generations - 1)) {
         // Adequate convergence not achieved. Generations exceeded
         std::cout << "Optimisation ended: maximum number of generations reached."
                   << std::endl;
+        this->stop = Optimiser::MAX_GENS;
         return -1;
     }
 
@@ -1676,6 +1743,7 @@ int RoadGA::stopCheck() {
             // Number of stall generations exceeded
             std::cout << "Optimisation ended: maximum number of stall generations reached."
                     << std::endl;
+            this->stop = Optimiser::STALLED;
             return -2;
         }
 
@@ -1696,7 +1764,7 @@ int RoadGA::stopCheck() {
             }
         }
 
-    } else if (this->type = Optimiser::CONTROLLED) {
+    } else if (this->type == Optimiser::CONTROLLED) {
         if (surrErr(0) > surrThresh) {
             surrGood = false;
         }
@@ -1707,23 +1775,24 @@ int RoadGA::stopCheck() {
 
         // If the best road has not changed materially for five generations
         if (this->generation > this->learnPeriod) {
-            if ((abs((this->best(this->generation) - this->best(
-                    this->generation - 1))/(this->best(
-                    this->generation - 1))) < this->stoppingTol) &&
-                    (abs((this->best(this->generation) - this->best(
-                    this->generation - 2))/(this->best(this->generation - 2)))
-                    < this->stoppingTol) && (abs((this->best(this->generation)
-                    - this->best(this->generation - 3))/(this->best(
-                    this->generation - 3))) < this->stoppingTol) &&
-                    (abs((this->best(this->generation) - this->best(
-                    this->generation - 4))/(this->best(this->generation - 4)))
-                    < this->stoppingTol) && (abs((this->best(this->generation)
-                    - this->best(this->generation - 5))/(this->best(
-                    this->generation - 5))) < this->stoppingTol)) {
+            bool close = true;
+
+            for (int ii = 0; ii < std::min((int)this->learnPeriod,5); ii++) {
+                double diff = fabs((this->best(this->generation) - this->best(
+                        this->generation - 1))/(this->best(this->generation -
+                        1)));
+
+                if (diff > this->stoppingTol) {
+                    close = false;
+                    break;
+                }
+            }
+
+            if (close) {
                 // Solution successfully found
                 std::cout << "Optimisation ended: stopping tolerance achieved."
                         << std::endl;
-
+                this->stop = Optimiser::COMPLETE;
                 return 1;
 
             } else {
@@ -1755,8 +1824,9 @@ bool RoadGA::stallTest() {
 
         total = pow(total,1.0/totalWeight);
 
-        if (abs(this->av(this->generation - 1) - total)/(total) <
-                this->stoppingTol) {
+        double currDiff = fabs(fabs(this->av(this->generation) - total)/(total));
+
+        if (currDiff < this->stoppingTol) {
             return true;
         } else {
             return false;
@@ -2448,5 +2518,1363 @@ void RoadGA::generateSample(const Eigen::MatrixXd &current, const
             currf.row(noSamps) = candf.row(sample(ii)).cast<float>();
             noSamps++;
         }
+    }
+}
+
+void RoadGA::initialiseFromTextInput(std::string inputFile) {
+
+    std::ifstream input;
+    input.open(inputFile.c_str());
+
+    if (!input.is_open()) {
+        std::cout << "ERROR: Please specify a valid input file." << std::endl;
+        std::abort();
+    }
+
+    std::string line;
+
+    // Skip the first nine lines
+    for (int ii = 0; ii < 10; ii++) {
+        getline(input,line);
+    }
+
+    std::vector<std::string> values, listParams;
+
+    // General optimisation parameters
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setMutationRate(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setCrossoverFrac(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setMaxGens(::atoi(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setPopSize(::atoi(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setStoppingTol(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setConfidence(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setConfidenceLevel(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setSolutionScheme(values[1]);
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setStallGens(::atoi(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setScale(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setLearningPeriod(::atoi(values[1].c_str()));
+
+    for (int ii = 0; ii < 6; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setSelector(static_cast<RoadGA::Selection>(::atoi(values[1].
+            c_str())));
+
+    for (int ii = 0; ii < 5; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setFitScaling(static_cast<RoadGA::Scaling>(::atoi(values[1].
+            c_str())));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setTopProportion(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setMaxSurvivalRate(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setTournamentSize(::atoi(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setGPU(values[1] == "TRUE" ? true : false);
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    int threads = ::atoi(values[1].c_str());
+    if (threads > 1) {
+        ThreadManagerPtr threader(new ThreadManager(threads));
+        this->setThreadManager(threader);
+    } else {
+        this->setThreadManager(nullptr);
+    }
+
+    // Surrogate parameters
+    for (int ii = 0; ii < 3; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setSurrDimRes(::atoi(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setSurrogateThreshold(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setMaxLearnNo(::atoi(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setMinLearnNo(::atoi(values[1].c_str()));
+
+    for (int ii = 0; ii < 3; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setInterpolationRoutine(static_cast<RoadGA::InterpolationRoutine>(
+            ::atoi(values[1].c_str())));
+
+    // Design Parameters
+    DesignParametersPtr desParams(new DesignParameters());
+    for (int ii = 0; ii < 3; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setDesignVelocity(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setStartX(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setStartY(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setEndX(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setEndY(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setMaxGrade(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setMaxSE(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setRoadWidth(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setReactionTime(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setDeccelRate(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setIntersectionPoints(::atoi(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setSegmentLength(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setCutRep(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setFillRep(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setBridgeFixed(::atoi(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setBridgeWidth(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setBridgeHeight(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setTunnelFixed(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setTunnelWidth(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setTunnelDepth(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setCostPerSM(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setAirPollutionCost(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setNoisePollutionCost(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setWaterPollutionCost(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setOilExtractionCost(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setLandUseCost(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setSolidChemWasteCost(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    desParams->setSpiral(values[1] == "TRUE" ? true : false);
+
+    // Traffic Parameters
+    TrafficPtr traffic(new Traffic());
+    for (int ii = 0; ii < 3; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    traffic->setPeakProportion(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    traffic->setDirectionality(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    traffic->setPeakHours(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    traffic->setGR(::atof(values[1].c_str()));
+
+    // Economic Parameters
+    EconomicPtr economic(new Economic());
+    for (int ii = 0; ii < 3; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    economic->setRRR(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    economic->setYears(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    economic->setTimeStep(::atof(values[1].c_str()));
+
+    // Earthwork Parameters
+    for (int ii = 0; ii < 3; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    listParams = Utility::getDictionary(values[1],",");
+    Eigen::VectorXd cd(listParams.size());
+    for (int ii = 0; ii < listParams.size(); ii++) {
+        cd(ii) = ::atof(listParams[ii].c_str());
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    listParams = Utility::getDictionary(values[1],",");
+    Eigen::VectorXd cc(listParams.size());
+    for (int ii = 0; ii < listParams.size(); ii++) {
+        cc(ii) = ::atof(listParams[ii].c_str());
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    EarthworkCostsPtr earthwork(new EarthworkCosts(cd,cc,::atof(values[1].
+            c_str())));
+
+    // Unit Costs
+    for (int ii = 0; ii < 3; ii++) {
+        getline(input,line);
+    }
+    UnitCostSPtr unitCosts(new UnitCosts());
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    unitCosts->setAccidentCost(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    unitCosts->setAirPollution(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    unitCosts->setNoisePollution(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    unitCosts->setWaterPollution(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    unitCosts->setOilExtraction(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    unitCosts->setLandUse(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    unitCosts->setSolidChemWaste(::atof(values[1].c_str()));
+
+    // Other Inputs
+    for (int ii = 0; ii < 3; ii++) {
+        getline(input,line);
+    }
+    OtherInputsPtr otherInputs(new OtherInputs());
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    otherInputs->setHabGridRes(::atoi(values[1].c_str()));
+    this->setGridRes(::atoi(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    otherInputs->setMinLon(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    otherInputs->setMaxLon(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    otherInputs->setMinLat(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    otherInputs->setMaxLat(::atof(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    otherInputs->setLonPoints(::atoi(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    otherInputs->setLatPoints(::atoi(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    otherInputs->setNoPaths(::atoi(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    otherInputs->setDimRes(::atof(values[1].c_str()));
+
+    // Experimental Parameters
+    for (int ii = 0; ii < 3; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setNoRuns(::atof(values[1].c_str()));
+    for (int ii = 0; ii < 5; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setType(static_cast<Optimiser::Type>(::atof(values[1]
+            .c_str())));
+    for (int ii = 0; ii < 8; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setROVMethod(static_cast<Optimiser::ROVType>(::atof(values[1]
+            .c_str())));
+
+    // Variable Parameters
+    for (int ii = 0; ii < 4; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    listParams = Utility::getDictionary(values[1],",");
+    Eigen::VectorXi ab(listParams.size());
+    for (int ii = 0; ii < listParams.size(); ii++) {
+        ab(ii) = ::atoi(listParams[ii].c_str());
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    listParams = Utility::getDictionary(values[1],",");
+    Eigen::VectorXd hpsd(listParams.size());
+    for (int ii = 0; ii < listParams.size(); ii++) {
+        hpsd(ii) = ::atof(listParams[ii].c_str());
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    listParams = Utility::getDictionary(values[1],",");
+    Eigen::VectorXd mpsd(listParams.size());
+    for (int ii = 0; ii < listParams.size(); ii++) {
+        mpsd(ii) = ::atof(listParams[ii].c_str());
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    listParams = Utility::getDictionary(values[1],",");
+    Eigen::VectorXd rcsd(listParams.size());
+    for (int ii = 0; ii < listParams.size(); ii++) {
+        rcsd(ii) = ::atof(listParams[ii].c_str());
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    listParams = Utility::getDictionary(values[1],",");
+    Eigen::VectorXd pgrm(listParams.size());
+    for (int ii = 0; ii < listParams.size(); ii++) {
+        pgrm(ii) = ::atof(listParams[ii].c_str());
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    listParams = Utility::getDictionary(values[1],",");
+    Eigen::VectorXd pgrsd(listParams.size());
+    for (int ii = 0; ii < listParams.size(); ii++) {
+        pgrsd(ii) = ::atof(listParams[ii].c_str());
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    listParams = Utility::getDictionary(values[1],",");
+    Eigen::VectorXd cpm(listParams.size());
+    for (int ii = 0; ii < listParams.size(); ii++) {
+        cpm(ii) = ::atof(listParams[ii].c_str());
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    listParams = Utility::getDictionary(values[1],",");
+    Eigen::VectorXd cpsd(listParams.size());
+    for (int ii = 0; ii < listParams.size(); ii++) {
+        cpsd(ii) = ::atof(listParams[ii].c_str());
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    listParams = Utility::getDictionary(values[1],",");
+    Eigen::VectorXd ocsd(listParams.size());
+    for (int ii = 0; ii < listParams.size(); ii++) {
+        ocsd(ii) = ::atof(listParams[ii].c_str());
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    listParams = Utility::getDictionary(values[1],",");
+    Eigen::VectorXd mpl(listParams.size());
+    for (int ii = 0; ii < listParams.size(); ii++) {
+        mpl(ii) = ::atof(listParams[ii].c_str());
+    }
+    VariableParametersPtr varParams(new VariableParameters(mpl,ab,hpsd,mpsd,
+            rcsd,pgrm,pgrsd,cpm,cpsd,ocsd));
+
+    // Traffic Programs
+    for (int ii = 0; ii < 6; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    int noPrograms = ::atoi(values[1].c_str());
+    std::vector<TrafficProgramPtr> programs(noPrograms);
+
+    for (int ii = 0; ii < noPrograms; ii++) {
+        getline(input,line);
+        values = Utility::getDictionary(line,":");
+        listParams = Utility::getDictionary(values[1],",");
+        Eigen::VectorXd flows(listParams.size());
+        for (int jj = 0; jj < listParams.size(); jj++) {
+            flows(jj) = ::atof(listParams[jj].c_str());
+        }
+        listParams = Utility::getDictionary(values[2],",");
+        Eigen::VectorXd switching(listParams.size());
+        for (int jj = 0; jj < listParams.size(); jj++) {
+            switching(jj) = ::atof(listParams[jj].c_str());
+        }
+        bool bridge = (values[1] == "TRUE" ? true : false);
+
+        TrafficProgramPtr prog(new TrafficProgram(bridge,traffic,flows,
+                switching));
+
+        programs[ii] = prog;
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+    // INPUT FILES
+    for (int ii = 0; ii < 9; ii++) {
+        getline(input,line);;
+    }
+    // Region Data
+    std::ifstream input2;
+
+    getline(input,line);
+    std::vector<std::string> fileNames;
+    fileNames = Utility::getDictionary(line,":");
+    input2.open(fileNames[1].c_str(),std::ifstream::in);
+    // First pass, get the dimensions of the data
+    int nRows = 0;
+    int nCols = 0;
+    while(getline(input2,line)) {
+        nRows++;
+        values = Utility::getDictionary(line,",");
+        if (values.size() > nCols) {
+            nCols = values.size();
+        }
+    }
+    input2.close();
+
+    // Now read in the data.
+    Eigen::MatrixXd X(nRows,nCols);
+    Eigen::MatrixXd Y(nRows,nCols);
+    Eigen::MatrixXd Z(nRows,nCols);
+    Eigen::MatrixXi veg(nRows,nCols);
+    Eigen::MatrixXd acq(nRows,nCols);
+    Eigen::MatrixXd soil(nRows,nCols);
+
+    // X Values
+    this->xValuesFile = fileNames[1];
+    input2.open(fileNames[1].c_str(),std::ifstream::in);
+    for (int ii = 0; ii < nRows; ii++) {
+        getline(input2,line);
+        values = Utility::getDictionary(line,",");
+
+        for (int jj = 0; jj < values.size(); jj++) {
+            X(ii,jj) = ::atof(values[jj].c_str());
+        }
+    }
+    input2.close();
+
+    // Y Values
+    this->yValuesFile = fileNames[1];
+    getline(input,line);
+    fileNames = Utility::getDictionary(line,":");
+    input2.open(fileNames[1].c_str(),std::ifstream::in);
+    for (int ii = 0; ii < nRows; ii++) {
+        getline(input2,line);
+        values = Utility::getDictionary(line,",");
+
+        for (int jj = 0; jj < values.size(); jj++) {
+            Y(ii,jj) = ::atof(values[jj].c_str());
+        }
+    }
+    input2.close();
+
+    // Z Values
+    this->zValuesFile = fileNames[1];
+    getline(input,line);
+    fileNames = Utility::getDictionary(line,":");
+    input2.open(fileNames[1].c_str(),std::ifstream::in);
+    for (int ii = 0; ii < nRows; ii++) {
+        getline(input2,line);
+        values = Utility::getDictionary(line,",");
+
+        for (int jj = 0; jj < values.size(); jj++) {
+            Z(ii,jj) = ::atof(values[jj].c_str());
+        }
+    }
+    input2.close();
+
+    // Vegetation
+    this->vegetationFile = fileNames[1];
+    getline(input,line);
+    fileNames = Utility::getDictionary(line,":");
+    input2.open(fileNames[1].c_str(),std::ifstream::in);
+    for (int ii = 0; ii < nRows; ii++) {
+        getline(input2,line);
+        values = Utility::getDictionary(line,",");
+
+        for (int jj = 0; jj < values.size(); jj++) {
+            veg(ii,jj) = ::atoi(values[jj].c_str());
+        }
+    }
+    input2.close();
+
+    // Acquisition
+    this->acquisitionFile = fileNames[1];
+    getline(input,line);
+    fileNames = Utility::getDictionary(line,":");
+    input2.open(fileNames[1].c_str(),std::ifstream::in);
+    for (int ii = 0; ii < nRows; ii++) {
+        getline(input2,line);
+        values = Utility::getDictionary(line,",");
+
+        for (int jj = 0; jj < values.size(); jj++) {
+            acq(ii,jj) = ::atof(values[jj].c_str());
+        }
+    }
+    input2.close();
+
+    // Soil
+    this->soilFile = fileNames[1];
+    getline(input,line);
+    fileNames = Utility::getDictionary(line,":");
+    input2.open(fileNames[1].c_str(),std::ifstream::in);
+    for (int ii = 0; ii < nRows; ii++) {
+        getline(input2,line);
+        values = Utility::getDictionary(line,",");
+
+        for (int jj = 0; jj < values.size(); jj++) {
+            soil(ii,jj) = ::atof(values[jj].c_str());
+        }
+    }
+    input2.close();
+
+    RegionPtr region(new Region("regionData",true));
+
+    // Set column-major cell indices for region
+    Eigen::MatrixXi idx(X.rows(),X.cols());
+    for (int ii = 0; ii < X.cols(); ii++) {
+        for (int jj = 0; jj < X.rows(); jj++) {
+            idx(jj,ii) = jj + ii*X.rows();
+        }
+    }
+
+    region->setCellIdx(idx);
+    region->setX(X);
+    region->setY(Y);
+    region->setZ(Z);
+    region->setVegetation(veg);
+    region->setAcquisitionCost(acq);
+    region->setSoilStabilisationCost(soil);
+
+    // Commodity Data
+    for (int ii = 0; ii < 6; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    int noFuels = ::atoi(values[1].c_str());
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    int noCommodities = ::atoi(values[1].c_str());
+    std::vector<CommodityPtr> fuels(noFuels);
+    std::vector<CommodityPtr> commodities(noCommodities);
+    std::vector<std::string> fuelsFiles(noFuels);
+    std::vector<std::string> commoditiesFiles(noCommodities);
+
+    for (int ii = 0; ii < noFuels; ii++) {
+        CommodityPtr fuel(new Commodity(this->me()));
+
+        getline(input,line);
+        fileNames = Utility::getDictionary(line,":");
+        fuelsFiles[ii] = fileNames[1];
+        input2.open(fileNames[1].c_str(),std::ifstream::in);
+
+        for (int jj = 0; jj < 3; jj++) {
+            getline(input2,line);
+        }
+
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        fuel->setName(values[1]);
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        fuel->setCurrent(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        fuel->setMean(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        fuel->setNoiseSD(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        fuel->setMRStrength(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        fuel->setJumpProb(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        fuel->setPoissonJump(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        fuel->setOreContent(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        fuel->setOreContentSD(::atof(values[1].c_str()));
+        fuel->setStatus(true);
+
+        getline(input2,line);
+
+        input2.close();
+
+        fuels[ii] = fuel;
+    }
+
+    this->fuelsFiles = fuelsFiles;
+
+    for (int ii = 0; ii < noCommodities; ii++) {
+        CommodityPtr commodity(new Commodity(this->me()));
+
+        getline(input,line);
+        fileNames = Utility::getDictionary(line,":");
+        commoditiesFiles[ii] = fileNames[1];
+        input2.open(fileNames[1].c_str(),std::ifstream::in);
+
+        for (int jj = 0; jj < 3; jj++) {
+            getline(input2,line);
+        }
+
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        commodity->setName(values[1]);
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        commodity->setCurrent(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        commodity->setMean(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        commodity->setNoiseSD(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        commodity->setMRStrength(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        commodity->setJumpProb(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        commodity->setPoissonJump(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        commodity->setOreContent(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        commodity->setOreContentSD(::atof(values[1].c_str()));
+        commodity->setStatus(true);
+
+        getline(input2,line);
+
+        input2.close();
+
+        commodities[ii] = commodity;
+    }
+    this->commoditiesFiles = commoditiesFiles;
+
+    economic->setFuels(fuels);
+    economic->setCommodities(commodities);
+
+    // Vehicle Data
+    for (int ii = 0; ii < 4; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    int noVehicles = ::atoi(values[1].c_str());
+    std::vector<VehiclePtr> vehicles(noVehicles);
+    std::vector<std::string> vehiclesFiles(noVehicles);
+
+    for (int ii = 0; ii < noVehicles; ii++) {
+        VehiclePtr vehicle(new Vehicle());
+
+        getline(input,line);
+        fileNames = Utility::getDictionary(line,":");
+        vehiclesFiles[ii] = fileNames[1];
+        input2.open(fileNames[1].c_str(),std::ifstream::in);
+
+        for (int jj = 0; jj < 3; jj++) {
+            getline(input2,line);
+        }
+
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        vehicle->setName(values[1]);
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        vehicle->setWidth(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        vehicle->setLength(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        vehicle->setProportion(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        vehicle->setMaximumLoad(::atof(values[1].c_str()));
+
+        for (int jj = 0; jj < 4; jj++) {
+            getline(input2,line);
+        }
+
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        vehicle->setFuel(fuels[::atoi(values[1].c_str())]);
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        vehicle->setConstant(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        vehicle->setGradeCoefficient(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        vehicle->setVelocityCoefficient(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        vehicle->setVelocitySquared(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        vehicle->setHourlyCost(::atof(values[1].c_str()));
+
+        input2.close();
+
+        vehicles[ii] = vehicle;
+    }
+
+    this->vehiclesFiles = vehiclesFiles;
+
+    traffic->setVehicles(vehicles);
+
+    // Putting it all together
+    this->setPrograms(programs);
+    this->setOtherInputs(otherInputs);
+    this->setDesignParams(desParams);
+    this->setEarthworkCosts(earthwork);
+    this->setUnitCosts(unitCosts);
+    this->setVariableParams(varParams);
+    this->setEconomic(economic);
+    this->setTraffic(traffic);
+    this->setRegion(region);
+
+    // Species Data
+    for (int ii = 0; ii < 4; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    int noSpecies = ::atoi(values[1].c_str());
+    std::vector<SpeciesPtr> species(noSpecies);
+    std::vector<std::string> speciesFiles(noSpecies);
+
+    for (int ii = 0; ii < noSpecies; ii++) {
+        SpeciesPtr s(new Species());
+
+        getline(input,line);
+        fileNames = Utility::getDictionary(line,":");
+        speciesFiles[ii] = fileNames[1];
+        input2.open(fileNames[1].c_str(),std::ifstream::in);
+
+        if (!input2.good()) {
+            std::cout << "cunt's fucked" << std::endl;
+        }
+
+        for (int jj = 0; jj < 8; jj++) {
+            getline(input2,line);
+        }
+
+        // Habitat types for this species
+        std::vector<HabitatTypePtr> habTypes(5);
+
+        for (int jj = 0; jj < 5; jj++) {
+            getline(input2,line);
+            values = Utility::getDictionary(line,":");
+
+            HabitatTypePtr habTyp(new HabitatType());
+            habTyp->setType(static_cast<HabitatType::habType>(jj));
+            habTyp->setMaxPop(::atof(values[1].c_str()));
+            habTyp->setCostPerM2(::atof(values[2].c_str()));
+            habTyp->setHabPrefMean(::atof(values[3].c_str()));
+            habTyp->setHabPrefSD(::atof(values[4].c_str()));
+
+            values = Utility::getDictionary(values[5],",");
+            Eigen::VectorXi vegetations(values.size());
+
+            for (int kk = 0; kk < values.size(); kk++) {
+                vegetations(kk) = ::atoi(values[kk].c_str());
+            }
+
+            habTyp->setVegetations(vegetations);
+
+            habTypes[jj] = habTyp;
+        }
+
+        // Species Parameters
+        for (int jj = 0; jj < 3; jj++) {
+            getline(input2,line);
+        }
+
+        s->setActive(true);
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        s->setName(values[1]);
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        s->setSex(values[1] == "MALE" ? false : true);
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        s->setLambdaMean(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        s->setLambdaSD(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        s->setRangingCoeffMean(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        s->setRangingCoeffSD(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        s->setLocalVariability(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        s->setLengthMean(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        s->setLengthSD(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        s->setSpeedMean(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        s->setSpeedSD(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        s->setCostPerAnimal(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        s->setThreshold(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        s->setInitialPopulation(::atof(values[1].c_str()));
+
+        // Growth Rate Information
+        for (int jj = 0; jj < 3; jj++) {
+            getline(input2,line);
+        }
+        UncertaintyPtr spgr(new Uncertainty(this->me()));
+        spgr->setName("Growth Rate");
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        spgr->setCurrent(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        spgr->setMean(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        spgr->setNoiseSD(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        spgr->setMRStrength(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        spgr->setJumpProb(::atof(values[1].c_str()));
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        spgr->setPoissonJump(::atof(values[1].c_str()));
+
+        // Initial Population Map
+        for (int jj = 0; jj < 4; jj++) {
+            getline(input2,line);
+        }
+
+        getline(input2,line);
+        values = Utility::getDictionary(line,":");
+        std::string initPopsFile = values[1].c_str();
+
+        input2.close();
+        input2.open(initPopsFile,std::ifstream::in);
+
+        if (input2.good()) {
+            Eigen::MatrixXd IP(Z.rows(),Z.cols());
+            for (int ii = 0; ii < Z.rows(); ii++) {
+                std::getline(input2,line,'\n');
+                std::stringstream ss(line);
+                for (int jj = 0; jj < Z.cols(); jj++) {
+                    std::string substr;
+                    std::getline(ss,substr,',');
+                    std::stringstream subss(substr);
+                    double val;
+                    if (substr != "NaN") {
+                        subss >> val;
+                        IP(ii,jj) = val;
+                    } else {
+                        IP(ii,jj) = std::numeric_limits<int>::quiet_NaN();
+                    }
+                }
+            }
+
+            s->setPopulationMap(IP);
+
+        } else {
+            input2.close();
+            std::ofstream input2;
+            input2.open(initPopsFile,std::ios::out);
+
+            s->initialisePopulationMap(this->me());
+
+            for (int ii = 0; ii < s->getHabitatMap().rows(); ii++) {
+                for (int jj = 0; jj < s->getHabitatMap().cols(); jj++) {
+                    input2 << s->getPopulationMap()(ii,jj);
+
+                    if (jj < (s->getHabitatMap().cols() - 1)) {
+                        input2 << ",";
+                    }
+                }
+
+                if (ii < (s->getHabitatMap().rows()-1)) {
+                    input2 << std::endl;
+                }
+            }
+        }
+        input2.close();
+
+        this->speciesFiles = speciesFiles;
+        s->setHabitatTypes(habTypes);
+        s->setGrowthRate(spgr);
+        s->generateHabitatMap(this->me());
+
+        species[ii] = s;
+    }
+
+    this->setSpecies(species);
+    // Now that we have all of the contained objects within the roadGA object,
+    // we can initialise the storage elements
+    this->initialiseStorage();
+
+    input.close();
+}
+
+void RoadGA::getExistingSurrogateData() {
+    std::ifstream outputFileCheck;
+
+    std::string scenarioFolder = this->getRootFolder() + "/" + "Scenario_" +
+            std::to_string(this->scenario->getCurrentScenario());
+
+    std::string surrogateResults = scenarioFolder + "/" + "surrogate_data";
+    outputFileCheck.open(surrogateResults);
+
+    this->noSamples = 0;
+
+    if (outputFileCheck.good()) {
+        std::string tempLine;
+
+        for (int ii = 0; ii < 4; ii++) {
+            getline(outputFileCheck,tempLine);
+        }
+
+        if (this->type == Optimiser::MTE) {
+            std::vector<double> values(this->species.size()*3);
+
+            while (getline(outputFileCheck,tempLine)) {
+                std::istringstream iss(tempLine);
+
+                for (int jj = 0; jj < values.size(); jj++) {
+                    iss >> values[jj];
+                }
+
+                // Save results to sample data
+                for (int jj = 0; jj < this->species.size(); jj++) {
+                    this->iars(noSamples,jj) = values[jj*3];
+                    this->pops(noSamples,jj) = values[jj*3 + 1];
+                    this->popsSD(noSamples,jj) = values[jj*3 + 2];
+                }
+
+                this->noSamples++;
+            }
+        } else if (this->type == Optimiser::CONTROLLED) {
+            std::vector<double> values(this->species.size() + 3);
+
+            while (getline(outputFileCheck,tempLine)) {
+                std::istringstream iss(tempLine);
+
+                for (int jj = 0; jj < values.size(); jj++) {
+                    iss >> values[jj];
+                }
+
+                // Save results to sample data
+                for (int jj = 0; jj < this->species.size(); jj++) {
+                    this->iars(noSamples,jj) = values[jj];
+                }
+
+                this->use(noSamples) = values[species.size() + 1];
+                this->values(noSamples) = values[species.size() + 2];
+                this->valuesSD(noSamples) = values[species.size() + 3];
+
+                this->noSamples++;
+            }
+        }
+    }
+}
+
+void RoadGA::saveExperimentalResults() {
+
+    Optimiser::saveExperimentalResults();
+
+    // Save other components specific to this solver
+
+    // Save Experimental Scenario
+    // Ensure results folder is created in the correct location
+    std::string scenarioFolder = this->getRootFolder() + "/" + "Scenario_" +
+            std::to_string(this->scenario->getCurrentScenario());
+    std::string runFolder = scenarioFolder + "/" + std::to_string(this->
+            scenario->getRun());
+
+    if(!(boost::filesystem::exists(runFolder))) {
+        boost::filesystem::create_directory(runFolder);
+    }
+
+    std::ifstream outputFileCheck;
+    std::ofstream outputFile1;
+
+    // Save Run Results:
+    std::string runResults = runFolder + "/" + "run_results";
+    outputFileCheck.open(runResults);
+
+    if (outputFileCheck.good()) {
+        outputFileCheck.close();
+        std::remove(runResults.c_str());
+    } else {
+        outputFileCheck.close();
+    }
+
+    // Save surrogate details:
+
+    if (this->type > Optimiser::SIMPLEPENALTY) {
+
+        // Save Surrogate Model:
+        std::string surrogateModel = runFolder + "/" + "surrogate_model";
+        outputFileCheck.open(runResults);
+
+        if (outputFileCheck.good()) {
+            outputFileCheck.close();
+            std::remove(runResults.c_str());
+        } else {
+            outputFileCheck.close();
+        }
+        outputFile1.open(surrogateModel,std::ios::trunc);
+
+        int existingLines = 0;
+
+        // Save Surrogate Results:
+        std::ofstream outputFile2;
+
+        std::string surrogateResults = scenarioFolder + "/" + "surrogate_data";
+        outputFileCheck.open(surrogateResults);
+
+        if (outputFileCheck.good()) {
+            std::string templLine;
+            while (getline(outputFileCheck,templLine)) {
+                existingLines++;
+            }
+            outputFileCheck.close();
+
+            existingLines -= 4;
+
+            outputFile2.open(surrogateResults,std::ios::app);
+        } else {
+            outputFileCheck.close();
+
+            outputFile2.open(surrogateResults);
+
+            // Prepare header details for raw surrogate data files
+            outputFile2 << "####################################################################################################" << std::endl;
+            outputFile2 << "######################################## SURROGATE RESULTS #########################################" << std::endl;
+            outputFile2 << "####################################################################################################" << std::endl;
+            std::setw(10);
+            std::setprecision(12);
+
+            if (this->type == Optimiser::MTE) {
+                for (int ii = 0; ii < this->species.size(); ii++) {
+                    outputFile2 << "IAR_" << ii << "        END_POP_" << ii << "        END_POP_SD" << ii;
+                }
+                outputFile2 << std::endl;
+            } else if (this->type == Optimiser::CONTROLLED) {
+                for (int ii = 0; ii < this->species.size(); ii++) {
+                    outputFile2 << "IAR_" << ii;
+                }
+
+                outputFile2 << "INITIAL_UNIT_PROFIT" << "AVERAGE_VALUE" << "VALUE_SD" << std::endl;
+            }
+        }
+
+        if (this->type == Optimiser::MTE) {
+            // RAW DATA
+            for (int ii = existingLines; ii < this->noSamples; ii++) {
+                for (int jj = 0; jj < this->species.size(); jj++) {
+                    outputFile2 << this->iars(ii,jj) << this->pops(ii,jj) <<
+                            this->popsSD(ii,jj);
+                    if (jj < (this->species.size() - 1)) {
+                        outputFile2 << "  ";
+                    }
+                }
+                outputFile2 << std::endl;
+            }
+
+            // FITTED MODEL
+            // Prepare header details for raw surrogate data files
+            outputFile1 << "####################################################################################################" << std::endl;
+            outputFile1 << "######################################### SURROGATE MODEL ##########################################" << std::endl;
+            outputFile1 << "####################################################################################################" << std::endl;
+            std::setw(10);
+            std::setprecision(12);
+
+            outputFile1 << "SURROGATE DIM RES           :     " << this->surrDimRes << std::endl;
+            outputFile1 << "NO SPECIES                  :     " << this->species.size() << std::endl << std::endl;
+
+            if (this->interp == Optimiser::CUBIC_SPLINE) {
+                // Using AlgLib
+                for (int ii = 0; ii < species.size(); ii++) {
+                    double minIAR = 0;
+                    double maxIAR = this->iars.col(ii).maxCoeff();
+
+                    Eigen::VectorXd iarsTemp = Eigen::VectorXd::LinSpaced(this
+                            ->surrDimRes,minIAR,maxIAR);
+                    std::vector<std::vector<double>> surrModel;
+                    surrModel.resize(this->surrDimRes,std::vector<double>(2));
+
+                    for (int jj = 0; jj < this->surrDimRes; jj++) {
+                        surrModel[jj][0] = iarsTemp(jj);
+
+                        surrModel[jj][1] = alglib::spline1dcalc(this->
+                                surrogate[2*this->scenario->
+                                getCurrentScenario()][this->scenario->getRun()]
+                                [ii],iarsTemp(jj));
+                    }
+
+                    // IAR Values for this species
+                    outputFile1 << "# SPECIES " << ii << std::endl;
+                    for (int jj = 0; jj < this->surrDimRes; jj++) {
+                        outputFile1 << surrModel[jj][0];
+                        if (jj < (this->surrDimRes - 1)) {
+                            outputFile1 << ",";
+                        }
+                    }
+
+                    outputFile1 << std::endl;
+
+                    // End population values for this species
+                    outputFile1 << "# SPECIES " << ii << std::endl;
+                    for (int jj = 0; jj < this->surrDimRes; jj++) {
+                        outputFile1 << surrModel[jj][1];
+                        if (jj < (this->surrDimRes - 1)) {
+                            outputFile1 << ",";
+                        }
+                    }
+
+                    outputFile1 << std::endl << std::endl;
+                }
+
+            } else if (this->interp == Optimiser::MULTI_LOC_LIN_REG) {
+                // Using multiple local linear regression
+                for (int ii = 0; ii < this->species.size(); ii++) {
+                    outputFile1 << "SPECIES " << ii << " IAR  : ";
+
+                    for (int jj = 0; jj < this->surrDimRes; jj++) {
+                        outputFile1 << this->getSurrogateML()[2*this->getScenario()
+                                ->getCurrentScenario()][this->getScenario()->
+                                getRun()][0](ii*surrDimRes + jj);
+                        if (jj < (this->surrDimRes - 1)) {
+                            outputFile1 << ",";
+                        }
+                    }
+                    outputFile1 << std::endl;
+
+                    outputFile1 << "# MEAN POPULATION : " << std::endl;
+
+                    for (int jj = 0; jj < this->getSurrogateML()[2*this->getScenario()
+                         ->getCurrentScenario()][this->getScenario()->getRun()][0]
+                         .size(); jj++) {
+                        outputFile1 << this->getSurrogateML()[2*this->getScenario()->
+                                getCurrentScenario()][this->getScenario()->getRun()][0]
+                                (jj);
+                        if(jj < (this->getSurrogateML()[2*this->getScenario()->
+                                 getCurrentScenario()][this->getScenario()->getRun()]
+                                 [0].size() - 1)) {
+                            outputFile1 << ",";
+                        }
+                    }
+                    outputFile1 << std::endl;
+
+                    outputFile1 << std::endl << "# POPULATION SD   : " << std::endl;
+
+                    for (int jj = 0; jj < this->getSurrogateML()[2*this->getScenario()
+                         ->getCurrentScenario()+1][this->getScenario()->getRun()][0]
+                         .size(); jj++) {
+                        outputFile1 << this->getSurrogateML()[2*this->getScenario()->
+                                getCurrentScenario()][this->getScenario()->getRun()][0]
+                                (jj);
+                        if(jj < (this->getSurrogateML()[2*this->getScenario()->
+                                 getCurrentScenario()+1][this->getScenario()->getRun()]
+                                 [0].size() - 1)) {
+                            outputFile1 << ",";
+                        }
+                    }
+                    outputFile1 << std::endl;
+                }
+            }
+
+        } else if (this->type == Optimiser::CONTROLLED) {
+            // RAW DATA
+            for (int ii = existingLines; ii < this->noSamples; ii++) {
+                for (int jj = 0; jj < this->species.size(); jj++) {
+                    outputFile2 << this->iars(ii,jj) << "  ";
+                }
+
+                outputFile2 << this->use(ii) << this->useSD(ii) << this->
+                        values(ii) << this->valuesSD(ii) << std::endl;
+            }
+
+            // FITTED MODEL
+            // Prepare header details for raw surrogate data files
+            outputFile1 << "####################################################################################################" << std::endl;
+            outputFile1 << "######################################### SURROGATE MODEL ##########################################" << std::endl;
+            outputFile1 << "####################################################################################################" << std::endl;
+            std::setw(10);
+            std::setprecision(12);
+
+            outputFile1 << "SURROGATE DIM RES           :     " << this->surrDimRes << std::endl;
+            outputFile1 << "NO SPECIES                  :     " << this->species.size() << std::endl << std::endl;
+
+            for (int ii = 0; ii <= this->species.size(); ii++) {
+                outputFile1 << "DIMENSION_" << ii << "      : ";
+
+                for (int jj = 0; jj < this->surrDimRes; jj++) {
+                    outputFile1 << this->getSurrogateML()[2*this->getScenario()
+                            ->getCurrentScenario()][this->getScenario()->
+                            getRun()][0](ii*surrDimRes + jj);
+                    if (jj < (this->surrDimRes - 1)) {
+                        outputFile1 << ",";
+                    }
+                }
+                outputFile1 << std::endl;
+            }
+
+            outputFile1 << std::endl << "# MEAN VALUATION FOR EACH SURROGATE POINT (INDEXED AS (dim1a,dim2a,...,dimNa)," << std::endl;
+            outputFile1 << "# (dim1a,dim2a,...,dimNb), etc." << std::endl;
+
+            for (int ii = 0; ii < this->getSurrogateML()[2*this->getScenario()
+                 ->getCurrentScenario()][this->getScenario()->getRun()][0]
+                 .size(); ii++) {
+                outputFile1 << this->getSurrogateML()[2*this->getScenario()->
+                        getCurrentScenario()][this->getScenario()->getRun()][0]
+                        (ii);
+                if(ii < (this->getSurrogateML()[2*this->getScenario()->
+                         getCurrentScenario()][this->getScenario()->getRun()]
+                         [0].size() - 1)) {
+                    outputFile1 << ",";
+                }
+            }
+            outputFile1 << std::endl;
+
+            outputFile1 << std::endl << "# VALUATION STANDARD DEVIATION FOR EACH SURROGATE POINT (INDEXED AS (dim1a,dim2a,...,dimNa)," << std::endl;
+            outputFile1 << "# (dim1a,dim2a,...,dimNb), etc." << std::endl;
+
+            for (int ii = 0; ii < this->getSurrogateML()[2*this->getScenario()
+                 ->getCurrentScenario()+1][this->getScenario()->getRun()][0]
+                 .size(); ii++) {
+                outputFile1 << this->getSurrogateML()[2*this->getScenario()->
+                        getCurrentScenario()][this->getScenario()->getRun()][0]
+                        (ii);
+                if(ii < (this->getSurrogateML()[2*this->getScenario()->
+                         getCurrentScenario()+1][this->getScenario()->getRun()]
+                         [0].size() - 1)) {
+                    outputFile1 << ",";
+                }
+            }
+        }
+
+        outputFile2.close();
+
+        outputFile1.open(runResults,std::ios::out);
+        outputFile1 << "####################################################################################################" << std::endl;
+        outputFile1 << "########################################### RUN RESULTS ############################################" << std::endl;
+        outputFile1 << "####################################################################################################" << std::endl;
+        outputFile1 << "GENERATION              BEST ROAD FITNESS       AVERAGE ROAD FITNESS    SURROGATE FITNESS" << std::endl;
+        std::setprecision(6);
+        std::setw(12);
+
+        for (int ii = 0; ii < this->generation; ii++) {
+            outputFile1 << ii << this->best(ii) << this->av(ii) << this->surrFit(ii) << std::endl;
+        }
+
+        outputFile1.close();
+
+    } else {
+        outputFile1.open(runResults,std::ios::out);
+        outputFile1 << "####################################################################################################" << std::endl;
+        outputFile1 << "########################################### RUN RESULTS ############################################" << std::endl;
+        outputFile1 << "####################################################################################################" << std::endl;
+        outputFile1 << "GENERATION              BEST ROAD FITNESS       AVERAGE ROAD FITNESS" << std::endl;
+        std::setprecision(6);
+        std::setw(12);
+
+        for (int ii = 0; ii < this->generation; ii++) {
+            outputFile1 << ii << this->best(ii) << this->av(ii) << std::endl;
+        }
+
+        outputFile1.close();
     }
 }

@@ -551,6 +551,23 @@ public:
      */
     virtual void plotResults(bool plot = false);
 
+    /**
+     * Initialises the program with input data
+     *
+     * @param inputfile as std::string
+     */
+    void initialiseFromTextInput(std::string inputFile);
+
+    /**
+     * Gets surrogate data for scenario if it already exists
+     */
+    void getExistingSurrogateData();
+
+    /**
+     * Saves the results of the experiment to an external source
+     */
+    virtual void saveExperimentalResults();
+
 private:
     double scale;               /**< Cooling rate for mutation */
     Eigen::VectorXd xO;         /**< X coordinate of plane origins */

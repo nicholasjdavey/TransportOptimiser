@@ -240,13 +240,8 @@ void Simulator::simulateMTE(std::vector<Eigen::MatrixXd>& visualiseResults) {
     std::vector<Eigen::VectorXd> capacities(srp.size());
 
     for (int ii = 0; ii < srp.size(); ii++) {
-        initPops[ii].resize(srp[ii]->getHabPatches().size());
-        capacities[ii].resize(srp[ii]->getHabPatches().size());
-
-        for (int jj = 0; jj < srp.size(); jj++) {
-            initPops[ii](jj) = srp[ii]->getHabPatches()[jj]->getPopulation();
-            capacities[ii](jj) = srp[ii]->getHabPatches()[jj]->getCapacity();
-        }
+        initPops[ii] = srp[ii]->getInitPops();
+        capacities[ii] = srp[ii]->getCapacities();
     }
 
     // When visualising, we also need to know where the road cells are, so we
@@ -266,6 +261,7 @@ void Simulator::simulateROVCR(bool policyMap) {
     //  1. Values of all uncertainties
     //  2. Control taken
     //  3. Adjusted populations
+    //  4. Regressions
 
     // Save optimal control map produced:
     //  1. Optimal values
@@ -284,6 +280,8 @@ void Simulator::simulateROVCR(bool policyMap) {
     int controls = program->getFlowRates().size();
     int noPaths = optimiser->getOtherInputs()->getNoPaths();
     int nYears = optimiser->getEconomic()->getYears();
+    int dimRes = this->getRoad()->getOptimiser()->getOtherInputs()->
+            getDimRes();
 
     std::vector<SpeciesRoadPatchesPtr> srp = road->getSpeciesRoadPatches();
     Eigen::MatrixXd iar(srp.size(),1);
@@ -359,10 +357,14 @@ void Simulator::simulateROVCR(bool policyMap) {
     Eigen::MatrixXd unitProfits(nYears+1,noPaths);
 
     // 3. Optimal profit-to-go outputs matrix (along each path)
-    Eigen::MatrixXd condExp(noPaths,nYears);
+    Eigen::MatrixXd condExp(noPaths,nYears+1);
 
     // 4. Optimal control matrix (along each path)
-    Eigen::MatrixXi optCont(noPaths,nYears);
+    Eigen::MatrixXi optCont(noPaths,nYears+1);
+
+    // 5. Regression data
+    Eigen::VectorXd regressions(nYears*controls*(dimRes*(srp.size() + 1) +
+            pow(dimRes,(srp.size() + 1))*2));
 
     if (varParams->getGrowthRateSDMultipliers()(scenario->getPopGRSD()) == 0) {
 
@@ -382,8 +384,21 @@ void Simulator::simulateROVCR(bool policyMap) {
             // instead implement it here.
             if (gpu) {
                 // Call the external, CUDA-compiled code
-                SimulateGPU::simulateROVCUDA(this->me(),srp,adjPops,
-                        unitProfits,condExp,optCont);
+                // We try 5 times to execute the code. If it fails, we
+                // continue.
+                int counter = 0;
+                bool success = false;
+
+                while (!success && counter < 5) {
+                    try {
+                        SimulateGPU::simulateROVCUDA(this->me(),srp,adjPops,
+                                unitProfits,condExp,optCont,regressions,
+                                policyMap);
+                        success = true;
+                    } catch (...) {
+                        counter++;
+                    }
+                }
 
             } else {
                 // Put multi-threaded code without the GPU here
@@ -394,8 +409,19 @@ void Simulator::simulateROVCR(bool policyMap) {
             // We will always use multiple threads otherwise it is too slow
             if (gpu) {
                 // Call the external, CUDA-compiled code
-                SimulateGPU::simulateROVCUDA(this->me(),srp,adjPops,
-                        unitProfits,condExp,optCont);
+                int counter = 0;
+                bool success = false;
+
+                while (!success && counter < 5) {
+                    try {
+                        SimulateGPU::simulateROVCUDA(this->me(),srp,adjPops,
+                                unitProfits,condExp,optCont,regressions,
+                                policyMap);
+                        success = true;
+                    } catch (...) {
+                        counter++;
+                    }
+                }
 
             } else {
                 // Put multi-threaded code without the GPU here
@@ -409,61 +435,171 @@ void Simulator::simulateROVCR(bool policyMap) {
 
     // Compute the mean of each control to determine the optimal control and
     // operating value at time 0. We also compute the standard deviation.
-    float *mean;
-    float *controlPaths;
-    mean = (float*)malloc(controls*sizeof(float));
-    controlPaths = (float*)malloc(controls*sizeof(float));
+    float mean = condExp.col(0).mean();
+//    float *controlPaths;
+//    mean = (float*)malloc(controls*sizeof(float));
+//    controlPaths = (float*)malloc(controls*sizeof(float));
 
-    for (int ii = 0; ii < controls; ii++) {
-        mean[ii] = 0;
-        controlPaths[ii] = 0;
-    }
+//    for (int ii = 0; ii < controls; ii++) {
+//        mean[ii] = 0;
+//        controlPaths[ii] = 0;
+//    }
 
-    for (int ii = 0; ii < noPaths; ii++) {
-        mean[optCont.data()[ii]] += condExp.data()[ii];
-        controlPaths[optCont.data()[ii]] += (float)optCont.data()[ii];
-    }
+//    for (int ii = 0; ii < noPaths; ii++) {
+//        mean[optCont.data()[ii]] += condExp.data()[ii];
+//        controlPaths[optCont.data()[ii]]++;
+//    }
 
-    for (int ii = 0; ii < controls; ii++) {
-        mean[ii] = mean[ii]/controlPaths[ii];
-    }
+//    for (int ii = 0; ii < controls; ii++) {
+//        mean[ii] = mean[ii]/controlPaths[ii];
+//    }
 
-    int firstControl = 0;
-    road->getAttributes()->setVarProfitIC(mean[0]);
+//    int firstControl = 0;
+    road->getAttributes()->setVarProfitIC(mean);
 
-    for (int ii = 1; ii < controls; ii++) {
-        if (mean[ii] < road->getAttributes()->getVarProfitIC()) {
-            road->getAttributes()->setVarProfitIC(mean[ii]);
-            firstControl = ii;
-        }
-    }
+//    for (int ii = 1; ii < controls; ii++) {
+//        if (mean[ii] < road->getAttributes()->getVarProfitIC()) {
+//            road->getAttributes()->setVarProfitIC(mean[ii]);
+//            firstControl = ii;
+//        }
+//    }
 
     // Knowing the optimal control at time zero, we can compute the standard
     // deviation.
-    float var = 0;
+//    float var = 0;
 
-    for (int ii = 0; ii < noPaths; ii++) {
-        if (optCont.data()[ii] == firstControl) {
-            var += pow(mean[firstControl] - condExp.data()[ii],2);
-        }
-    }
+//    for (int ii = 0; ii < noPaths; ii++) {
+//        if (optCont.data()[ii] == firstControl) {
+//            var += pow(mean[firstControl] - condExp.data()[ii],2);
+//        }
+//    }
 
-    road->getAttributes()->setTotalValueSD(pow(var/controlPaths[firstControl],
-            0.5));
+//    road->getAttributes()->setTotalValueSD(pow(var/controlPaths[firstControl],
+//            0.5));
 
-    free(mean);
-    free(controlPaths);
+//    free(mean);
+//    free(controlPaths);
 
-    // If we are visualising the policy map, save this info too
+    // If we are visualising the policy map and saving all computation results
+    // for later, save this info too
     if (policyMap) {
-        // Complete later
+        PolicyMapPtr policyMap(new PolicyMap(program,nYears,noPaths,srp
+                .size() + 1));
+
+        for (int ii = 0; ii < nYears; ii++) {
+            // Each new row
+            Eigen::MatrixXd stateLevels(noPaths,srp.size() + 1);
+
+            for (int jj = 0; jj < srp.size(); jj++) {
+                stateLevels.col(jj) = adjPops[ii].col(jj);
+            }
+
+            stateLevels.col(srp.size()) = adjPops[ii].col(srp.size());
+
+            policyMap->getPolicyMapYear()[ii]->setStateLevels(stateLevels);
+            policyMap->getPolicyMapYear()[ii]->setProfits(condExp.col(ii));
+            policyMap->getPolicyMapYear()[ii]->setOptConts(optCont.col(ii));
+            policyMap->setRegression(regressions);
+        }
+
+        road->setPolicyMap(policyMap);
     }
 }
 
 void Simulator::simulateROVCR(std::vector<Eigen::MatrixXd>& visualisePops,
-        std::vector<int> &visualiseFlows) {
+        Eigen::VectorXi &visualiseFlows, Eigen::VectorXd&
+        visualiseUnitProfits) {
     // Visualise a single path for the road for demonstration purposes
 
+//    SimulateGPU::simulateSingleROVPath(this->me(),visualisePops,visualiseFlows,
+//            visualiseUnitProfits);
+    RoadPtr road = this->road.lock();
+    std::vector<SpeciesRoadPatchesPtr> species = road->getSpeciesRoadPatches();
+    std::vector<Eigen::VectorXd> initPops(species.size());
+    std::vector<Eigen::VectorXd> capacities(species.size());
+
+    for (int ii = 0; ii < species.size(); ii++) {
+        initPops[ii] = species[ii]->getInitPops();
+        capacities[ii] = species[ii]->getCapacities();
+    }
+
+    OptimiserPtr optimiser = road->getOptimiser();
+    ExperimentalScenarioPtr scenario = optimiser->getScenario();
+
+    int timeSteps = road->getOptimiser()->getEconomic()->getYears();
+
+    TrafficProgramPtr program = (road->getOptimiser()
+            ->getPrograms())[scenario->getProgram()];
+    int controls = program->getFlowRates().size();
+
+    std::vector<Eigen::MatrixXd> reArrMat(species.size()*controls);
+
+    // Initialise all the transformation matrices that take the population at
+    // the start of a period (for a single species) to the population at the
+    // end of the period by accounting for transition and mortality.
+    for (int ii = 0; ii < species.size(); ii++) {
+        for (int jj = 0; jj < controls; jj++) {
+            reArrMat[ii*controls + jj] = (species[ii]->getTransProbs())*
+                    (species[ii]->getSurvivalProbs()[jj]);
+        }
+
+        visualisePops[ii].col(0) = initPops[ii].col(0);
+    }
+
+    // For now, we just take the first path for the exogenous variables
+    for (int ii = 0; ii < timeSteps; ii++) {
+        visualiseUnitProfits(ii) = road->getPolicyMap()->getPolicyMapYear()[ii]
+                ->getStateLevels()(0,optimiser->getSpecies().size());
+    }
+
+    // Now we simulate the population, choosing the optimal control at each
+    // time step.
+    for (int ii = 0; ii < timeSteps; ii++) {
+        // First compute the state and expected payoff under each control
+        Eigen::MatrixXd states(controls,species.size() + 1);
+
+        // Compute the total population for each species
+        Eigen::VectorXd totalPops(species.size());
+        for (int jj = 0; jj < species.size(); jj++) {
+            totalPops(jj) = visualisePops[jj].col(ii).sum();
+        }
+
+        // Compute the aars for each species under each control
+        for (int jj = 0; jj < species.size(); jj++) {
+            Eigen::VectorXd aars(controls);
+            Eigen::VectorXd pops = visualisePops[jj].col(ii);
+
+            species[jj]->computeAAR(pops,aars);
+
+            states.col(jj) = aars*totalPops(jj);
+        }
+
+        // The last column is simply the current unit profit
+        states.col(species.size()) = Eigen::VectorXd::Constant(controls,
+                visualiseUnitProfits(ii));
+
+        // Check which controls are valid
+        std::vector<bool> valid(controls);
+
+        for (int jj = 0; jj < controls; jj++) {
+            valid[jj] = true;
+
+            for (int kk = 0; kk < species.size(); kk++) {
+                if (states(jj,kk) < species[kk]->getSpecies()->getThreshold()
+                        *optimiser->getVariableParams()->getPopulationLevels()
+                        (optimiser->getScenario()->getPopLevel())) {
+                    valid[jj] = false;
+                    break;
+                }
+            }
+        }
+
+        // For each valid control, compute the expected payoff
+
+        // The best control is the one with the highest expected payoff
+
+        // Simulate one time step forward using this control
+    }
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -585,8 +721,8 @@ void Simulator::simulateMTEPath(const std::vector<SpeciesRoadPatchesPtr>&
     // the start of a period (for a single species) to the population at the
     // end of the period by accounting for transition and mortality.
     for (int jj = 0; jj < species.size(); jj++) {
-        reArrMat[jj] = (species[jj]->getTransProbs())*(species[jj]->
-                getSurvivalProbs()[controls-1]);
+        reArrMat[jj] = (species[jj]->getTransProbs().array())*(species[jj]->
+                getSurvivalProbs()[controls-1].array());
 
         visualiseResults[jj].col(0) = initPops[jj].col(0);
     }
@@ -598,7 +734,7 @@ void Simulator::simulateMTEPath(const std::vector<SpeciesRoadPatchesPtr>&
 
         // Next, compute animal movement and road mortality
         for (int kk = 0; kk < species.size(); kk++) {
-            pops[kk] = reArrMat[jj].transpose()*pops[kk];
+            pops[kk] = reArrMat[kk].transpose()*pops[kk];
         }
 
         // Finally, account for natural birth and death
@@ -608,34 +744,32 @@ void Simulator::simulateMTEPath(const std::vector<SpeciesRoadPatchesPtr>&
 
         // Save the results to the visualisation matrix
         for (int kk = 0; kk < species.size(); kk++) {
-            visualiseResults[jj].col(jj+1) = pops[kk];
+            visualiseResults[kk].col(jj+1) = pops[kk];
         }
     }
 }
 
 void Simulator::simulateROVCRPath(const std::vector<SpeciesRoadPatchesPtr>&
-            species, const std::vector<Eigen::VectorXd>& initPops, const
-            std::vector<Eigen::VectorXd>& capacities,
-            std::vector<Eigen::VectorXd>& exogenousPaths,
-            std::vector<Eigen::VectorXd>& endogenousPaths) {
-
+        species, const std::vector<Eigen::VectorXd>& initPops, const
+        std::vector<Eigen::VectorXd>& capacities,
+        std::vector<Eigen::VectorXd>& exogenousPaths,
+        std::vector<Eigen::VectorXd>& endogenousPaths) {
 }
 
 void Simulator::simulateROVCRPath(const std::vector<SpeciesRoadPatchesPtr>&
-            species, const std::vector<Eigen::VectorXd>& initPops, const
-            std::vector<Eigen::VectorXd>& capacities,
-            const std::vector<Eigen::VectorXd>& exogenousPaths,
-            std::vector<Eigen::VectorXd>& endogenousPaths,
-            std::vector<Eigen::MatrixXd> &visualiseResults) {
-
+        species, const std::vector<Eigen::VectorXd>& initPops, const
+        std::vector<Eigen::VectorXd>& capacities,
+        const std::vector<Eigen::VectorXd>& exogenousPaths,
+        std::vector<Eigen::VectorXd>& endogenousPaths,
+        std::vector<Eigen::MatrixXd> &visualiseResults) {
 }
 
 void Simulator::recomputeForwardPath(const std::vector<SpeciesRoadPatchesPtr>&
-            species, const std::vector<Eigen::VectorXd>& initPops, const
-            std::vector<Eigen::VectorXd>& capacities,
-            const std::vector<Eigen::VectorXd>& exogenousPaths,
-            const unsigned long timeStep, const std::vector<std::vector<
-            alglib::spline1dinterpolant>> optPtG,
-            std::vector<Eigen::VectorXd>& endogenousPaths) {
+        species, const std::vector<Eigen::VectorXd>& initPops, const
+        std::vector<Eigen::VectorXd>& capacities,
+        const std::vector<Eigen::VectorXd>& exogenousPaths,
+        const unsigned long timeStep, const std::vector<std::vector<
+        alglib::spline1dinterpolant>> optPtG,
+        std::vector<Eigen::VectorXd>& endogenousPaths) {
 
 }

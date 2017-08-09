@@ -20,7 +20,8 @@ public:
      *
      * Constructs a %PolicyMap object by passing the program and number of years.
      */
-    PolicyMap(ProgramPtr program, unsigned long noYears);
+    PolicyMap(ProgramPtr program, unsigned long noYears, unsigned long noPaths,
+            unsigned long noDims);
 
     /**
      * Constructor II
@@ -42,7 +43,7 @@ public:
      * @return Program as ProgramPtr
      */
     ProgramPtr getProgram() {
-            return this->program;
+        return this->program;
     }
     /**
      * Sets the Program used
@@ -50,8 +51,8 @@ public:
      * @param prog as ProgramPtr
      */
     void setProgram(ProgramPtr prog) {
-    this->program.reset();
-            this->program = prog;
+        this->program.reset();
+        this->program = prog;
     }
 
     /**
@@ -71,6 +72,23 @@ public:
         this->yearlyMaps = pmy;
     }
 
+    /**
+     * Returns the regression data for the road under ROV
+     *
+     * @return Regression data as Eigen::VectorXd&
+     */
+    const Eigen::VectorXd& getRegression() {
+        return this->regression;
+    }
+    /**
+     * Sets the regression data for the road under ROV
+     *
+     * @param reg as Eigen::VectorXd&
+     */
+    void setRegression(Eigen::VectorXd& reg) {
+        this->regression = reg;
+    }
+
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -78,6 +96,7 @@ public:
 private:
     ProgramPtr program;                         /**< The program used for the policy map */
     std::vector<PolicyMapYearPtr> yearlyMaps;	/**< Vector of policy maps by year */
+    Eigen::VectorXd regression;                 /**< ROV Regression data */
 };
 
 #endif

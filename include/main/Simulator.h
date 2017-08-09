@@ -158,13 +158,16 @@ public:
      * each patch over time as well as the traffic control choice.
      *
      * @param (output) visualisePops as std::vector<Eigen::MatrixXd>&
-     * @param (output) visualiseFlows as std::vector<int>&
+     * @param (output) visualiseFlows as Eigen::VectorXi&
+     * @param (output) visualiseUnitProfits as Eigen::VectorXd&
      * @note This method automatically useds ALGO6, which is the most
      * comprehensive method, to visualise a single Monte Carlo chain and the
      * optimal actions taken over time.
+     * @note The policy map for this road has to have already been built
      */
     virtual void simulateROVCR(std::vector<Eigen::MatrixXd>& visualisePops,
-            std::vector<int>& visualiseFlows);
+            Eigen::VectorXi &visualiseFlows, Eigen::VectorXd&
+            visualiseUnitProfits);
 
 private:
     std::weak_ptr<Road> road;   /**< Road owning simulator */

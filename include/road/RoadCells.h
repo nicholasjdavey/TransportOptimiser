@@ -98,6 +98,23 @@ public:
     }
 
     /**
+     * Returns the width values
+     *
+     * @return Widths as const Eigen::VectorXd&
+     */
+    const Eigen::VectorXd& getWidths() {
+        return this->w;
+    }
+    /**
+     * Sets the width values of the segments
+     *
+     * @param w as const Eigen::VectorXd&
+     */
+    void setWidths(const Eigen::VectorXd& w) {
+        this->w = w;
+    }
+
+    /**
      * Returns the vegetation at each point
      *
      * @return Vegetation as const Eigen::VectorXi&

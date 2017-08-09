@@ -35,6 +35,11 @@ public:
 
     /**
      * Constructor I
+     */
+    Species();
+
+    /**
+     * Constructor II
      *
      * Constructs a %Species object with default parent values.
      */
@@ -165,7 +170,7 @@ public:
      *
      * @param rcsd as double
      */
-    void set(double rcsd) {
+    void setRangingCoeffSD(double rcsd) {
         this->rangingCoeffSD = rcsd;
     }
 
@@ -302,7 +307,7 @@ public:
      *
      * @param habitat as const std::vector<HabitatTypePtr>&
      */
-    void setHabitat(const std::vector<HabitatTypePtr>& habitat) {
+    void setHabitatTypes(const std::vector<HabitatTypePtr>& habitat) {
         this->habitat = habitat;
     }
 

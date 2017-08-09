@@ -20,10 +20,10 @@ int main(int argc, char **argv) {
     // We will later add the attributes to the Optimiser Object
     std::string solScheme = "GA";
 
-    RoadGAPtr roadGA(new RoadGA(0.6,0.375,500,50,1e-6,0.95,0.95,10,30,
-            solScheme,5, Optimiser::CONTROLLED,1.0,15,0.05,10,3,10,
+    RoadGAPtr roadGA(new RoadGA(0.6,0.375,2,50,1e-6,0.95,0.95,10,30,
+            solScheme,5, Optimiser::NOPENALTY,1.0,15,0.05,10,3,10,
             RoadGA::TOURNAMENT,RoadGA::RANK,0.4,0.65,5,0.1,true,
-            Optimiser::ALGO6,Optimiser::MULTI_LOC_LIN_REG));
+            Optimiser::ALGO4,Optimiser::MULTI_LOC_LIN_REG));
 
     // SET THREADER
     ThreadManagerPtr threader(new ThreadManager(8));
@@ -337,6 +337,8 @@ int main(int argc, char **argv) {
         }
     }
     initPopFile.close();
+
+    roadGA->setRootFolder("../Experiments/Experiments/Test_Simple");
 
     roadGA->optimise(true);
 

@@ -11,7 +11,7 @@ void RoadCells::computeRoadCells() {
 
     RoadPtr roadPtrShared = this->road.lock();
 
-	// Create short names for all important inputs
+    // Create short names for all important inputs
     const Eigen::MatrixXd& X = roadPtrShared->getOptimiser()->getRegion()->getX();
     const Eigen::MatrixXd& Y = roadPtrShared->getOptimiser()->getRegion()->getY();
     const Eigen::VectorXd& x = roadPtrShared->getRoadSegments()->getX();
@@ -20,7 +20,7 @@ void RoadCells::computeRoadCells() {
     const Eigen::VectorXd& w = roadPtrShared->getRoadSegments()->getWidths();
     const Eigen::VectorXi& typ = roadPtrShared->getRoadSegments()->getType();
 
-	// First need to see if the grid is evenly-spaced
+    // First need to see if the grid is evenly-spaced
     unsigned int rx = X.rows();
     unsigned int cy = Y.cols();
 

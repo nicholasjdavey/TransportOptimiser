@@ -196,7 +196,7 @@ public:
      *
      * @return Y midpoints as const Eigen::VectorXd&
      */
-    const Eigen::VectorXd& getMixY() {
+    const Eigen::VectorXd& getMidY() {
         return this->my;
     }
     /**
@@ -204,7 +204,7 @@ public:
      *
      * @param my as const Eigen::VectorXd&
      */
-    void setMY(const Eigen::VectorXd& my) {
+    void setMidY(const Eigen::VectorXd& my) {
         this->my = my;
     }
 
