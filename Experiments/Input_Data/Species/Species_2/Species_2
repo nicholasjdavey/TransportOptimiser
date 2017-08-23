@@ -1,0 +1,44 @@
+###################################################################################################
+############################################ SPECIES 1 ############################################
+###################################################################################################
+
+###################################################################################################
+# HABITAT TYPES
+# Input data as follows (DO NOT CHANGE ORDER OR ADD/DELETE TYPES!):
+# TYPE : Max Pop per m^2 : Cost per m^2 : Mean Preference : Preference SD : Veg1, Veg2, etc.
+PRIMARY:    0.0005      : 1e8       : 0         : 0         : 4
+MARGINAL:   0.00025     : 5e7       : -0.262    : 0.073     : 3
+OTHER:      0.0001      : 5e6       : -0.396    : 0.120     : 2
+CLEAR:      0.000       : 0         : -0.373    : 0.175     : 1
+ROAD:       0.000       : 0         : -1000     : 0         : 0
+
+###################################################################################################
+# SPECIES PARAMETERS
+Name                                        : Koala
+Sex                                         : MALE
+Mean Movement Propensity                    : 2.52e-3
+Movement Propensity SD                      : 0.0928e-3
+Mean Ranging Coefficient                    : -2.52e-3
+Ranging Coefficient SD                      : 0.1014e-3
+Growth Rate Local Variability               : 0.5
+Mean Length                                 : 0.7
+Length SD                                   : 0.012
+Mean Crossing Speed                         : 2.78
+Crossing Speed SD                           : 1.39
+Cost Per Animal Below Threshold             : 1e7
+Minimum Population Threshold                : 1000
+Initial Region Population                   : 1000
+
+###################################################################################################
+# GROWTH RATE PARAMETERS
+Current                                     : 0.014
+Mean                                        : 0.014
+Standard Deviation                          : 0.005
+Reversion                                   : 0.1
+Jump Probability                            : 0.1
+Jump Poisson Parameter                      : 0.1
+
+###################################################################################################
+# INITIAL POPULATION MAP
+# Relative to program root directory
+Initial Population Map                      : Experiments/Input_Data/Species/Species_2/Species_2_Pop.csv
