@@ -806,7 +806,7 @@ void RoadGA::plotResults(bool plot) {
             genCostsAv[ii][1] = this->av(ii);
         }
 
-        double minY = genCostsBest[0][1];
+        double minY = 0;
         double maxY = minY;
 
         for (int ii = 0; ii <= this->generation; ii++) {
@@ -837,23 +837,9 @@ void RoadGA::plotResults(bool plot) {
             }
         }
 
-        // Take log
-        if (minY > 0) {
-            minY = log10(minY);
-        } else if (minY < 0) {
-            minY = -log10(-minY);
-        }
-
-        if (maxY > 0) {
-            maxY = log10(maxY);
-        } else if (minY < 0) {
-            maxY = -log10(-maxY);
-        }
-
-        if (minY == maxY) {
-            minY = minY/1.2;
-            maxY = maxY*1.2;
-        }
+        // Ensure min and max are different
+        minY -= 0.2*fabs(minY);
+        maxY += 0.2*fabs(maxY);
 
         // PLOTS //////////////////////////////////////////////////////////////
         // Clear Previous plot
@@ -900,8 +886,8 @@ void RoadGA::plotResults(bool plot) {
         (*this->plothandle) << "set grid\n";
         (*this->plothandle) << "set xlabel 'Generation'\n";
         (*this->plothandle) << "set ylabel 'Cost (AUD x10^Y)'\n";
-        (*this->plothandle) << "set xrange [1:" + std::to_string(
-                this->generations+1) + "]\n";
+        (*this->plothandle) << "set xrange [0.5:" + std::to_string(
+                this->generations+0.5) + "]\n";
         // We use our custom bi-directional logscale
         (*this->plothandle) << "set yrange [" + std::to_string(minY) + ":"
                 + std::to_string(maxY) + "]\n";
@@ -993,16 +979,25 @@ void RoadGA::plotResults(bool plot) {
                 (*this->surrPlotHandle) << "set xlabel 'Generation'\n";
                 (*this->surrPlotHandle) << "set ylabel 'Model Error'\n";
                 //(*this->surrPlotHandle) << "set logscale y\n";
-                (*this->surrPlotHandle) << "set xrange [1:" + std::to_string(
-                        this->generations+1) + "]\n";
+                (*this->surrPlotHandle) << "set xrange [0.5:" + std::to_string(
+                        this->generations+0.5) + "]\n";
                 double minVal = this->surrFit.block(0,ii,this->generation+1,1).
-                        minCoeff()/2;
+                        minCoeff();
+                double maxVal = this->surrFit.col(ii).maxCoeff();
                 if (minVal == 0) {
                     minVal = 1e-3;
+                } else {
+                    minVal = minVal - fmod(minVal,pow(10.0,floor(log10(minVal))
+                            ));
+                }
+                if (maxVal == 0) {
+                    maxVal = minVal*10.0;
+                } else {
+                    maxVal = maxVal - fmod(maxVal,pow(10.0,floor(log10(maxVal))
+                            )) + pow(10.0,floor(log10(maxVal)));
                 }
                 (*this->surrPlotHandle) << "set yrange [" + std::to_string(
-                        minVal) + ":" + std::to_string(this->surrFit.col(ii).
-                        maxCoeff()) + "]\n";
+                        minVal) + ":" + std::to_string(maxVal) + "]\n";
                 (*this->surrPlotHandle) << "plot '-' with points pointtype 7 \n";
                 (*this->surrPlotHandle).send1d(surrErrData);
             }
@@ -3328,7 +3323,7 @@ void RoadGA::initialiseFromTextInput(std::string inputFile) {
         input2.open(fileNames[1].c_str(),std::ifstream::in);
 
         if (!input2.good()) {
-            std::cout << "cunt's fucked" << std::endl;
+            std::cout << "File doesn't exist" << std::endl;
         }
 
         for (int jj = 0; jj < 8; jj++) {
@@ -3664,8 +3659,8 @@ void RoadGA::saveExperimentalResults() {
             // RAW DATA
             for (int ii = existingLines; ii < this->noSamples; ii++) {
                 for (int jj = 0; jj < this->species.size(); jj++) {
-                    outputFile2 << this->iars(ii,jj) << this->pops(ii,jj) <<
-                            this->popsSD(ii,jj);
+                    outputFile2 << this->iars(ii,jj) << "    " <<
+                            this->pops(ii,jj) << "    " << this->popsSD(ii,jj);
                     if (jj < (this->species.size() - 1)) {
                         outputFile2 << "  ";
                     }
@@ -3780,7 +3775,7 @@ void RoadGA::saveExperimentalResults() {
             // RAW DATA
             for (int ii = existingLines; ii < this->noSamples; ii++) {
                 for (int jj = 0; jj < this->species.size(); jj++) {
-                    outputFile2 << this->iars(ii,jj) << "  ";
+                    outputFile2 << this->iars(ii,jj) << "    ";
                 }
 
                 outputFile2 << this->use(ii) << this->useSD(ii) << this->

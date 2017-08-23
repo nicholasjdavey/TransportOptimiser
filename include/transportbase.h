@@ -18,6 +18,7 @@
 #include <iomanip>
 #include <fstream>
 #include <iomanip>
+#include <numeric>
 #include <stdlib.h>
 #include <vector>
 #include <cmath>

@@ -11,7 +11,7 @@
 Mutation Rate                                   : 0.6
 Crossover Fraction                              : 0.375
 Max Generations                                 : 5
-Population Size                                 : 50
+Population Size                                 : 100
 Stopping Tolerance                              : 1e-4
 Confidence Interval                             : 0.95
 Confidence Level                                : 0.95
@@ -90,7 +90,7 @@ Traffic Growth Rate (p.a.)                      : 0
 ###################################################################################################
 ## ECONOMIC PARAMETERS
 Required Rate of Return (per cen per annum)     : 7
-Number of Years                                 : 50
+Number of Years                                 : 30
 Step Size (Years)                               : 1
 
 ###################################################################################################
@@ -200,5 +200,5 @@ Vehicle 3                                       : Experiments/Input_Data/Vehicle
 ## SPECIES DATA
 # Add new species datafiles (in accordance with the template) on new lines below preceded by ":"
 Number of Species                               : 1
-Species 1                                       : Experiments/Input_Data/Species/Species_1
+Species 1                                       : Experiments/Input_Data/Species/Species_1/Species_1
 

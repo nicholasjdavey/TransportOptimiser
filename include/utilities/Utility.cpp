@@ -8,7 +8,7 @@ Eigen::MatrixXi Utility::lineSegmentIntersect(const Eigen::MatrixXd& XY1,
         SimulateGPU::lineSegmentIntersect(XY1,XY2,crossings);
         return crossings;
     } else {
-        clock_t begin = clock();
+//        clock_t begin = clock();
 
         Eigen::MatrixXd X1 = XY1.block(0,0,XY1.rows(),1).replicate(1,XY2.
                 rows());
@@ -19,11 +19,11 @@ Eigen::MatrixXi Utility::lineSegmentIntersect(const Eigen::MatrixXd& XY1,
         Eigen::MatrixXd Y2 = XY1.block(0,3,XY1.rows(),1).replicate(1,XY2.
                 rows());
 
-        clock_t end = clock();
-        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-        std::cout << "\t Block 1: " << elapsed_secs << " s" << std::endl;
+//        clock_t end = clock();
+//        double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//        std::cout << "\t Block 1: " << elapsed_secs << " s" << std::endl;
 
-        begin = clock();
+//        begin = clock();
 
         Eigen::MatrixXd XY2T = XY2.transpose();
 
@@ -36,11 +36,11 @@ Eigen::MatrixXi Utility::lineSegmentIntersect(const Eigen::MatrixXd& XY1,
         Eigen::MatrixXd Y4 = XY2T.block(3,0,1,XY2T.cols()).replicate(XY1.
                 rows(),1);
 
-        end = clock();
-        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-        std::cout << "\t Block 2: " << elapsed_secs << " s" << std::endl;
+//        end = clock();
+//        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//        std::cout << "\t Block 2: " << elapsed_secs << " s" << std::endl;
 
-        begin = clock();
+//        begin = clock();
 
         Eigen::MatrixXd X4_X3 = (X4-X3);
         Eigen::MatrixXd Y1_Y3 = (Y1-Y3);
@@ -49,11 +49,11 @@ Eigen::MatrixXi Utility::lineSegmentIntersect(const Eigen::MatrixXd& XY1,
         Eigen::MatrixXd X2_X1 = (X2-X1);
         Eigen::MatrixXd Y2_Y1 = (Y2-Y1);
 
-        end = clock();
-        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-        std::cout << "\t Block 3: " << elapsed_secs << " s" << std::endl;
+//        end = clock();
+//        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//        std::cout << "\t Block 3: " << elapsed_secs << " s" << std::endl;
 
-        begin = clock();
+//        begin = clock();
 
         Eigen::MatrixXd numerator_a = X4_X3.array() * Y1_Y3.array() -
                 Y4_Y3.array() * X1_X3.array();
@@ -62,28 +62,28 @@ Eigen::MatrixXi Utility::lineSegmentIntersect(const Eigen::MatrixXd& XY1,
         Eigen::MatrixXd denominator = Y4_Y3.array() * X2_X1.array() -
                 X4_X3.array() * Y2_Y1.array();
 
-        end = clock();
-        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-        std::cout << "\t Block 4: " << elapsed_secs << " s" << std::endl;
+//        end = clock();
+//        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//        std::cout << "\t Block 4: " << elapsed_secs << " s" << std::endl;
 
-        begin = clock();
+//        begin = clock();
 
         Eigen::MatrixXd u_a = numerator_a.array() / denominator.array();
         Eigen::MatrixXd u_b = numerator_b.array() / denominator.array();
 
-        end = clock();
-        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-        std::cout << "\t Block 5: " << elapsed_secs << " s" << std::endl;
+//        end = clock();
+//        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//        std::cout << "\t Block 5: " << elapsed_secs << " s" << std::endl;
 
-        begin = clock();
+//        begin = clock();
 
         // Find adjacency matrix
         Eigen::MatrixXi INT_B = ((u_a.array() >= 0) && (u_a.array() <= 1) &&
                 (u_b.array() >= 0) && (u_b.array() <= 1)).cast<int>();
 
-        end = clock();
-        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-        std::cout << "\t Block 6: " << elapsed_secs << " s" << std::endl;
+//        end = clock();
+//        elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//        std::cout << "\t Block 6: " << elapsed_secs << " s" << std::endl;
 
         // Return the number of times each of the input lines intersects the
         // road
@@ -282,16 +282,16 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
     }
 
     // Now that we have all the index requirements, let's interpolate.
-    // Get the uppermost dimension x value
-    double x0 = surrogate(lowerIdx(0));
-    double x1 = surrogate(lowerIdx(0)+1);
+    // Get the lowermost dimension x value
+    double x0 = surrogate(lowerIdx(predictors.size()-1));
+    double x1 = surrogate(lowerIdx(predictors.size()-1)+1);
     double xd;
 
     if ((fabs(x1 - x0) < std::numeric_limits<double>::epsilon()) ||
             x0 == x1) {
         xd = 0.0;
     } else {
-        xd = (predictors(0) - x0)/(x1 - x0);
+        xd = (predictors(predictors.size()-1) - x0)/(x1 - x0);
     }
 
     // First, assign the yvalues to the coefficients matrix
@@ -300,23 +300,22 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
         // values on this dimension.
         int idxL = (int)(predictors.size()*dimRes);
 
-        if (predictors.size() > 1) {
-            int div = ii;
-            for (int jj = 0; jj < (predictors.size() - 1); jj++) {
-                int rem = div - 2*((int)div/2);
-                div = (int)(div/2);
+        int div = ii;
+        for (int jj = 0; jj < (predictors.size()-1); jj++) {
+            int rem = div - 2*((int)(div/2));
+            div = (int)(div/2);
 
-                if (rem == 0) {
-                    idxL += lowerIdx(predictors.size() - 2 - jj)*(int)pow(
-                            dimRes,jj + 1);
-                } else {
-                    idxL += (lowerIdx(predictors.size() - 2 - jj) + 1)*(int)
-                            pow(dimRes,jj + 1);
-                }
+            if (rem == 0) {
+                idxL += lowerIdx(predictors.size() - 2 - jj)*(int)pow(dimRes,
+                        jj+1);
+            } else {
+                idxL += (lowerIdx(predictors.size() - 2 - jj)+1)*(int)pow(
+                        dimRes,jj+1);
             }
-        } else {
-             idxL += (int)(lowerIdx(0)*pow(dimRes,predictors.size() - 1));
         }
+
+        // Now add the lowest dimension's lower index
+        idxL += lowerIdx(predictors.size() - 1);
 
         coeffs[ii] = surrogate(idxL)*(1 - xd) + surrogate(idxL + 1)*xd;
 
@@ -341,23 +340,24 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
 //        coeffs[ii] = surrogate(idxL)*(1 - xd) + surrogate(idxU)*xd;
     }
 
-    // Now we work our way down the dimensions using our computed coefficients
+    // Now we work our way up the dimensions using our computed coefficients
     // to get the interpolated value.
     for (int ii = 1; ii < predictors.size(); ii++) {
         // Get the current dimensions x value
-        x0 = surrogate(lowerIdx[ii] + dimRes*ii);
-        x1 = surrogate(lowerIdx[0]+1 + dimRes*ii);
+        x0 = surrogate(lowerIdx(predictors.size() - 1 - ii) + dimRes*(
+                predictors.size() - 1 - ii));
+        x1 = surrogate(lowerIdx(predictors.size() - 1 - ii) + 1 + dimRes*(
+                predictors.size() - 1 - ii));
 
         if ((fabs(x1 - x0) < std::numeric_limits<double>::epsilon()) ||
                 x0 == x1) {
             xd = 0.0;
         } else {
-            xd = (predictors(ii) - x0)/(x1 - x0);
+            xd = (predictors(predictors.size() - 1 - ii) - x0)/(x1 - x0);
         }
 
-        for (int jj = 0; jj < (int)pow(2,ii); jj++) {
-            int jump = (int)pow(2,predictors.size()-ii-2);
-            coeffs[jj] = coeffs[jj]*(1 - xd) + coeffs[jj+jump]*xd;
+        for (int jj = 0; jj < (int)pow(2,predictors.size() - 1 - ii); jj++) {
+            coeffs[jj] = coeffs[jj*2]*(1 - xd) + coeffs[jj*2+1]*xd;
         }
     }
 
