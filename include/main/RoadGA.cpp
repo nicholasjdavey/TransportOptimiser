@@ -57,14 +57,15 @@ void RoadGA::initialiseStorage() {
 
     int noSpecies = this->species.size();
     this->costs = Eigen::VectorXd::Zero(this->populationSizeGA);
-    this->profits = Eigen::VectorXd::Zero(this->populationSizeGA);
+    this->rovCurr = Eigen::VectorXd::Zero(this->populationSizeGA);
     this->iarsCurr = Eigen::MatrixXd::Zero(this->populationSizeGA,noSpecies);
     this->popsCurr = Eigen::MatrixXd::Zero(this->populationSizeGA,noSpecies);
     this->useCurr = Eigen::VectorXd::Zero(this->populationSizeGA);
 
     this->best = Eigen::VectorXd::Zero(this->generations);
     this->av = Eigen::VectorXd::Zero(this->generations);
-    this->surrFit = Eigen::VectorXd::Zero(this->generations);
+    this->surrFit = Eigen::MatrixXd::Zero(this->generations,this->species.
+            size());
 
     this->iars = Eigen::MatrixXd::Zero(this->generations*this->
             populationSizeGA*this->maxLearnNo,noSpecies);
@@ -75,6 +76,10 @@ void RoadGA::initialiseStorage() {
     this->popsSD = Eigen::MatrixXd::Zero(this->generations*this->
             populationSizeGA*this->maxLearnNo,noSpecies);
     this->useSD = Eigen::VectorXd::Zero(this->generations*this->
+            populationSizeGA*this->maxLearnNo);
+    this->values = Eigen::VectorXd::Zero(this->generations*this->
+            populationSizeGA*this->maxLearnNo);
+    this->valuesSD = Eigen::VectorXd::Zero(this->generations*this->
             populationSizeGA*this->maxLearnNo);
 }
 
@@ -549,6 +554,9 @@ void RoadGA::elite(const Eigen::VectorXi& parentsIdx,
 }
 
 void RoadGA::optimise(bool plot) {
+    // Initialise the generation
+    this->generation = 0;
+
     // Initialise surrogate-related info
     if (this->type == Optimiser::MTE) {
         this->surrErr.resize(this->species.size());
@@ -562,19 +570,19 @@ void RoadGA::optimise(bool plot) {
     // Run parent-level initial commands
     Optimiser::optimise(plot);
 
-    if (plot) {
-        GnuplotPtr plotPtr(new Gnuplot);
+//    if (plot) {
+//        GnuplotPtr plotPtr(new Gnuplot);
 
-        this->plothandle.reset();
-        this->plothandle = plotPtr;
+//        this->plothandle.reset();
+//        this->plothandle = plotPtr;
 
-        if (this->type > Optimiser::SIMPLEPENALTY) {
-            GnuplotPtr surrPlotPtr(new Gnuplot);
+//        if (this->type > Optimiser::SIMPLEPENALTY) {
+//            GnuplotPtr surrPlotPtr(new Gnuplot);
 
-            this->surrPlotHandle.reset();
-            this->surrPlotHandle = surrPlotPtr;
-        }
-    }
+//            this->surrPlotHandle.reset();
+//            this->surrPlotHandle = surrPlotPtr;
+//        }
+//    }
 
     this->creation();
 
@@ -582,7 +590,22 @@ void RoadGA::optimise(bool plot) {
 
     // Initially, the surrogate model is simply a straight line for all
     // AAR values (100% survival)
+//    if (this->noSamples >= 15) {
+//        if (this->type == Optimiser::MTE) {
+//            if (this->interp == Optimiser::CUBIC_SPLINE) {
+//                this->buildSurrogateModelMTE();
+//            } else if (this->interp == Optimiser::MULTI_LOC_LIN_REG) {
+//                this->buildSurrogateModelMTELocalLinear();
+//            }
+//        } else if (this->type == Optimiser::CONTROLLED) {
+//            this->buildSurrogateModelROVCR();
+//        }
+//    } else {
+//        this->defaultSurrogate();
+//    }
+
     this->defaultSurrogate();
+    this->initialPlots(plot);
     // Evaluate once to initialise the surrogate if we are using MTE or ROV
 //    if (this->type > Optimiser::SIMPLEPENALTY) {
 //        this->evaluateGeneration();
@@ -591,7 +614,7 @@ void RoadGA::optimise(bool plot) {
 //        surrErr = 0;
 //    }
 
-    while ((status == 0) && (this->generation <= this->generations)) {
+    while ((status == 0) && (this->generation < this->generations)) {
         // Evaluate the current generation using the new surrogate
         this->evaluateGeneration();
         this->output();
@@ -619,14 +642,14 @@ void RoadGA::optimise(bool plot) {
                 this->selector);
 
         // Perform crossover, mutation and elite subpopulation creation
+        this->elite(parentsElite,eliteChildren);
         this->crossover(parentsCrossover,crossoverChildren);
         this->mutation(parentsMutation,mutationChildren);
-        this->elite(parentsElite,eliteChildren);
 
         // Assign the new population
-        this->currentRoadPopulation.block(0,0,pc,cols) = crossoverChildren;
-        this->currentRoadPopulation.block(pc,0,pm,cols) = mutationChildren;
-        this->currentRoadPopulation.block(pc+pm,0,pe,cols) = eliteChildren;
+        this->currentRoadPopulation.block(0,0,pe,cols) = eliteChildren;
+        this->currentRoadPopulation.block(pe,0,pc,cols) = crossoverChildren;
+        this->currentRoadPopulation.block(pe+pc,0,pm,cols) = mutationChildren;
 
         // Print important results to console
         std::cout << "Generation: " << this->generation << "\t Average Cost: "
@@ -634,8 +657,12 @@ void RoadGA::optimise(bool plot) {
                 this->best(this->generation);
 
         if (this->type > Optimiser::SIMPLEPENALTY) {
-            std::cout << "\t Surrogate Error: " <<
-                    this->surrFit(this->generation);
+            if (this->type == Optimiser::MTE) {
+                // At this stage we do not know how to compute the error for
+                // CONTROLLED
+                std::cout << "\t Surrogate Error: " <<
+                        this->surrFit(this->generation);
+            }
         }
 
         std::cout << std::endl;
@@ -680,6 +707,237 @@ void RoadGA::optimise(bool plot) {
 
     // Save the results of the run.
     this->saveExperimentalResults();
+}
+
+void RoadGA::initialPlots(bool plot) {
+
+    if (plot) {
+        // Prepare terrain data
+        std::vector<std::vector<std::vector<double>>> terr;
+        terr.resize(region->getX().rows());
+
+        for (int ii = 0; ii < this->region->getX().rows()-2; ii++) {
+            terr[ii].resize(this->region->getX().rows()-2);
+            for (int jj = 0; jj < this->region->getX().cols()-2; jj++) {
+                terr[ii][jj].resize(3);
+            }
+        }
+
+        Eigen::MatrixXd X = this->region->getX();
+        Eigen::MatrixXd Y = this->region->getY();
+        Eigen::MatrixXd Z = this->region->getZ();
+
+        for (int ii = 1; ii < this->region->getX().rows()-1; ii++) {
+            for (int jj = 1; jj < this->region->getX().rows()-1; jj++) {
+                terr[ii-1][jj-1][0] = X(ii,jj);
+                terr[ii-1][jj-1][1] = Y(ii,jj);
+                terr[ii-1][jj-1][2] = Z(ii,jj);
+            }
+        }
+
+        // Prepare vegetation data
+        std::vector<std::vector<std::vector<double>>> veg;
+        veg.resize(this->region->getVegetation().rows()-2);
+
+        for (int ii = 0; ii < this->region->getVegetation().rows()-2; ii++) {
+            veg[ii].resize(this->region->getVegetation().rows()-2);
+            for (int jj = 0; jj < this->region->getVegetation().rows()-2;
+                    jj++) {
+                veg[ii][jj].resize(3);
+            }
+        }
+
+        Eigen::MatrixXi V = this->region->getVegetation();
+
+        for (int ii = 1; ii < this->region->getVegetation().rows()-1; ii++) {
+            for (int jj = 1; jj < this->region->getVegetation().rows()-1; jj++) {
+                veg[ii-1][jj-1][0] = X(ii,jj);
+                veg[ii-1][jj-1][1] = Y(ii,jj);
+                veg[ii-1][jj-1][2] = V(ii,jj);
+            }
+        }
+
+        // Set start and end points
+        int startXidx = (int)(this->designParams->getStartX())/(X.maxCoeff()
+                - X.minCoeff());
+        int startYidx = (int)(this->designParams->getStartY())/(Y.maxCoeff()
+                - Y.minCoeff());
+        int endXidx = (int)(this->designParams->getEndX())/(X.maxCoeff()
+                - X.minCoeff());
+        int endYidx = (int)(this->designParams->getEndY())/(Y.maxCoeff()
+                - Y.minCoeff());
+        veg[startXidx][startYidx][2] = 0;
+        veg[endXidx][endYidx][2] = 0;
+
+        // PLOTS //////////////////////////////////////////////////////////////
+        // Clear Previous plot
+        if (this->type > Optimiser::SIMPLEPENALTY) {
+            (*this->plothandle) << "set multiplot layout 1,3\n";
+            if (this->type == Optimiser::MTE) {
+                (*this->surrPlotHandle) << "set multiplot layout " <<
+                        this->species.size() <<",2\n";
+            } else if (this->species.size() < 2) {
+                (*this->surrPlotHandle) << "set multiplot layout 1,1\n";
+//                (*this->surrPlotHandle) << "set multiplot layout 1,2\n";
+            } else {
+                (*this->surrPlotHandle) << "set multiplot layout 1,1\n";
+            }
+        } else {
+            (*this->plothandle) << "set multiplot layout 1,3\n";
+        }
+
+        // Plot 1 (Terrain with Road)
+        (*this->plothandle) << "set title '3D View of Terrain'\n";
+        (*this->plothandle) << "set grid\n";
+        (*this->plothandle) << "set hidden3d\n";
+        (*this->plothandle) << "unset logscale y\n";
+        (*this->plothandle) << "unset key\n";
+        (*this->plothandle) << "unset view\n";
+        (*this->plothandle) << "unset pm3d\n";
+        (*this->plothandle) << "unset xlabel\n";
+        (*this->plothandle) << "unset ylabel\n";
+        (*this->plothandle) << "set xrange [*:*]\n";
+        (*this->plothandle) << "set yrange [*:*]\n";
+        (*this->plothandle) << "set view 45,45\n";
+        (*this->plothandle) << "splot '-' with lines\n";
+        (*this->plothandle).send2d(terr);
+        (*this->plothandle).flush();
+
+        // Plot 2 (Road on Vegetation)
+        (*this->plothandle) << "set title 'Road Path Through Vegetation'\n";
+        (*this->plothandle) << "unset key\n";
+        (*this->plothandle) << "set pm3d\n";
+        (*this->plothandle) << "set view map\n";
+        (*this->plothandle) << "plot '-' with image\n";
+        (*this->plothandle).send2d(veg);
+        (*this->plothandle).flush();
+
+        // Plot 3 (Stopping Criteria/Best and Average)
+        // Best and Average Option
+        (*this->plothandle) << "set title 'Best and Average Roads'\n";
+        (*this->plothandle) << "unset pm3d\n";
+        (*this->plothandle) << "unset key\n";
+        (*this->plothandle) << "set grid\n";
+        (*this->plothandle) << "set xlabel 'Generation'\n";
+        (*this->plothandle) << "set ylabel 'Cost (AUD x10^Y)'\n";
+        (*this->plothandle) << "set xrange [0.5:" + std::to_string(
+                this->generations+0.5) + "]\n";
+        (*this->plothandle) << "set yrange [0:10]\n";
+        (*this->plothandle) << "set key off\n";
+        std::vector<std::vector<double>> blankData;
+        blankData.resize(1,std::vector<double>(2));
+        blankData[0][0] = 1;
+        blankData[0][1] = 1;
+        (*this->plothandle) << "plot '-' with lines linecolor rgb'#ffffff'\n";
+        (*this->plothandle).send1d(blankData);
+        (*this->plothandle).flush();
+
+        // Stopping Criteria Option
+        if (this->type == Optimiser::MTE) {
+            for (int ii = 0; ii < this->species.size(); ii++) {
+                // Plot 4ii (Surrogate Model)
+                (*this->surrPlotHandle) << "set title 'Surrogate Model, Species"
+                        << ii+1 << "'\n";
+                (*this->surrPlotHandle) << "unset key\n";
+                (*this->surrPlotHandle) << "unset logscale y\n";
+                (*this->surrPlotHandle) << "set grid\n";
+                (*this->surrPlotHandle) << "set xlabel 'IAR'\n";
+                (*this->surrPlotHandle) << "set ylabel 'End Population'\n";
+                (*this->surrPlotHandle) << "set xrange [0:1]\n";
+                (*this->surrPlotHandle) << "set yrange [0:" + std::to_string(
+                        this->species[ii]->getInitialPopulation()) + "]\n";
+                std::vector<std::vector<double>> blankData;
+                blankData.resize(1,std::vector<double>(2));
+                blankData[0][0] = 1;
+                blankData[0][1] = 1;
+                (*this->surrPlotHandle) << "plot '-' with lines linecolor rgb'#ffffff'\n";
+                (*this->surrPlotHandle).flush();
+
+                // Plot 5ii (Surrogate Model Error)
+                (*this->surrPlotHandle) << "set title 'Surrogate Error'\n";
+                (*this->surrPlotHandle) << "unset key\n";
+                (*this->surrPlotHandle) << "set logscale y\n";
+                (*this->surrPlotHandle) << "set grid\n";
+                (*this->surrPlotHandle) << "set xlabel 'Generation'\n";
+                (*this->surrPlotHandle) << "set ylabel 'Model Error'\n";
+                (*this->surrPlotHandle) << "set xrange [0.5:" + std::to_string(
+                        this->generations+0.5) + "]\n";
+                (*this->surrPlotHandle) << "set yrange [1:10]\n";
+                (*this->surrPlotHandle) << "set key off\n";
+                (*this->surrPlotHandle) << "plot '-' with lines linecolor rgb'#ffffff'\n";
+                (*this->surrPlotHandle).send1d(blankData);
+                (*this->surrPlotHandle).flush();
+            }
+
+        } else if (this->type == Optimiser::CONTROLLED) {
+            // At this stage, we can only do a plot for two dimensions
+            if (this->species.size() == 1) {
+                // Plot 4ii (Surrogate Model)
+                (*this->surrPlotHandle) << "set title 'Surrogate Model\n";
+                (*this->surrPlotHandle) << "unset key\n";
+                (*this->surrPlotHandle) << "unset view\n";
+                (*this->surrPlotHandle) << "unset pm3d\n";
+                (*this->surrPlotHandle) << "unset logscale y\n";
+                (*this->surrPlotHandle) << "set grid\n";
+                (*this->surrPlotHandle) << "set xlabel 'IAR'\n";
+                (*this->surrPlotHandle) << "set ylabel 'Initial Period Unit Profit'\n";
+                (*this->surrPlotHandle) << "set zlabel 'PV of Operating Costs'\n";
+                (*this->surrPlotHandle) << "set xrange [0:1]\n";
+                (*this->surrPlotHandle) << "set yrange [0:1000]\n";
+                (*this->surrPlotHandle) << "set zrange [0:1000]\n";
+                (*this->surrPlotHandle) << "set view 45,45\n";
+                (*this->surrPlotHandle) << "splot '-' with lines linecolor rgb'#ffffff'\n";
+                std::vector<std::vector<double>> blankData;
+                blankData.resize(1,std::vector<double>(3));
+                blankData[0][0] = 0.5;
+                blankData[0][1] = 0.5;
+                blankData[0][2] = 1;
+                (*this->surrPlotHandle).send2d(blankData);
+                (*this->surrPlotHandle).flush();
+
+//                // Plot 5ii (Surrogate Model Error)
+//                blankData.resize(1,std::vector<double>(2));
+//                blankData[0][0] = 1;
+//                blankData[0][1] = 1;
+//                (*this->surrPlotHandle) << "set title 'Surrogate Error'\n";
+//                (*this->surrPlotHandle) << "unset key\n";
+//                (*this->surrPlotHandle) << "set logscale y\n";
+//                (*this->surrPlotHandle) << "set grid\n";
+//                (*this->surrPlotHandle) << "set xlabel 'Generation'\n";
+//                (*this->surrPlotHandle) << "set ylabel 'Model Error'\n";
+//                (*this->surrPlotHandle) << "set xrange [0.5:" + std::to_string(
+//                        this->generations+0.5) + "]\n";
+//                (*this->surrPlotHandle) << "set yrange [1:10]\n";
+//                (*this->surrPlotHandle) << "set key off\n";
+//                (*this->surrPlotHandle) << "plot '-' with lines linecolor rgb'#ffffff'\n";
+//                (*this->surrPlotHandle).send1d(blankData);
+//                (*this->surrPlotHandle).flush();
+            } else {
+                // At this stage we do not plot error as we do not know much
+                // about how to meaningfully and accurately compute it.
+//                // Plot 5ii (Surrogate Model Error)
+//                blankData.resize(1,std::vector<double>(2));
+//                blankData[0][0] = 1;
+//                blankData[0][1] = 1;
+//                (*this->surrPlotHandle) << "set title 'Surrogate Error'\n";
+//                (*this->surrPlotHandle) << "unset key\n";
+//                (*this->surrPlotHandle) << "set logscale y\n";
+//                (*this->surrPlotHandle) << "set grid\n";
+//                (*this->surrPlotHandle) << "set xlabel 'Generation'\n";
+//                (*this->surrPlotHandle) << "set ylabel 'Model Error'\n";
+//                (*this->surrPlotHandle) << "set xrange [0.5:" + std::to_string(
+//                        this->generations+0.5) + "]\n";
+//                (*this->surrPlotHandle) << "set yrange [1:10]\n";
+//                (*this->surrPlotHandle) << "set key off\n";
+//                (*this->surrPlotHandle) << "plot '-' with lines linecolor rgb'#ffffff'\n";
+//                (*this->surrPlotHandle).send1d(blankData);
+//                (*this->surrPlotHandle).flush();
+            }
+
+            (*this->plothandle) << "unset multiplot\n";
+            (*this->surrPlotHandle) << "unset logscale y\n";
+        }
+    }
 }
 
 void RoadGA::plotResults(bool plot) {
@@ -845,8 +1103,15 @@ void RoadGA::plotResults(bool plot) {
         // Clear Previous plot
         if (this->type > Optimiser::SIMPLEPENALTY) {
             (*this->plothandle) << "set multiplot layout 1,3\n";
-            (*this->surrPlotHandle) << "set multiplot layout " <<
-                    this->species.size() <<",2\n";
+            if (this->type == Optimiser::MTE) {
+                (*this->surrPlotHandle) << "set multiplot layout " <<
+                        this->species.size() <<",2\n";
+            } else if (this->species.size() < 2) {
+                (*this->surrPlotHandle) << "set multiplot layout 1,1\n";
+//                (*this->surrPlotHandle) << "set multiplot layout 1,2\n";
+            } else {
+                (*this->surrPlotHandle) << "set multiplot layout 1,1\n";
+            }
         } else {
             (*this->plothandle) << "set multiplot layout 1,3\n";
         }
@@ -894,6 +1159,7 @@ void RoadGA::plotResults(bool plot) {
         (*this->plothandle) << "plot '-' with points pointtype 5, '-' with points pointtype 7 \n";
         (*this->plothandle).send1d(genCostsBest);
         (*this->plothandle).send1d(genCostsAv);
+        (*this->plothandle).flush();
 
         // Stopping Criteria Option
 
@@ -970,6 +1236,7 @@ void RoadGA::plotResults(bool plot) {
                 (*this->surrPlotHandle) << "plot '-' with lines, '-' with points pointtype 7 \n";
                 (*this->surrPlotHandle).send1d(surrModel);
                 (*this->surrPlotHandle).send1d(surrData);
+                (*this->plothandle).flush();
 
                 // Plot 5ii (Surrogate Model Error)
                 (*this->surrPlotHandle) << "set title 'Surrogate Error'\n";
@@ -1000,11 +1267,201 @@ void RoadGA::plotResults(bool plot) {
                         minVal) + ":" + std::to_string(maxVal) + "]\n";
                 (*this->surrPlotHandle) << "plot '-' with points pointtype 7 \n";
                 (*this->surrPlotHandle).send1d(surrErrData);
+                (*this->plothandle).flush();
+            }
+        } else if (this->type == Optimiser::CONTROLLED) {
+            // At this stage, we can only do a plot for two dimensions
+            if (this->species.size() == 1) {
+                // Prepare surrogate data
+                std::vector<std::vector<double>> surrData;
+                surrData.resize(this->noSamples,std::vector<double>(3));
+                std::vector<std::vector<double>> surrSDData;
+                surrSDData.resize(this->noSamples,std::vector<double>(3));
+                std::vector<std::vector<double>> surrErrData;
+                surrErrData.resize(this->generation+1,std::vector<double>(2));
+
+                // Surrogate sample data
+                for (int jj = 0; jj < this->noSamples; jj++) {
+                    surrData[jj][0] = this->iars(jj,0);
+                    surrData[jj][1] = this->use(jj);
+                    surrData[jj][2] = this->values(jj);
+                    surrSDData[jj][0] = this->iars(jj,0);
+                    surrSDData[jj][1] = this->use(jj);
+                    surrSDData[jj][2] = this->valuesSD(jj);
+                }
+
+                // Surrogate error data
+                for (int jj = 0; jj <= this->generation; jj++) {
+                    surrErrData[jj][0] = jj+1;
+                    surrErrData[jj][1] = this->surrFit(jj,0);
+                }
+
+                // Surrogate model
+                double minIAR = 0;
+                double maxIAR = this->iars.col(0).maxCoeff();
+                double minUse = this->use.segment(0,this->noSamples).minCoeff();
+                double maxUse = this->use.segment(0,this->noSamples).maxCoeff();
+                double minValue = this->values.segment(0,this->noSamples)
+                        .minCoeff();
+                double maxValue = this->values.segment(0,this->noSamples)
+                        .maxCoeff();
+
+                Eigen::MatrixXd regX(this->surrDimRes,2);
+                regX.block(0,0,this->surrDimRes,1) = Eigen::VectorXd::
+                        LinSpaced(this->surrDimRes,minIAR,maxIAR);
+                regX.block(0,1,this->surrDimRes,1) = Eigen::VectorXd::
+                        LinSpaced(this->surrDimRes,minUse,maxUse);
+//                Eigen::VectorXd predictors((int)pow(this->surrDimRes,2)*2);
+//                Eigen::VectorXd results((int)pow(this->surrDimRes,2));
+                std::vector<std::vector<std::vector<double>>> surrModel;
+                surrModel.resize((int)(this->surrDimRes));
+
+                for (int ii = 0; ii < this->surrDimRes; ii++) {
+                    surrModel[ii].resize(this->surrDimRes);
+                    for (int jj = 0; jj < this->surrDimRes; jj++) {
+                        surrModel[ii][jj].resize(this->surrDimRes);
+                    }
+                }
+
+//                for (int ii = 0; ii < this->surrDimRes; ii++) {
+//                    for (int jj = 0; jj < this->surrDimRes; jj++) {
+//                        predictors((ii*this->surrDimRes)*2+jj*2) = regX(ii,0);
+//                        predictors((ii*this->surrDimRes)*2+jj*2 + 1) =
+//                                regX(jj,1);
+//                    }
+//                }
+
+                // At this stage, we only use the multiple local linear
+                // regression. We simply call the actual data points in the
+                // surrogate. We do not neet to do interpolation.
+//                SimulateGPU::interpolateSurrogateMulti(this->surrogateML[
+//                        2*this->scenario->getCurrentScenario()][this->
+//                        scenario->getRun()][0],predictors,results,this->
+//                        surrDimRes,2);
+
+                Eigen::VectorXd surr = this->surrogateML[2*this->scenario->
+                        getCurrentScenario()][this->scenario->getRun()][0];
+
+                for (int ii = 0; ii < this->surrDimRes; ii++) {
+                    for (int jj = 0; jj < this->surrDimRes; jj++) {
+                        surrModel[ii][jj][0] = regX(ii,0);
+                        surrModel[ii][jj][1] = regX(jj,1);
+                        surrModel[ii][jj][2] = surr(this->surrDimRes*2 + ii*
+                                this->surrDimRes + jj);
+                    }
+                }
+
+                // Plot 4ii (Surrogate Model)
+                (*this->surrPlotHandle) << "set title 'Surrogate Model\n";
+                (*this->surrPlotHandle) << "unset key\n";
+                (*this->surrPlotHandle) << "unset view\n";
+                (*this->surrPlotHandle) << "unset pm3d\n";
+                (*this->surrPlotHandle) << "unset logscale y\n";
+                (*this->surrPlotHandle) << "set grid\n";
+                (*this->surrPlotHandle) << "set xlabel 'IAR'\n";
+                (*this->surrPlotHandle) << "set ylabel 'Initial Period Unit Cost'\n";
+                (*this->surrPlotHandle) << "set zlabel 'PV of Operating Costs'\n";
+                (*this->surrPlotHandle) << "set xrange [0:" + std::to_string(
+                        maxIAR) + "]\n";
+                (*this->surrPlotHandle) << "set yrange [" + std::to_string(
+                        minUse) + ":" + std::to_string(maxUse) + "]\n";
+                (*this->surrPlotHandle) << "set yrange [" + std::to_string(
+                        minUse) + ":" + std::to_string(maxUse) + "]\n";
+                (*this->surrPlotHandle) << "set zrange [" + std::to_string(
+                        minValue) + ":" + std::to_string(maxValue) + "]\n";
+                (*this->surrPlotHandle) << "set view 45,45\n";
+//                (*this->surrPlotHandle) << "splot '-' with points pointtype 7 \n";
+                (*this->surrPlotHandle) << "splot '-' with lines, '-' with points pointtype 7 \n";
+                (*this->surrPlotHandle).send2d(surrModel);
+                (*this->surrPlotHandle).send1d(surrData);
+                (*this->plothandle).flush();
+
+//                // Surrogate error data
+//                for (int jj = 0; jj <= this->generation; jj++) {
+//                    surrErrData[jj][0] = jj+1;
+//                    surrErrData[jj][1] = this->surrFit(jj,0);
+//                }
+
+//                // Plot 5 (Surrogate Model Error)
+//                (*this->surrPlotHandle) << "set title 'Surrogate Error'\n";
+//                (*this->surrPlotHandle) << "unset key\n";
+//                (*this->surrPlotHandle) << "set logscale y\n";
+//                (*this->surrPlotHandle) << "set grid\n";
+//                (*this->surrPlotHandle) << "set xlabel 'Generation'\n";
+//                (*this->surrPlotHandle) << "set ylabel 'Model Error'\n";
+//                //(*this->surrPlotHandle) << "set logscale y\n";
+//                (*this->surrPlotHandle) << "set xrange [0.5:" + std::to_string(
+//                        this->generations+0.5) + "]\n";
+//                double minVal = this->surrFit.block(0,0,this->generation+1,1).
+//                        minCoeff();
+//                double maxVal = this->surrFit.col(0).maxCoeff();
+//                if (minVal <= 0) {
+//                    minVal = 1e-3;
+//                } else {
+//                    minVal = minVal - fmod(minVal,pow(10.0,floor(log10(minVal))
+//                            ));
+//                }
+//                if (maxVal == 0) {
+//                    maxVal = minVal*10.0;
+//                } else {
+//                    maxVal = maxVal - fmod(maxVal,pow(10.0,floor(log10(maxVal))
+//                            )) + pow(10.0,floor(log10(maxVal)));
+//                }
+//                (*this->surrPlotHandle) << "set yrange [" + std::to_string(
+//                        minVal) + ":" + std::to_string(maxVal) + "]\n";
+//                (*this->surrPlotHandle) << "plot '-' with points pointtype 7 \n";
+//                (*this->surrPlotHandle).send1d(surrErrData);
+//                (*this->plothandle).flush();
+
+            } else {
+//                // Only plot the surrogate error
+//                std::vector<std::vector<double>> surrErrData;
+//                surrErrData.resize(this->generation+1,std::vector<double>(2));
+
+//                // Surrogate error data
+//                for (int jj = 0; jj <= this->generation; jj++) {
+//                    surrErrData[jj][0] = jj+1;
+//                    surrErrData[jj][1] = this->surrFit(jj,0);
+//                }
+
+//                // Plot 5 (Surrogate Model Error)
+//                (*this->surrPlotHandle) << "set title 'Surrogate Error'\n";
+//                (*this->surrPlotHandle) << "unset key\n";
+//                (*this->surrPlotHandle) << "set logscale y\n";
+//                (*this->surrPlotHandle) << "set grid\n";
+//                (*this->surrPlotHandle) << "set xlabel 'Generation'\n";
+//                (*this->surrPlotHandle) << "set ylabel 'Model Error'\n";
+//                //(*this->surrPlotHandle) << "set logscale y\n";
+//                (*this->surrPlotHandle) << "set xrange [0.5:" + std::to_string(
+//                        this->generations+0.5) + "]\n";
+//                double minVal = this->surrFit.block(0,0,this->generation+1,1).
+//                        minCoeff();
+//                double maxVal = this->surrFit.col(0).maxCoeff();
+//                if (minVal == 0) {
+//                    minVal = 1e-3;
+//                } else {
+//                    minVal = minVal - fmod(minVal,pow(10.0,floor(log10(minVal))
+//                            ));
+//                }
+//                if (maxVal == 0) {
+//                    maxVal = minVal*10.0;
+//                } else {
+//                    maxVal = maxVal - fmod(maxVal,pow(10.0,floor(log10(maxVal))
+//                            )) + pow(10.0,floor(log10(maxVal)));
+//                }
+//                (*this->surrPlotHandle) << "set yrange [" + std::to_string(
+//                        minVal) + ":" + std::to_string(maxVal) + "]\n";
+//                (*this->surrPlotHandle) << "plot '-' with points pointtype 7 \n";
+//                (*this->surrPlotHandle).send1d(surrErrData);
+//                (*this->plothandle).flush();
             }
         }
 
         (*this->plothandle) << "unset multiplot\n";
-        (*this->surrPlotHandle) << "unset logscale y\n";
+        if (this->type > Optimiser::SIMPLEPENALTY) {
+            (*this->surrPlotHandle) << "unset logscale y\n";
+            (*this->surrPlotHandle) << "unset multiplot\n";
+        }
     }
 }
 
@@ -1029,7 +1486,18 @@ void RoadGA::assignBestRoad() {
 void RoadGA::output() {
 
     this->best(this->generation) = this->costs.minCoeff();
-    this->av(this->generation) = this->costs.mean();
+    // Occasionally we will get NaN values. We must omit these from the mean.
+    double total = 0.0;
+    double validPoints = 0.0;
+
+    for (int ii = 0; ii < this->costs.size(); ii++) {
+        if (std::isfinite(this->costs(ii))) {
+            total += this->costs(ii);
+            validPoints++;
+        }
+    }
+
+    this->av(this->generation) = total/validPoints;
     if (this->type > Optimiser::SIMPLEPENALTY) {
         this->surrFit.row(this->generation) = this->surrErr.transpose();
     }
@@ -1043,7 +1511,7 @@ void RoadGA::computeSurrogate() {
     // surrogate model.
     // We always wish to select some samples at each iteration to keep
     // testing the effectiveness of the algorithm.
-    double pFull;
+    double pFull = 0;
     if (this->generation == 0) {
         this->surrErr = Eigen::VectorXd::Constant(1,this->species.size());
     } else {
@@ -1058,12 +1526,17 @@ void RoadGA::computeSurrogate() {
             pFull = std::max((this->maxLearnNo/this->populationSizeGA)*
                     std::min((this->surrErr.maxCoeff() - this->surrThresh)*(
                     (double)(this->surrErr.maxCoeff() > this->surrThresh))*
-                    this->maxLearnNo,1.0),10.0/this->populationSizeGA);
+                    this->maxLearnNo,1.0),this->maxLearnNo/(double)this->
+                    populationSizeGA);
         } else {
-            pFull = std::max((this->maxLearnNo/this->populationSizeGA)*
-                    std::min((this->surrErr.maxCoeff() - this->surrThresh)*(
-                    (double)(this->surrErr.maxCoeff() > this->surrThresh))*
-                    this->maxLearnNo,1.0),3.0/this->populationSizeGA);
+            // Beyond the learning period, we will only use the minimum
+            // learning number
+            pFull = this->minLearnNo/this->populationSizeGA;
+//            pFull = std::max((this->maxLearnNo/this->populationSizeGA)*
+//                    std::min((this->surrErr.maxCoeff() - this->surrThresh)*(
+//                    (double)(this->surrErr.maxCoeff() > this->surrThresh))*
+//                    this->maxLearnNo,1.0),this->minLearnNo/(double)this->
+//                    populationSizeGA);
         }
     } else if (this->type == Optimiser::CONTROLLED) {
         // We treat ROV the same as MTE for now even though it should be much
@@ -1073,19 +1546,27 @@ void RoadGA::computeSurrogate() {
             pFull = std::max((this->maxLearnNo/this->populationSizeGA)*
                     std::min((this->surrErr.maxCoeff() - this->surrThresh)*(
                     (double)(this->surrErr.maxCoeff() > this->surrThresh))*
-                    this->maxLearnNo,1.0/this->populationSizeGA),10.0/this->
-                    populationSizeGA);
+                    this->maxLearnNo,1.0/this->populationSizeGA),this->
+                    maxLearnNo/(double)this->populationSizeGA);
         } else {
-            pFull = std::max((this->maxLearnNo/this->populationSizeGA)*
-                    std::min((this->surrErr.maxCoeff() - this->surrThresh)*(
-                    (double)(this->surrErr.maxCoeff() > this->surrThresh))*
-                    this->maxLearnNo,1.0/this->populationSizeGA),3.0/this->
-                    populationSizeGA);
+            // Beyond the learning period, we will only use the minimum
+            // learning number
+            pFull = this->minLearnNo/this->populationSizeGA;
+//            pFull = std::max((this->maxLearnNo/this->populationSizeGA)*
+//                    std::min((this->surrErr.maxCoeff() - this->surrThresh)*(
+//                    (double)(this->surrErr.maxCoeff() > this->surrThresh))*
+//                    this->maxLearnNo,1.0/this->populationSizeGA),this->
+//                    minLearnNo/(double)this->populationSizeGA);
         }
     }
 
     // Actual number of roads to sample
     int newSamples = ceil(pFull * this->populationSizeGA);
+
+    // We always need at least 10 samples to start the surrogate model creation
+    if ((newSamples + this->noSamples) < 10) {
+        newSamples = 10 - this->noSamples;
+    }
     Eigen::VectorXi sampleRoads(newSamples);
 
 //    // Select individuals for computing learning from the full model
@@ -1119,7 +1600,9 @@ void RoadGA::computeSurrogate() {
                     .block(0,ii,this->populationSizeGA,1);
         }
 
-        this->generateSample(current,candidates,newSamples,sampleRoads);
+        if (newSamples > 0) {
+            this->generateSample(current,candidates,newSamples,sampleRoads);
+        }
 
     } else if (this->type == Optimiser::CONTROLLED) {
         Eigen::MatrixXd current(this->noSamples,this->species.size()+1);
@@ -1139,7 +1622,9 @@ void RoadGA::computeSurrogate() {
         candidates.block(0,species.size(),this->populationSizeGA,1) = this->
                 useCurr;
 
-        this->generateSample(current,candidates,newSamples,sampleRoads);
+        if (newSamples > 0) {
+            this->generateSample(current,candidates,newSamples,sampleRoads);
+        }
     }
 
     // Call the thread pool. The computed function and form of the surrogate
@@ -1224,6 +1709,18 @@ void RoadGA::computeSurrogate() {
 
     } else if (this->type == Optimiser::CONTROLLED) {
 
+        int validCounter = 0;
+        Eigen::VectorXd currErr = Eigen::VectorXd::Zero(1);
+
+        // We will normalise the error by dividing the absolute value of each
+        // deviation by the range of values in the sample data.
+        double range = 0;
+
+        if (this->noSamples >= 2) {
+            range = this->values.segment(0,this->noSamples).maxCoeff() - this->
+                    values.segment(0,this->noSamples).minCoeff();
+        }
+
         for (unsigned long ii = 0; ii < newSamples; ii++) {
 
             // As each full model requires its own parallel routine and this
@@ -1231,16 +1728,79 @@ void RoadGA::computeSurrogate() {
             // road serially. Furthermore, we do not want to add new roads to
             // the threadpool
             //      endPop_i = f_i(aar_i)
-            RoadPtr road(new Road(this->me(),
-                    this->currentRoadPopulation.row(ii)));
-            Eigen::MatrixXd rovResult(1,this->species.size()+2);
-            this->surrogateResultsROVCR(road,rovResult);
+            RoadPtr road(new Road(this->me(),this->currentRoadPopulation
+                    .row(sampleRoads(ii))));
+            Eigen::MatrixXd rovResult(1,this->species.size()+3);
+            Optimiser::ComputationStatus fullStatus = this->
+                    surrogateResultsROVCR(road,rovResult);
 
-            this->iars.row(this->noSamples + ii) = rovResult.block(0,2,
-                    1,this->species.size());
-            this->use(this->noSamples + ii) = rovResult(0,0);
-            this->useSD(this->noSamples + ii) = rovResult(0,1);
+            // Outputs
+            if (fullStatus == Optimiser::COMPUTATION_SUCCESS) {
+                this->values(this->noSamples + validCounter) = rovResult(0,0);
+                this->valuesSD(this->noSamples + validCounter) =
+                        rovResult(0,1);
+                // IAR predictors
+                this->iars.row(this->noSamples + validCounter) = rovResult
+                        .block(0,2,1,this->species.size());
+                // Unit profit predictors
+                this->use(this->noSamples + validCounter) = rovResult(0,this->
+                        species.size()+2);
+
+                // We need to compute the current period error by evaluating the
+                // sample roads against the new surrogate. We compute the error
+                // of the mean population. For now we just compute the error of
+                // the current samples, not all that have been computed to date
+                // (although we could easily do this if desired). We use the
+                // old surrogate here for the comparison.
+
+                // For now we normalise the error by the difference between the
+                // maximum and minimum cost values
+
+                currErr(0) += fabs((this->values(this->noSamples + validCounter)
+                        - this->rovCurr(sampleRoads(ii)))/range);
+                validCounter++;
+            }
         }
+
+// UNCOMMENT THIS SECTION AT A LATER STAGE //////////////////////////////////////
+//        // We should let the error be the error for the best road only. This is
+//        // easier and more useful as the best road is the only one we care
+//        // about.
+//        Eigen::Matrix<double,Eigen::Dynamic,1> Y(1);
+//        Eigen::Matrix<int,Eigen::Dynamic,1> I(1);
+//        Eigen::Matrix<double,Eigen::Dynamic,Eigen::Dynamic> costs(
+//                this->populationSizeGA,1);
+//        costs = this->costs.cast<double>();
+
+//        igl::mat_min(costs,1,Y,I);
+
+//        RoadPtr road(new Road(this->me(),this->currentRoadPopulation
+//                .row(I(0))));
+//        Eigen::MatrixXd rovResult(1,this->species.size()+3);
+//        Optimiser::ComputationStatus fullStatus = this->
+//                surrogateResultsROVCR(road,rovResult);
+
+//        if (fullStatus == Optimiser::COMPUTATION_SUCCESS) {
+//            // We need to compute the current period error by evaluating the
+//            // best roads against the new surrogate. We compute the error
+//            // of the mean population. For now we just compute the error of
+//            // the current samples, not all that have been computed to date
+//            // (although we could easily do this if desired). We use the
+//            // old surrogate here for the comparison.
+//            currErr(0) = fabs((rovResult(0,0) - this->rovCurr(sampleRoads(ii)))
+//                    /rovResult(0,0));
+//        }
+
+        currErr(0) = currErr(0)/validCounter;
+
+        if (std::isfinite(currErr(0))) {
+            this->surrFit(this->generation) = currErr(0);
+        } else {
+            this->surrFit(this->generation) = 1;
+        }
+
+        this->surrErr(0) = this->surrFit(this->generation);
+//        this->surrFit(this->generation) = currErr(0);
 
         this->noSamples += newSamples;
 
@@ -1252,15 +1812,16 @@ void RoadGA::computeSurrogate() {
 void RoadGA::evaluateGeneration() {
     // Initialise the current vectors used to zero
     this->costs = Eigen::VectorXd::Zero(this->populationSizeGA);
-    this->profits = Eigen::VectorXd::Zero(this->populationSizeGA);
+    this->rovCurr = Eigen::VectorXd::Zero(this->populationSizeGA);
     this->iarsCurr = Eigen::MatrixXd::Zero(this->populationSizeGA,
             this->species.size());
     this->popsCurr = Eigen::MatrixXd::Zero(this->populationSizeGA,
             this->species.size());
     this->useCurr = Eigen::VectorXd::Zero(this->populationSizeGA);
+    this->rovCurr = Eigen::VectorXd::Zero(this->populationSizeGA);
 
     if (this->type == Optimiser::CONTROLLED) {
-        this->profits = Eigen::VectorXd::Zero(this->populationSizeGA);
+        this->rovCurr = Eigen::VectorXd::Zero(this->populationSizeGA);
     }
 
     // Computes the current population of roads using a surrogate function
@@ -1282,7 +1843,7 @@ void RoadGA::evaluateGeneration() {
                 road->evaluateRoad();
 
                 this->costs(ii) = road->getAttributes()->getTotalValueMean();
-                this->profits(ii) = road->getAttributes()->getVarProfitIC();
+                this->rovCurr(ii) = road->getAttributes()->getVarProfitIC();
 
                 if (this->type > Optimiser::SIMPLEPENALTY) {
                     for (int jj = 0; jj < this->species.size(); jj++) {
@@ -1322,7 +1883,7 @@ void RoadGA::evaluateGeneration() {
 //            std::cout << "Road Design & Evaluation Time " << ii << ": " << elapsed_secs << " s" << std::endl << std::endl;
 
             this->costs(ii) = road->getAttributes()->getTotalValueMean();
-            this->profits(ii) = road->getAttributes()->getVarProfitIC();
+            this->rovCurr(ii) = road->getAttributes()->getVarProfitIC();
 
             if (this->type > Optimiser::SIMPLEPENALTY) {
                 for (int jj = 0; jj < this->species.size(); jj++) {
@@ -2115,6 +2676,8 @@ RoadGA::ComputationStatus RoadGA::surrogateResultsMTE(RoadPtr road,
             mteResult(2,ii) = species[ii]->getEndPopSD()/initPops(ii);
         }
 
+        this->writeOutSurrogateData(mteResult);
+
         return RoadGA::COMPUTATION_SUCCESS;
 
     } catch (int err) {
@@ -2124,19 +2687,128 @@ RoadGA::ComputationStatus RoadGA::surrogateResultsMTE(RoadPtr road,
     }
 }
 
-void RoadGA::surrogateResultsROVCR(RoadPtr road, Eigen::MatrixXd& rovResult) {
+RoadGA::ComputationStatus RoadGA::surrogateResultsROVCR(RoadPtr road,
+        Eigen::MatrixXd& rovResult) {
 
-    road->designRoad();
-    road->evaluateRoad(true);
-    std::vector<SpeciesRoadPatchesPtr> species =
-            road->getSpeciesRoadPatches();
+    try {
+        road->designRoad();
+        road->evaluateRoad(true);
+        std::vector<SpeciesRoadPatchesPtr> species =
+                road->getSpeciesRoadPatches();
 
-    rovResult(0,1) = road->getAttributes()->getTotalUtilisationROV();
-    rovResult(0,2) = road->getAttributes()->getTotalUtilisationROVSD();
-    for (int ii = 0; ii < this->species.size(); ii++) {
-        Eigen::VectorXd iars = species[ii]->getInitAAR();
-        rovResult(0,ii+2) = iars(iars.size()-1);
+        rovResult(0,0) = road->getAttributes()->getTotalUtilisationROV();
+        rovResult(0,1) = road->getAttributes()->getTotalUtilisationROVSD();
+        for (int ii = 0; ii < this->species.size(); ii++) {
+            Eigen::VectorXd iars = species[ii]->getInitAAR();
+            rovResult(0,ii+2) = iars(iars.size()-1);
+        }
+
+        // Fixed cost per unit traffic
+        double unitCost = road->getAttributes()->getUnitVarCosts();
+        // Fuel consumption per vehicle class per unit traffic (L)
+        Eigen::VectorXd fuelCosts = road->getCosts()->getUnitFuelCost();
+        Eigen::VectorXd currentFuelPrice(fuelCosts.size());
+
+        for (int ii = 0; ii < fuelCosts.size(); ii++) {
+            currentFuelPrice(ii) = (road->getOptimiser()->getTraffic()->
+                    getVehicles())[ii]->getFuel()->getCurrent();
+        }
+
+        unitCost += fuelCosts.transpose()*currentFuelPrice;
+
+        rovResult(0,this->species.size()+2) = unitCost;
+
+        this->writeOutSurrogateData(rovResult);
+
+        return RoadGA::COMPUTATION_SUCCESS;
+
+    } catch (int err) {
+        return RoadGA::COMPUTATION_FAILED;
+
+        std::cout << "Failure in full model computation ROV" << std::endl;
     }
+}
+
+void RoadGA::writeOutSurrogateData(Eigen::MatrixXd &data) {
+    std::string scenarioFolder = this->getRootFolder() + "/" + "Scenario_" +
+            std::to_string(this->scenario->getCurrentScenario());
+
+    if(!(boost::filesystem::exists(scenarioFolder))) {
+        boost::filesystem::create_directory(scenarioFolder);
+    }
+
+    std::ifstream outputFileCheck;
+    std::ofstream outputFile2;
+
+    std::string surrogateResults = scenarioFolder + "/" + "surrogate_data";
+    outputFileCheck.open(surrogateResults);
+
+    int existingLines = 0;
+
+    if (outputFileCheck.good()) {
+        std::string templLine;
+        while (getline(outputFileCheck,templLine)) {
+            existingLines++;
+        }
+        outputFileCheck.close();
+
+        existingLines -= 4;
+
+        outputFile2.open(surrogateResults,std::ios::app);
+    } else {
+        outputFileCheck.close();
+
+        outputFile2.open(surrogateResults);
+
+        // Prepare header details for raw surrogate data files
+        outputFile2 << "####################################################################################################" << std::endl;
+        outputFile2 << "######################################## SURROGATE RESULTS #########################################" << std::endl;
+        outputFile2 << "####################################################################################################" << std::endl;
+        std::setprecision(12);
+
+        if (this->type == Optimiser::MTE) {
+            for (int ii = 0; ii < this->species.size(); ii++) {
+                outputFile2 << "IAR_" << std::setw(3) << std::setfill('0') <<
+                        ii << "                  " "END_POP_" << std::setw(17)
+                        << ii << "END_POP_SD" << std::setw(15) << ii;
+            }
+            outputFile2 << std::endl;
+        } else if (this->type == Optimiser::CONTROLLED) {
+            for (int ii = 0; ii < this->species.size(); ii++) {
+                outputFile2 << "IAR_" << std::setw(3) << ii <<
+                        "                  ";
+            }
+
+            outputFile2 << "INITIAL_UNIT_PROFIT      " <<
+                    "AVERAGE_VALUE            " << "VALUE_SD" << std::endl;
+        }
+    }
+
+    // SAVE RESULTS
+    if (this->type == Optimiser::MTE) {
+        // RAW DATA
+        for (int jj = 0; jj < this->species.size(); jj++) {
+            outputFile2 << std::setw(20) << data(0,jj) << "     " <<
+                    std::setw(20) << data(1,jj) << "     " << std::setw(20) <<
+                    data(2,jj);
+            if (jj < (this->species.size() - 1)) {
+                outputFile2 << "";
+            }
+        }
+        outputFile2 << std::endl;
+
+    } else if (this->type == Optimiser::CONTROLLED) {
+        // RAW DATA
+        for (int jj = 0; jj < this->species.size(); jj++) {
+            outputFile2 << std::setw(20) << data(jj+2);
+        }
+
+        outputFile2 << std::setw(20) << data(this->species.size()+2) <<
+                std::setw(20) << data(0,0) << std::setw(20) << data(0,1);
+    }
+
+    outputFile2 << std::endl;
+    outputFile2.close();
 }
 
 void RoadGA::defaultSurrogate() {
@@ -2935,8 +3607,15 @@ void RoadGA::initialiseFromTextInput(std::string inputFile) {
     for (int ii = 0; ii < listParams.size(); ii++) {
         mpl(ii) = ::atof(listParams[ii].c_str());
     }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    listParams = Utility::getDictionary(values[1],",");
+    Eigen::VectorXd crvcm(listParams.size());
+    for (int ii = 0; ii < listParams.size(); ii++) {
+        crvcm(ii) = ::atof(listParams[ii].c_str());
+    }
     VariableParametersPtr varParams(new VariableParameters(mpl,ab,hpsd,mpsd,
-            rcsd,pgrm,pgrsd,cpm,cpsd,ocsd));
+            rcsd,pgrm,pgrsd,cpm,cpsd,ocsd,crvcm));
 
     // Traffic Programs
     for (int ii = 0; ii < 6; ii++) {
@@ -3067,7 +3746,7 @@ void RoadGA::initialiseFromTextInput(std::string inputFile) {
         getline(input2,line);
         values = Utility::getDictionary(line,",");
 
-        for (int jj = 0; jj < values.size(); jj++) {
+        for (int jj = 0; jj < X.cols(); jj++) {
             acq(ii,jj) = ::atof(values[jj].c_str());
         }
     }
@@ -3495,6 +4174,99 @@ void RoadGA::initialiseFromTextInput(std::string inputFile) {
     }
 
     this->setSpecies(species);
+
+    // Comparison Road Data
+    // We don't include a path for now, only the costs of the road for
+    // computing the ROV component.
+    for (int ii = 0; ii < 6; ii++) {
+        getline(input,line);
+    }
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    bool roadExists = values[1] == "TRUE" ? true : false;
+
+    if (roadExists) {
+        std::vector<std::string> valuesRoad;
+
+        // Include a dummy genome for now
+        Eigen::VectorXd X = Eigen::VectorXd::Zero(this->designParams->
+                getIntersectionPoints());
+        Eigen::VectorXd Y = Eigen::VectorXd::Zero(this->designParams->
+                getIntersectionPoints());
+        Eigen::VectorXd Z = Eigen::VectorXd::Zero(this->designParams->
+                getIntersectionPoints());
+        RoadPtr road(new Road(this->me(),X,Y,Z));
+        CostsPtr costsRoad(new Costs(road));
+
+        // Travel time (hours)
+        getline(input,line);
+        values = Utility::getDictionary(line,":");
+        double travelTime = ::atof(values[1].c_str());
+        // Length (m)
+        getline(input,line);
+        values = Utility::getDictionary(line,":");
+        double length = ::atof(values[1].c_str());
+        // Fuel consumptions (L/1000 km)
+        getline(input,line);
+        values = Utility::getDictionary(line,":");
+        valuesRoad = Utility::getDictionary(values[1],",");
+        Eigen::VectorXd fc(valuesRoad.size());
+        // Unit accident const (variable)
+        getline(input,line);
+        values = Utility::getDictionary(line,":");
+        double accidentVar = ::atof(values[1].c_str());
+
+        for (int ii = 0; ii < fc.size(); ii++) {
+            // We multiply by 3.6e6 to bring the units in line with Jong et al.
+            // 1999
+            fc(ii) = ::atof(valuesRoad[ii].c_str())*3600000;
+        }
+
+        // Perform cost calculations for road
+        double K = this->getTraffic()->getPeakProportion();
+        double D = this->getTraffic()->getDirectionality();
+        double Hp = this->getTraffic()->getPeakHours();
+
+        Eigen::VectorXd Q(3);
+        Q << 1.0e-6*K*D*154.5*18,
+                1.0e-6*K*(1-D)*154.5*18,
+                5.0e-7*(6570-309*Hp)*(1-K)/(18-Hp)*18;
+
+
+        Eigen::MatrixXd fcrep(vehicles.size(),3);
+        igl::repmat(fc,1,3,fcrep);
+
+        double enviroCost = 6570*0.001*0.01*length*(
+                unitCosts->getAirPollution()
+                + unitCosts->getNoisePollution()
+                + unitCosts->getWaterPollution()
+                + unitCosts->getOilExtraction()
+                + unitCosts->getLandUse()
+                + unitCosts->getSolidChemWaste());
+
+        costsRoad->setUnitFuelCost(fcrep*Q);
+
+        Eigen::VectorXd cphr(vehicles.size());
+        Eigen::VectorXd prop(vehicles.size());
+
+        for (int ii = 0; ii < vehicles.size(); ii++) {
+            prop(ii) = vehicles[ii]->getProportion();
+            cphr(ii) = vehicles[ii]->getHourlyCost();
+        }
+
+        Eigen::Vector3d repTcphr = Eigen::Vector3d::Constant(prop.transpose()*
+                cphr);
+
+        double travelCost = (2.0e6)*travelTime*repTcphr.transpose()*Q;
+
+        costsRoad->setLengthVariable(travelCost + enviroCost);
+        costsRoad->setAccidentVariable(accidentVar);
+
+        road->setCosts(costsRoad);
+
+        this->setComparisonRoad(road);
+    }
+
     // Now that we have all of the contained objects within the roadGA object,
     // we can initialise the storage elements
     this->initialiseStorage();
@@ -3554,9 +4326,9 @@ void RoadGA::getExistingSurrogateData() {
                     this->iars(noSamples,jj) = values[jj];
                 }
 
-                this->use(noSamples) = values[species.size() + 1];
-                this->values(noSamples) = values[species.size() + 2];
-                this->valuesSD(noSamples) = values[species.size() + 3];
+                this->use(this->noSamples) = values[species.size()];
+                this->values(this->noSamples) = values[species.size() + 1];
+                this->valuesSD(this->noSamples) = values[species.size() + 2];
 
                 this->noSamples++;
             }
@@ -3614,59 +4386,60 @@ void RoadGA::saveExperimentalResults() {
         int existingLines = 0;
 
         // Save Surrogate Results:
-        std::ofstream outputFile2;
+        // Performed after computing each data point
+//        std::ofstream outputFile2;
 
-        std::string surrogateResults = scenarioFolder + "/" + "surrogate_data";
-        outputFileCheck.open(surrogateResults);
+//        std::string surrogateResults = scenarioFolder + "/" + "surrogate_data";
+//        outputFileCheck.open(surrogateResults);
 
-        if (outputFileCheck.good()) {
-            std::string templLine;
-            while (getline(outputFileCheck,templLine)) {
-                existingLines++;
-            }
-            outputFileCheck.close();
+//        if (outputFileCheck.good()) {
+//            std::string templLine;
+//            while (getline(outputFileCheck,templLine)) {
+//                existingLines++;
+//            }
+//            outputFileCheck.close();
 
-            existingLines -= 4;
+//            existingLines -= 4;
 
-            outputFile2.open(surrogateResults,std::ios::app);
-        } else {
-            outputFileCheck.close();
+//            outputFile2.open(surrogateResults,std::ios::app);
+//        } else {
+//            outputFileCheck.close();
 
-            outputFile2.open(surrogateResults);
+//            outputFile2.open(surrogateResults);
 
-            // Prepare header details for raw surrogate data files
-            outputFile2 << "####################################################################################################" << std::endl;
-            outputFile2 << "######################################## SURROGATE RESULTS #########################################" << std::endl;
-            outputFile2 << "####################################################################################################" << std::endl;
-            std::setw(10);
-            std::setprecision(12);
+//            // Prepare header details for raw surrogate data files
+//            outputFile2 << "####################################################################################################" << std::endl;
+//            outputFile2 << "######################################## SURROGATE RESULTS #########################################" << std::endl;
+//            outputFile2 << "####################################################################################################" << std::endl;
+//            std::setw(10);
+//            std::setprecision(12);
 
-            if (this->type == Optimiser::MTE) {
-                for (int ii = 0; ii < this->species.size(); ii++) {
-                    outputFile2 << "IAR_" << ii << "        END_POP_" << ii << "        END_POP_SD" << ii;
-                }
-                outputFile2 << std::endl;
-            } else if (this->type == Optimiser::CONTROLLED) {
-                for (int ii = 0; ii < this->species.size(); ii++) {
-                    outputFile2 << "IAR_" << ii;
-                }
+//            if (this->type == Optimiser::MTE) {
+//                for (int ii = 0; ii < this->species.size(); ii++) {
+//                    outputFile2 << "IAR_" << ii << "        END_POP_" << ii << "        END_POP_SD" << ii;
+//                }
+//                outputFile2 << std::endl;
+//            } else if (this->type == Optimiser::CONTROLLED) {
+//                for (int ii = 0; ii < this->species.size(); ii++) {
+//                    outputFile2 << "IAR_" << ii;
+//                }
 
-                outputFile2 << "INITIAL_UNIT_PROFIT" << "AVERAGE_VALUE" << "VALUE_SD" << std::endl;
-            }
-        }
+//                outputFile2 << "INITIAL_UNIT_PROFIT" << "AVERAGE_VALUE" << "VALUE_SD" << std::endl;
+//            }
+//        }
 
         if (this->type == Optimiser::MTE) {
-            // RAW DATA
-            for (int ii = existingLines; ii < this->noSamples; ii++) {
-                for (int jj = 0; jj < this->species.size(); jj++) {
-                    outputFile2 << this->iars(ii,jj) << "    " <<
-                            this->pops(ii,jj) << "    " << this->popsSD(ii,jj);
-                    if (jj < (this->species.size() - 1)) {
-                        outputFile2 << "  ";
-                    }
-                }
-                outputFile2 << std::endl;
-            }
+//            // RAW DATA
+//            for (int ii = existingLines; ii < this->noSamples; ii++) {
+//                for (int jj = 0; jj < this->species.size(); jj++) {
+//                    outputFile2 << this->iars(ii,jj) << "    " <<
+//                            this->pops(ii,jj) << "    " << this->popsSD(ii,jj);
+//                    if (jj < (this->species.size() - 1)) {
+//                        outputFile2 << "  ";
+//                    }
+//                }
+//                outputFile2 << std::endl;
+//            }
 
             // FITTED MODEL
             // Prepare header details for raw surrogate data files
@@ -3772,15 +4545,15 @@ void RoadGA::saveExperimentalResults() {
             }
 
         } else if (this->type == Optimiser::CONTROLLED) {
-            // RAW DATA
-            for (int ii = existingLines; ii < this->noSamples; ii++) {
-                for (int jj = 0; jj < this->species.size(); jj++) {
-                    outputFile2 << this->iars(ii,jj) << "    ";
-                }
+//            // RAW DATA
+//            for (int ii = existingLines; ii < this->noSamples; ii++) {
+//                for (int jj = 0; jj < this->species.size(); jj++) {
+//                    outputFile2 << this->iars(ii,jj) << "    ";
+//                }
 
-                outputFile2 << this->use(ii) << this->useSD(ii) << this->
-                        values(ii) << this->valuesSD(ii) << std::endl;
-            }
+//                outputFile2 << this->use(ii) << this->useSD(ii) << this->
+//                        values(ii) << this->valuesSD(ii) << std::endl;
+//            }
 
             // FITTED MODEL
             // Prepare header details for raw surrogate data files
@@ -3841,7 +4614,7 @@ void RoadGA::saveExperimentalResults() {
             }
         }
 
-        outputFile2.close();
+//        outputFile2.close();
 
         outputFile1.open(runResults,std::ios::out);
         outputFile1 << "####################################################################################################" << std::endl;

@@ -77,7 +77,7 @@ public:
         const Eigen::VectorXd& zCoords);
 
     /**
-     * Constructor II
+     * Constructor III
      *
      * Constructs a %Road object using the encoded genome
      */

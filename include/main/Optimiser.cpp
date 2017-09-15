@@ -335,6 +335,9 @@ void Optimiser::saveBestRoadResults() {
     RoadPtr road = this->bestRoads[this->scenario->getCurrentScenario()][this->
             scenario->getRun()];
 
+    road->designRoad();
+    road->evaluateRoad(true,true);
+
     // Ensure results folder is created in the correct location
     std::string scenarioFolder = this->getRootFolder() + "/" + "Scenario_" +
             std::to_string(this->scenario->getCurrentScenario());

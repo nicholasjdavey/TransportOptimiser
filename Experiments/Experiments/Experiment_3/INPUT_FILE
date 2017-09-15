@@ -10,7 +10,7 @@
 ## GENERAL OPTIMISATION PARAMETERS
 Mutation Rate                                   : 0.6
 Crossover Fraction                              : 0.375
-Max Generations                                 : 1
+Max Generations                                 : 200
 Population Size                                 : 400
 Stopping Tolerance                              : 1e-4
 Confidence Interval                             : 0.95
@@ -52,10 +52,10 @@ Interpolation Routine                           : 1
 ###################################################################################################
 ## DESIGN PARAMETERS
 Design Speed (m/s)                              : 27.8
-Start X Coordinate (m)                          : 500
-Start Y Coordinate (m)                          : 4500
-End X Coordinate (m)                            : 4500
-End Y Coordinate (m)                            : 500
+Start X Coordinate (m)                          : 0
+Start Y Coordinate (m)                          : 0
+End X Coordinate (m)                            : 9000
+End Y Coordinate (m)                            : 9000
 Max Grade (per cent)                            : 5
 Max Superelevation (per cent)                   : 8
 Road Width (m)                                  : 15
@@ -129,7 +129,7 @@ Number of Runs per Experiment                   : 5
 #    simple penalty = 1
 #    mte            = 2
 #    controlled     = 3
-Optimisation Method                             : 3
+Optimisation Method                             : 0
 # ROV Method
 #    Regression Monte Carlo (Tsitsiklis and Van Roy)                                        = 0
 #    Regression Monte Carlo (Longstaff and Schwartz)                                        = 1
@@ -171,12 +171,12 @@ Program 1   : 0,75,150 : 0,0,0,0,0,0,0,0 : FALSE
 ## REGION DATA
 # Ensure that the files below are all of the same dimension. All points must correspond to each
 # other. This is relative to the root directory for the program.
-X Values Matrix                                 : Experiments/Input_Data/Regions/Region_2/xvals.csv
-Y Values Matrix                                 : Experiments/Input_Data/Regions/Region_2/yvals.csv
-Z Values Matrix                                 : Experiments/Input_Data/Regions/Region_2/zvals.csv
-Vegetation Data Matrix                          : Experiments/Input_Data/Regions/Region_2/habitat.csv
-Acquisition Costs Matrix                        : Experiments/Input_Data/Regions/Region_2/acquisition.csv
-Soil Stabilisation Costs Matrix                 : Experiments/Input_Data/Regions/Region_2/stabilisation.csv
+X Values Matrix                                 : Experiments/Input_Data/Regions/Region_3/xcoordsMatrix.csv
+Y Values Matrix                                 : Experiments/Input_Data/Regions/Region_3/ycoordsMatrix.csv
+Z Values Matrix                                 : Experiments/Input_Data/Regions/Region_3/zcoordsMatrix.csv
+Vegetation Data Matrix                          : Experiments/Input_Data/Regions/Region_3/habitat.csv
+Acquisition Costs Matrix                        : Experiments/Input_Data/Regions/Region_3/acquisition.csv
+Soil Stabilisation Costs Matrix                 : Experiments/Input_Data/Regions/Region_3/stabilisation.csv
 
 ###################################################################################################
 ## COMMODITY DATA (Includes Fuels)
@@ -184,10 +184,9 @@ Soil Stabilisation Costs Matrix                 : Experiments/Input_Data/Regions
 # Add new commodity datafiles (in accordance with the template file) on new lines below preceded by
 # ":"
 Number of Fuels                                 : 2
-Number of Transported Commodities               : 1
+Number of Transported Commodities               : 0
 Commodity 1                                     : Experiments/Input_Data/Commodities/diesel
 Commodity 2                                     : Experiments/Input_Data/Commodities/petrol
-Commodity 3                                     : Experiments/Input_Data/Commodities/ore
 
 ###################################################################################################
 ## VEHICLE DATA

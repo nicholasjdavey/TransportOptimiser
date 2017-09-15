@@ -305,6 +305,21 @@ void Costs::computeLengthCosts() {
     double travelCost = (2.0e6)*travelTime*repTcphr.transpose()*Q;
 
     this->lengthVar = enviroCost + travelCost;
+
+    // If we are dealing with the situation where we have an existing
+    // alternative route, we convert these variable costs to variable profits
+    // by taking away the cost of the existing road.
+    if (this->getRoad()->getOptimiser()->getComparisonRoad() != nullptr) {
+        RoadPtr compRoad = this->getRoad()->getOptimiser()->
+                getComparisonRoad();
+        this->unitFuelVar = this->unitFuelVar.array() - compRoad->getCosts()->
+                getUnitFuelCost().array()*this->getRoad()->getOptimiser()->
+                getVariableParams()->getCompRoad()(this->getRoad()->
+                getOptimiser()->getScenario()->getCompRoad());
+        this->lengthVar -= compRoad->getCosts()->getLengthVariable()*this->
+                getRoad()->getOptimiser()->getVariableParams()->getCompRoad()
+                (this->getRoad()->getOptimiser()->getScenario()->getCompRoad());
+    }
 }
 
 void Costs::computeAccidentCosts() {
@@ -328,6 +343,14 @@ void Costs::computeAccidentCosts() {
     this->accidentVar = accCost*qfac*(0.96*(R.array())*(delta.array())/1000
             +0.14*(delta.array()*180/M_PI - 0.12*(double)spiral)).sum() *
             pow(0.978,3.28*width-30);
+
+    // As with the length costs above, if we are comparing this to an existing
+    // road, we only care about the difference.
+    if (this->getRoad()->getOptimiser()->getComparisonRoad() != nullptr) {
+        RoadPtr compRoad = this->getRoad()->getOptimiser()->
+                getComparisonRoad();
+        this->accidentVar -= compRoad->getCosts()->getAccidentVariable();
+    }
 
     Eigen::VectorXd mActual = R.array()*(1-cos(delta.array()/2));
     Eigen::VectorXd mReq = R.array()/(1-cos(28.65*ssd.array()*M_PI/

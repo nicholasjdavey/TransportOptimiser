@@ -354,7 +354,7 @@ void Simulator::simulateROVCR(bool policyMap) {
     }
 
     // 2. Unit profits map inputs at each time step
-    Eigen::MatrixXd unitProfits(nYears+1,noPaths);
+    Eigen::MatrixXd unitProfits(noPaths,nYears+1);
 
     // 3. Optimal profit-to-go outputs matrix (along each path)
     Eigen::MatrixXd condExp(noPaths,nYears+1);
@@ -435,7 +435,10 @@ void Simulator::simulateROVCR(bool policyMap) {
 
     // Compute the mean of each control to determine the optimal control and
     // operating value at time 0. We also compute the standard deviation.
-    float mean = condExp.col(0).mean();
+
+    // The mean is actually simply the first period value, which is the same
+    // for all paths. This step could therefore just get the first value.
+//    float mean = condExp.col(0).mean();
 //    float *controlPaths;
 //    mean = (float*)malloc(controls*sizeof(float));
 //    controlPaths = (float*)malloc(controls*sizeof(float));
@@ -455,7 +458,7 @@ void Simulator::simulateROVCR(bool policyMap) {
 //    }
 
 //    int firstControl = 0;
-    road->getAttributes()->setVarProfitIC(mean);
+//    road->getAttributes()->setVarProfitIC(mean);
 
 //    for (int ii = 1; ii < controls; ii++) {
 //        if (mean[ii] < road->getAttributes()->getVarProfitIC()) {
@@ -491,10 +494,10 @@ void Simulator::simulateROVCR(bool policyMap) {
             Eigen::MatrixXd stateLevels(noPaths,srp.size() + 1);
 
             for (int jj = 0; jj < srp.size(); jj++) {
-                stateLevels.col(jj) = adjPops[ii].col(jj);
+                stateLevels.col(jj) = adjPops[ii+1].col(jj);
             }
 
-            stateLevels.col(srp.size()) = adjPops[ii].col(srp.size());
+            stateLevels.col(srp.size()) = adjPops[ii].col(srp.size()-1);
 
             policyMap->getPolicyMapYear()[ii]->setStateLevels(stateLevels);
             policyMap->getPolicyMapYear()[ii]->setProfits(condExp.col(ii));
@@ -509,6 +512,13 @@ void Simulator::simulateROVCR(bool policyMap) {
 void Simulator::simulateROVCR(std::vector<Eigen::MatrixXd>& visualisePops,
         Eigen::VectorXi &visualiseFlows, Eigen::VectorXd&
         visualiseUnitProfits) {
+    // If an alternate route is provided, we do not bother computing the
+    // commodity as it is always present (throughput is unchanged overall).
+    bool comparisonRoad = false;
+    if (this->getRoad()->getOptimiser()->getComparisonRoad() != nullptr) {
+        comparisonRoad = true;
+    }
+
     // Visualise a single path for the road for demonstration purposes
 
 //    SimulateGPU::simulateSingleROVPath(this->me(),visualisePops,visualiseFlows,

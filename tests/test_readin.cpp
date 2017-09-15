@@ -124,8 +124,10 @@ int main(int argc, char **argv) {
     csd << 1,2,3;
     Eigen::VectorXd cpsd(3);
     cpsd << 1,2,3;
+    Eigen::VectorXd cr(3);
+    cr << 0.5,1,1.5;
     VariableParametersPtr varParams(new VariableParameters(popLevels,bridge,
-            hp,l,beta,pgr,pgrsd,c,csd,cpsd));
+            hp,l,beta,pgr,pgrsd,c,csd,cpsd,cr));
 
     // ECONOMIC
     EconomicPtr economic(new Economic());

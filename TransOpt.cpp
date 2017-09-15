@@ -20,6 +20,17 @@ int main(int argc, char **argv) {
 
     roadGA->initialiseFromTextInput(inputFile);
 
+    // Initialise the plots
+    GnuplotPtr plotPtr(new Gnuplot);
+
+    roadGA->setPlotHandle(plotPtr);
+
+    if (roadGA->getType() > Optimiser::SIMPLEPENALTY) {
+        GnuplotPtr surrPlotPtr(new Gnuplot);
+
+        roadGA->setSurrPlotHandle(surrPlotPtr);
+    }
+
     // Run all of the experiments
     int programs = roadGA->getPrograms().size();
     int popLevels = roadGA->getVariableParams()->getPopulationLevels().size();
@@ -32,6 +43,7 @@ int main(int argc, char **argv) {
     int cm = roadGA->getVariableParams()->getCommodityMultipliers().size();
     int csdm = roadGA->getVariableParams()->getCommoditySDMultipliers().size();
     int ore = roadGA->getVariableParams()->getCommodityPropSD().size();
+    int cr = roadGA->getVariableParams()->getCompRoad().size();
     int runs = roadGA->getNoRuns();
 
     for (int ii = 0; ii < programs; ii++) {
@@ -45,23 +57,25 @@ int main(int argc, char **argv) {
                                     for (int qq = 0; qq < cm; qq++) {
                                         for (int rr = 0; rr < csdm; rr++) {
                                             for (int ss = 0; ss < ore; ss++) {
-                                                for (int tt = 0; tt < runs; tt++) {
+                                                for (int tt = 0; tt < cr; tt++) {
+                                                    for (int uu = 0; uu < runs; uu++) {
                                                     ExperimentalScenarioPtr scenario(new ExperimentalScenario(roadGA,ii,jj,
-                                                            kk,ll,mm,nn,oo,pp,qq,rr,ss,tt));
+                                                            kk,ll,mm,nn,oo,pp,qq,rr,ss,tt,uu));
 
-                                                    scenario->setCurrentScenario(ii*popLevels*habPrefs*lambda*beta*ab*grm*
-                                                            grsdm*cm*csdm*ore*runs + jj*habPrefs*lambda*beta*ab*grm*grsdm*
-                                                            cm*csdm*ore*runs + kk*lambda*beta*ab*grm*grsdm*cm*csdm*ore*runs
-                                                            + ll*beta*ab*grm*grsdm*cm*csdm*ore*runs + mm*ab*grm*grsdm*cm*
-                                                            csdm*ore*runs + nn*grm*grsdm*cm*csdm*ore*runs + oo*grsdm*cm*
-                                                            csdm*ore*runs + pp*cm*csdm*ore*runs + qq*csdm*ore*runs + rr*ore
-                                                            *runs + ss*runs + tt);
+                                                        scenario->setCurrentScenario(ii*popLevels*habPrefs*lambda*beta*ab*grm*
+                                                                grsdm*cm*csdm*ore*cr + jj*habPrefs*lambda*beta*ab*grm*grsdm*
+                                                                cm*csdm*ore*cr + kk*lambda*beta*ab*grm*grsdm*cm*csdm*ore*cr
+                                                                + ll*beta*ab*grm*grsdm*cm*csdm*ore*cr + mm*ab*grm*grsdm*cm*
+                                                                csdm*ore*cr + nn*grm*grsdm*cm*csdm*ore*cr + oo*grsdm*cm*
+                                                                csdm*ore*cr + pp*cm*csdm*ore*cr + qq*csdm*ore*cr + rr*ore
+                                                                *cr + ss*cr + tt);
 
-                                                    roadGA->setScenario(scenario);
-                                                    roadGA->initialiseStorage();
-                                                    roadGA->getExistingSurrogateData();
-                                                    // Optimise
-                                                    roadGA->optimise(true);
+                                                        roadGA->setScenario(scenario);
+                                                        roadGA->initialiseStorage();
+                                                        roadGA->getExistingSurrogateData();
+                                                        // Optimise
+                                                        roadGA->optimise(true);
+                                                    }
                                                 }
                                             }
                                         }

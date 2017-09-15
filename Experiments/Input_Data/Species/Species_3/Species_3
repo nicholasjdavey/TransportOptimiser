@@ -41,4 +41,4 @@ Jump Poisson Parameter                      : 0.1
 ###################################################################################################
 # INITIAL POPULATION MAP
 # Relative to program root directory
-Initial Population Map                      : Experiments/Input_Data/Species/Species_2/Species_2_Pop.csv
+Initial Population Map                      : Experiments/Input_Data/Species/Species_3/Species_3_Pop.csv

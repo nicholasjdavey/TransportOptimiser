@@ -26,7 +26,7 @@ public:
             &bridge, const Eigen::VectorXd& hp, const Eigen::VectorXd& l, const
             Eigen::VectorXd& b, const Eigen::VectorXd& pgr, const
             Eigen::VectorXd& pgrsd, const Eigen::VectorXd& c, const
-            Eigen::VectorXd& csd, Eigen::VectorXd& cpsd);
+            Eigen::VectorXd& csd, Eigen::VectorXd& cpsd, Eigen::VectorXd& crvcm);
     /**
      * Destructor
      */
@@ -229,6 +229,23 @@ public:
         this->commodityPropSD = cpsd;
     }
 
+    /**
+     * Returns the multipliers for the comparison road variable costs
+     *
+     * @return Multipliers as Eigen::VectorXd&
+     */
+    const Eigen::VectorXd getCompRoad() {
+        return this->compRoad;
+    }
+    /**
+     * Sets the multipliers for the comparison road variable costs
+     *
+     * @param cr as Eigen::VectorXd&
+     */
+    void setCompRoad(Eigen::VectorXd& cr) {
+        this->compRoad = cr;
+    }
+
     // STATIC ROUTINES ///////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES //////////////////////////////////////////////////////
@@ -249,6 +266,7 @@ public:
     // mean reversion strength
     // To be added in the future
     Eigen::VectorXd commodityPropSD;    /**< Ore composition standard deviation scaling to use */
+    Eigen::VectorXd compRoad;           /**< Multiplier for comparison road variable costs */
 };
 
 #endif

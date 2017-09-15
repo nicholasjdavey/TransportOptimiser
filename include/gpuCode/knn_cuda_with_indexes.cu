@@ -105,9 +105,9 @@ __global__ void cuComputeDistanceTexture(int wA, float * B, int wB, int pB, int 
   */
 __global__ void cuComputeDistanceGlobal( float* A, int wA, int pA, float* B, int wB, int pB, int dim,  float* AB){
 
-	// Declaration of the shared memory arrays As and Bs used to store the sub-matrix of A and B
-	__shared__ float shared_A[BLOCK_DIM][BLOCK_DIM];
-	__shared__ float shared_B[BLOCK_DIM][BLOCK_DIM];
+    // Declaration of the shared memory arrays As and Bs used to store the sub-matrix of A and B
+    __shared__ float shared_A[BLOCK_DIM][BLOCK_DIM];
+    __shared__ float shared_B[BLOCK_DIM][BLOCK_DIM];
     
     // Sub-matrix of A (begin, step, end) and Sub-matrix of B (begin, step)
     __shared__ int begin_A;
@@ -120,8 +120,8 @@ __global__ void cuComputeDistanceGlobal( float* A, int wA, int pA, float* B, int
     int tx = threadIdx.x;
     int ty = threadIdx.y;
 	
-	// Other variables
-	float tmp;
+    // Other variables
+    float tmp;
     float ssd = 0;
 	
     // Loop parameters
@@ -132,7 +132,7 @@ __global__ void cuComputeDistanceGlobal( float* A, int wA, int pA, float* B, int
     end_A   = begin_A + (dim-1) * pA;
     
     // Conditions
-	int cond0 = (begin_A + tx < wA); // used to write in shared memory
+    int cond0 = (begin_A + tx < wA); // used to write in shared memory
     int cond1 = (begin_B + tx < wB); // used to write in shared memory & to computations and to write in output matrix
     int cond2 = (begin_A + ty < wA); // used to computations and to write in output matrix
     
@@ -241,9 +241,9 @@ __global__ void cuComputeNormTexture(int wA, float * B, int wB, int pB, int dim,
   */
 __global__ void cuComputeNormGlobal( float* A, int wA, int pA, float* B, int wB, int pB, int dim,  float* AB, float norm, bool inf){
 
-        // Declaration of the shared memory arrays As and Bs used to store the sub-matrix of A and B
-        __shared__ float shared_A[BLOCK_DIM][BLOCK_DIM];
-        __shared__ float shared_B[BLOCK_DIM][BLOCK_DIM];
+    // Declaration of the shared memory arrays As and Bs used to store the sub-matrix of A and B
+    __shared__ float shared_A[BLOCK_DIM][BLOCK_DIM];
+    __shared__ float shared_B[BLOCK_DIM][BLOCK_DIM];
 
     // Sub-matrix of A (begin, step, end) and Sub-matrix of B (begin, step)
     __shared__ int begin_A;
@@ -496,7 +496,7 @@ void knn_cuda_with_indexes::knn(float* ref_host, int ref_width, float* query_hos
     unsigned long memory_free;
     
 	
-	// Check if we can use texture memory for reference points
+    // Check if we can use texture memory for reference points
     unsigned int use_texture = ( ref_width*size_of_float<=MAX_TEXTURE_WIDTH_IN_BYTES && height*size_of_float<=MAX_TEXTURE_HEIGHT_IN_BYTES );
     
     // CUDA Initialisation
@@ -531,7 +531,7 @@ void knn_cuda_with_indexes::knn(float* ref_host, int ref_width, float* query_hos
     }
     ind_pitch = ind_pitch_in_bytes/size_of_int;
     
-	// Allocation of memory (global or texture) for reference points
+    // Allocation of memory (global or texture) for reference points
     if (use_texture){
 	
         // Allocation of texture memory
@@ -555,7 +555,7 @@ void knn_cuda_with_indexes::knn(float* ref_host, int ref_width, float* query_hos
     }
     else{
 	
-		// Allocation of global memory
+        // Allocation of global memory
         result = cudaMallocPitch( (void **) &ref_dev, &ref_pitch_in_bytes, ref_width * size_of_float, height);
         if (result){
             knn_cuda_with_indexes::printErrorMessage(result,  ref_width*size_of_float*height);
@@ -570,7 +570,7 @@ void knn_cuda_with_indexes::knn(float* ref_host, int ref_width, float* query_hos
     // Split queries to fit in GPU memory
     for (int i=0; i<query_width; i+=max_nb_query_traited){
         
-		// Number of query points considered
+        // Number of query points considered
         actual_nb_query_width = min( (unsigned long)max_nb_query_traited, (unsigned long)(query_width-i) );
         
         // Copy of part of query actually being treated

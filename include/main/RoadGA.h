@@ -215,12 +215,12 @@ public:
         this->costs = costs;
     }
 
-    Eigen::VectorXd& getProfits() {
-        return this->profits;
+    Eigen::VectorXd& getROVCurr() {
+        return this->rovCurr;
     }
 
-    void setProfits(Eigen::VectorXd& profits) {
-        this->profits = profits;
+    void setROVCurr(Eigen::VectorXd& rov) {
+        this->rovCurr = rov;
     }
 
     Eigen::MatrixXd& getIARSCurr() {
@@ -523,8 +523,18 @@ public:
      *
      * @param road as RoadPtr
      * @return Matrix of data for building surrogate function for ROVCR
+     * @return Error code as Optimiser::ComputationStatus
      */
-    virtual void surrogateResultsROVCR(RoadPtr road, Eigen::MatrixXd &rovResult);
+    virtual Optimiser::ComputationStatus surrogateResultsROVCR(RoadPtr road,
+            Eigen::MatrixXd &rovResult);
+
+    /**
+     * Writes out the surrogate results for a road calculation immediately
+     * after computing the full model
+     *
+     * @param data as Eigen::MatrixXd&
+     */
+    void writeOutSurrogateData(Eigen::MatrixXd& data);
 
     /**
      * Builds the 2D cubic splines representing the surrogate model for the
@@ -550,6 +560,14 @@ public:
      * @param plot as bool (default = false)
      */
     virtual void plotResults(bool plot = false);
+
+    /**
+     * Creates the initial plots for the optimisation before the first
+     * generation
+     *
+     * @param plot as bool (default = false)
+     */
+    virtual void initialPlots(bool plot = false);
 
     /**
      * Initialises the program with input data
@@ -583,10 +601,10 @@ private:
     unsigned long minLearnNo;   /**< Minimum number of roads on which to perform full model (best roads found) */
     // Values for current road population /////////////////////////////////////
     Eigen::VectorXd costs;      /**< Total costs of current population */
-    Eigen::VectorXd profits;    /**< Unit operating profit per unit time for all roads */
     Eigen::MatrixXd iarsCurr;   /**< IARs of current population */
     Eigen::MatrixXd popsCurr;   /**< Full traffic flow end pops of current population */
-    Eigen::VectorXd useCurr;    /**< Utility (ROV) of current population */
+    Eigen::VectorXd useCurr;    /**< Unit operating profit per unit time for all roads */
+    Eigen::VectorXd rovCurr;    /**< Utility (ROV) of current population */
     // Values for progression of GA ///////////////////////////////////////////
     Eigen::VectorXd best;       /**< Best cost for each generation */
     Eigen::VectorXd av;         /**< Average cost for each generation */
@@ -595,7 +613,7 @@ private:
     Eigen::MatrixXd iars;       /**< IARS for surrogate model (each column for each species) */
     Eigen::MatrixXd pops;       /**< Full traffic flow end pops for surrogate model */
     Eigen::MatrixXd popsSD;     /**< Standard deviations of above */
-    Eigen::VectorXd use;        /**< Utilities (ROV) for surrogate models (profit per unit traffic per unit exogenous price factor: petro, etc.) */
+    Eigen::VectorXd use;        /**< Utilities (ROV) for surrogate models (profit per unit traffic per unit exogenous price factor: petrol, etc.) */
     Eigen::VectorXd useSD;      /**< Utilities standard deviations (to delete) */
     Eigen::VectorXd values;     /**< Mean operating value */
     Eigen::VectorXd valuesSD;   /**< Operating value standard deviation */

@@ -11,7 +11,7 @@ int main(int argc, char **argv) {
 
     // EXPERIMENTAL SCENARIO
     ExperimentalScenarioPtr scenario(new ExperimentalScenario(roadGA,0,0,0,0,0,
-            0,0,0,0,0,0,0));
+            0,0,0,0,0,0,0,0));
 
     scenario->setCurrentScenario(0);
     roadGA->setScenario(scenario);
@@ -108,8 +108,10 @@ int main(int argc, char **argv) {
     csd << 1,2,3;
     Eigen::VectorXd cpsd(3);
     cpsd << 1,2,3;
+    Eigen::VectorXd cr(3);
+    cr << 0.5,1,1.5;
     VariableParametersPtr varParams(new VariableParameters(popLevels,bridge,
-            hp,l,beta,pgr,pgrsd,c,csd,cpsd));
+            hp,l,beta,pgr,pgrsd,c,csd,cpsd,cr));
 
     // DESIGN PARAMETERS
     DesignParametersPtr desParams(new DesignParameters(100/3.6,0,0,9000,9000,

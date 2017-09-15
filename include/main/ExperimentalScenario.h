@@ -27,7 +27,7 @@ public:
     ExperimentalScenario(OptimiserPtr optimiser, int program, int popLevel,
             int habPrefSD, int lambdaSD, int rangingCoeffSD, int animalBridge,
             int popGR, int popGRSD, int commodity, int commoditySD, int ore,
-            int run);
+            int cr, int run);
     /**
      * Destructor
      */
@@ -274,6 +274,23 @@ public:
         this->currentScenario = cs;
     }
 
+    /**
+     * Returns the index of the comparison road variable cost multiplier used
+     *
+     * @return Index as int
+     */
+    int getCompRoad() {
+        return this->compRoad;
+    }
+    /**
+     * Sets the index of the comparison road variable cost multiplier used
+     *
+     * @param cr as int
+     */
+    void setCompRoad(int cr) {
+        this->compRoad = cr;
+    }
+
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -300,6 +317,7 @@ private: // (0 = no uncertainty in each of the below)
     int commodity;      /**< Index of commodity price mean multiplier used */
     int commoditySD;    /**< Index of commodity price uncertainty multiplier used */
     int oreCompSD;      /**< Index of ore composition standard deviation multiplier used */
+    int compRoad;       /**< Index of comparison road variable cost multiplier used */
     int currentScenario;/**< Index of current scenario. Used for saving results */
 };
 

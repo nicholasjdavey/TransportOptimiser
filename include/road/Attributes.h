@@ -298,8 +298,8 @@ private:
     double initialUnitCost;         /**< Initial period cost per unit traffic */
     double totalValueMean;          /**< Overall value mean */
     double totalValueSD;            /**< Overall value standard deviation */
-    double totalUtilisationROV;     /**< Overall utilisation mean, ROV */
-    double totalUtilisationROVSD;   /**< Overall utilisation standard deviation, ROV */
+    double totalUtilisationROV;     /**< Overall operating value mean, ROV */
+    double totalUtilisationROVSD;   /**< Overall operating value standard deviation, ROV */
 };
 
 #endif

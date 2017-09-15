@@ -14,13 +14,14 @@ ExperimentalScenario::ExperimentalScenario(OptimiserPtr optimiser) {
     this->commoditySD = 0;
     this->currentScenario = 0;
     this->oreCompSD = 0;
+    this->compRoad = 0;
     this->run = 0;
 }
 
 ExperimentalScenario::ExperimentalScenario(OptimiserPtr optimiser, int program,
         int popLevel, int habPref, int lambda, int rangingCoeff,
         int animalBridge, int popGR, int popGRSD, int commodity,
-        int commoditySD, int ore, int run) {
+        int commoditySD, int ore, int cr, int run) {
 
     this->optimiser = optimiser;
     this->program = program;
@@ -34,6 +35,7 @@ ExperimentalScenario::ExperimentalScenario(OptimiserPtr optimiser, int program,
     this->commodity = commodity;
     this->commoditySD = commoditySD;
     this->run = run;
+    this->compRoad = cr;
     this->oreCompSD = ore;
 }
 

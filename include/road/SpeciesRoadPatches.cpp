@@ -10,52 +10,50 @@ SpeciesRoadPatches::SpeciesRoadPatches(OptimiserPtr optimiser, SpeciesPtr
 SpeciesRoadPatches::~SpeciesRoadPatches() {}
 
 void SpeciesRoadPatches::createSpeciesModel(bool visualise) {    
-    ////////////////////////
-    time_t begin = clock();
-    ////////////////////////
+//    ////////////////////////
+//    time_t begin = clock();
+//    ////////////////////////
     this->generateHabitatPatchesGrid(visualise);
-    ////////////////////////
-    time_t end = clock();
-    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-    std::cout << "Patch build time " << elapsed_secs << " s" << std::endl;
-    ////////////////////////
-    ////////////////////////
-    begin = clock();
-    ////////////////////////
+//    ////////////////////////
+//    time_t end = clock();
+//    double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//    std::cout << "Patch build time " << elapsed_secs << " s" << std::endl;
+//    ////////////////////////
+//    ////////////////////////
+//    begin = clock();
+//    ////////////////////////
     this->habitatPatchDistances();
-    ////////////////////////
-    end = clock();
-    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-    std::cout << "Distances time " << elapsed_secs << " s" << std::endl;
-    ////////////////////////
-    ////////////////////////
-    begin = clock();
-    ////////////////////////
+//    ////////////////////////
+//    end = clock();
+//    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//    std::cout << "Distances time " << elapsed_secs << " s" << std::endl;
+//    ////////////////////////
+//    ////////////////////////
+//    begin = clock();
+//    ////////////////////////
     this->roadCrossings();
-    ////////////////////////
-    end = clock();
-    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-    std::cout << "Crossings time " << elapsed_secs << " s" << std::endl;
-    ////////////////////////
-    ////////////////////////
-    begin = clock();
-    ////////////////////////
+//    ////////////////////////
+//    end = clock();
+//    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//    std::cout << "Crossings time " << elapsed_secs << " s" << std::endl;
+//    ////////////////////////
+//    ////////////////////////
+//    begin = clock();
+//    ////////////////////////
     this->computeTransitionProbabilities();
-    ////////////////////////
-    end = clock();
-    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-    std::cout << "Trans prob time " << elapsed_secs << " s" << std::endl;
-    ////////////////////////
-    ////////////////////////
-    begin = clock();
-    ////////////////////////
+//    ////////////////////////
+//    end = clock();
+//    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//    std::cout << "Trans prob time " << elapsed_secs << " s" << std::endl;
+//    ////////////////////////
+//    ////////////////////////
 //    begin = clock();
     this->computeSurvivalProbabilities();
-    ////////////////////////
-    end = clock();
-    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-    std::cout << "Surv prob time " << elapsed_secs << " s" << std::endl;
-    ////////////////////////
+//    ////////////////////////
+//    end = clock();
+//    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//    std::cout << "Surv prob time " << elapsed_secs << " s" << std::endl;
+//    ////////////////////////
 //    end = clock();
 //    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
 //    std::cout << "Survival Probabilities Time: " << elapsed_secs << " s" << std::endl;

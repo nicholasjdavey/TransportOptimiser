@@ -18,10 +18,9 @@ inline void gpuAssert(cudaError_t code, const char *file, int line, bool abort
     if (code != cudaSuccess) {
         fprintf(stderr,"GPUassert: %s %s %d\n", cudaGetErrorString(code), file,
                 line);
-//        cudaDeviceReset();
         cudaGetLastError();
-        cudaDeviceReset();
-        cudaSetDevice(0);
+//        cudaDeviceReset();
+        cudaThreadExit();
         throw "CUDA Error.";
     }
 }
@@ -682,6 +681,9 @@ __global__ void randControls(int noPaths, int nYears, int noControls, float*
 
     if (idx < noPaths*nYears) {
         control[idx] = (int)(randCont[idx]*noControls);
+        if (control[idx] == noControls) {
+            control[idx]--;
+        }
     }
 }
 
@@ -732,6 +734,9 @@ __global__ void printAverages(int nYears, int noSpecies, int noControls,
         }
 
         printf("Year: %d Total: %f C1: %f C2: %f C3: %f\n", idx,totals[0],aar[0],aar[1],aar[2]);
+
+        free(totals);
+        free(aar);
     }
 }
 
@@ -963,6 +968,10 @@ __global__ void allocateXYRegressionData(int noPaths, int noControls, int
 
     // For each path
     for (int ii = 0; ii < noPaths; ii++) {
+        if (controls[ii] >= noControls) {
+            printf("Invalid control %d\n",controls[ii]);
+        }
+
         yvals[noPaths*controls[ii] + dataPoints[controls[ii]]] = condExp[(
                 year + 1)*noPaths + ii];
 
@@ -1270,6 +1279,8 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
             }
             state[noSpecies*noControls] = unitCost + unitFuel - unitRevenue*
                     orePrice;
+            unitProfits[start*noPaths + idx] = unitCost + unitFuel -
+                    unitRevenue*orePrice;
 
 //            if (idx == noPaths-1) {
 //                printf("Test: %f %f %f %f\n",state[0],state[1],state[2],state[3]);
@@ -1939,7 +1950,7 @@ __global__ void firstPeriodInduction(int noPaths, int nYears, int noSpecies,
         float rrr, int noFuels, int noCommodities, float* Q, float* fuelCosts,
         float* totalPops, float* speciesParams, int* controls, float* aars,
         float* uComposition, float* uResults, int* fuelIdx, float* condExp,
-        int* optCont) {
+        int* optCont, float* stats) {
 
     float *payoffs, *dataPoints;
     payoffs = (float*)malloc(noControls*sizeof(float));
@@ -1970,7 +1981,7 @@ __global__ void firstPeriodInduction(int noPaths, int nYears, int noSpecies,
     for (int ii = 0; ii < noPaths; ii++) {
         int control = controls[ii*nYears];
 
-        payoffs[control] += condExp[ii];
+        payoffs[control] += condExp[ii+noPaths];
         dataPoints[control]++;
     }
 
@@ -1980,8 +1991,8 @@ __global__ void firstPeriodInduction(int noPaths, int nYears, int noSpecies,
         // population is below the threshold, then the payoff is
         // invalid.
         if (dataPoints[ii] > 0) {
-            payoffs[ii] = payoffs[ii]/(dataPoints[ii]*rrr/(100*
-                    timeStep));
+            payoffs[ii] = payoffs[ii]/(dataPoints[ii]*(1+rrr/(100*
+                    timeStep)));
         } else {
             break;
         }
@@ -2012,7 +2023,6 @@ __global__ void firstPeriodInduction(int noPaths, int nYears, int noSpecies,
     // As the zero flow rate option is always available, we can
     // initially set the optimal control to this before checking the
     // other controls.
-
     float bestExp = payoffs[0];
     int bestCont = 0;
 
@@ -2026,10 +2036,24 @@ __global__ void firstPeriodInduction(int noPaths, int nYears, int noSpecies,
     }
 
     // Assign the optimal control and payoff to all paths at time period 0
+
+    // Standard deviation
+    stats[2] = 0;
+
+    // Assign values and prepare standard deviation
     for (int ii = 0; ii < noPaths; ii++) {
         condExp[ii] = bestExp;
         optCont[ii] = bestCont;
+
+        if (controls[ii*nYears] == bestCont) {
+            stats[2] += (condExp[ii+noPaths] - payoffs[bestCont])*(condExp[ii
+                    +noPaths] - payoffs[bestCont]);
+        }
     }
+
+    stats[0] = condExp[0];
+    stats[1] = (float)optCont[0];
+    stats[2] = sqrt(stats[2]/(dataPoints[bestCont]*(1+rrr/(100*timeStep))));
 
     free(valid);
     free(payoffs);
@@ -2199,6 +2223,9 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
             }
             state[noSpecies*noControls] = unitCost + unitFuel - unitRevenue*
                     orePrice;
+
+            unitProfits[start*noPaths + idx] = unitCost + unitFuel -
+                    unitRevenue*orePrice;
 
             // Determine the current period payoffs to select the optimal
             // control for this period.
@@ -2538,6 +2565,26 @@ __global__ void multiLocLinReg(int noPoints, int noDims, int dimRes, int nYears,
     }
 }
 
+__global__ void rovCorrection(int noPoints, int noDims, int dimRes, int nYears,
+        int noControls, int year, int control, float* regression) {
+
+    // Global thread index
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+    if (idx < noPoints) {
+        float currVal = regression[year*noControls*(dimRes*noDims +
+                (int)pow(dimRes,noDims)*2) + control*(dimRes*noDims +
+                (int)pow(dimRes,noDims)*2) + dimRes*noDims + idx];
+
+        // The surrogate value cannot be greater than zero by definition
+        if (currVal > 0) {
+            regression[year*noControls*(dimRes*noDims + (int)pow(dimRes,
+                    noDims)*2) + control*(dimRes*noDims + (int)pow(dimRes,
+                    noDims)*2) + dimRes*noDims + idx] = 0.0;
+        }
+    }
+}
+
 // Interpolation routine for multiple regression. Uses linear interpolation
 // for now for speed.
 __global__ void interpolateMulti(int points, int noDims, int dimRes, float*
@@ -2610,6 +2657,11 @@ __global__ void interpolateMulti(int points, int noDims, int dimRes, float*
             }
         }
 
+        // Free variables
+        free(lowerInd);
+        free(coeffs);
+        free(upper);
+        free(lower);
         // Output the result
         results[idx] = coeffs[0];
     }
@@ -2710,11 +2762,11 @@ void SimulateGPU::expPV(UncertaintyPtr uncertainty) {
         CUDA_CALL(cudaFree(d_jumpSizes));
         CUDA_CALL(cudaFree(d_jumps));
         CUDA_CALL(cudaFree(d_results));
-        free(results);
 
     } catch (const char* err) {
         throw err;
     }
+    free(results);
 }
 
 // Matrix multiplication (Naive)
@@ -2772,9 +2824,9 @@ void SimulateGPU::eMMN(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
     free(Af);
     free(Bf);
     free(Cf);
-    cudaFree(d_A);
-    cudaFree(d_B);
-    cudaFree(d_C);
+    CUDA_CALL(cudaFree(d_A));
+    CUDA_CALL(cudaFree(d_B));
+    CUDA_CALL(cudaFree(d_C));
 }
 
 // Performs matrix multiplication using shared memory
@@ -2808,7 +2860,7 @@ void SimulateGPU::eMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
     CUDA_CALL(cudaMemcpy(d_B,Bf.data(),c*d*sizeof(float),
             cudaMemcpyHostToDevice));
 
-    cudaMalloc(&d_C,a*d*sizeof(float));
+    CUDA_CALL(cudaMalloc(&d_C,a*d*sizeof(float)));
 
     // declare the number of blocks per grid and the number of threads per block
     dim3 threads(BLOCK_SIZE,VECTOR_SIZE);
@@ -3371,7 +3423,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
         /////////////////////////////////////////
         // Plot the surrogate
-        GnuplotPtr plotPtr(new Gnuplot);
+//        GnuplotPtr plotPtr(new Gnuplot);
         /////////////////////////////////////////
 
         // Get important values for computation
@@ -3736,6 +3788,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     //    printControls<<<1,1>>>(noPaths,0,nYears,d_controls);
 
     //    time_t begin = clock();
+        free(noPatches);
 
         ///////////////////////////////////////////////////////////////////////////
         begin = clock();
@@ -3820,12 +3873,15 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         // Make the grid for regressions. One for each control for each
         // time step mapped against the N-dimensional grid. We interpolate
         // when we compute the forward paths.
-        float *d_regression, *d_adjPops;
+        float *d_regression, *d_adjPops, *d_stats;
 
         CUDA_CALL(cudaMalloc((void**)&d_regression,nYears*noControls*(
                 dimRes*noDims + pow(dimRes,noDims)*2)*sizeof(float)));
         CUDA_CALL(cudaMalloc((void**)&d_adjPops,adjPops[0].rows()*
                 adjPops[0].cols()*sizeof(float)));
+
+        Eigen::VectorXf stats(3);
+        CUDA_CALL(cudaMalloc((void**)&d_stats,3*sizeof(float)));
 
         // Choose the appropriate method for backwards induction
         switch (optimiser->getROVMethod()) {
@@ -4069,102 +4125,102 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                         CUDA_CALL(cudaFree(d_xminsN));
                         CUDA_CALL(cudaFree(d_xmaxesN));
 
-                        // Test plots /////////////////////////////////////////////
-                        // Prepare raw data
-                        for(int kk = 0; kk < (noDims-1); kk++) {
-                            ref.block(0,kk,dataPoints[jj],1) = (ref.block(0,kk,
-                                    dataPoints[jj],1)*(xmaxes(kk) - xmins(kk)))
-                                    .array() + xmins(kk);
-                        }
+//                        // Test plots /////////////////////////////////////////////
+//                        // Prepare raw data
+//                        for(int kk = 0; kk < (noDims-1); kk++) {
+//                            ref.block(0,kk,dataPoints[jj],1) = (ref.block(0,kk,
+//                                    dataPoints[jj],1)*(xmaxes(kk) - xmins(kk)))
+//                                    .array() + xmins(kk);
+//                        }
 
-                        ref.block(0,noDims-1,dataPoints[jj],1) = (ref.block(0,
-                                noDims-1,dataPoints[jj],1)*(scaling*(xmaxes(noDims
-                                -1) - xmins(noDims-1)))).array() + xmins(noDims-1);
+//                        ref.block(0,noDims-1,dataPoints[jj],1) = (ref.block(0,
+//                                noDims-1,dataPoints[jj],1)*(scaling*(xmaxes(noDims
+//                                -1) - xmins(noDims-1)))).array() + xmins(noDims-1);
 
-    //                    ref.block(0,1,dataPoints[jj],1) = (-1*((ref.block(0,1,
-    //                            dataPoints[jj],1)*(xmaxes(1) - xmins(1)))
-    //                            .array() + xmins(1) -1)).array().log();
+//    //                    ref.block(0,1,dataPoints[jj],1) = (-1*((ref.block(0,1,
+//    //                            dataPoints[jj],1)*(xmaxes(1) - xmins(1)))
+//    //                            .array() + xmins(1) -1)).array().log();
 
-                        std::vector<std::vector<double>> raw;
-                        raw.resize(dataPoints[jj]);
+//                        std::vector<std::vector<double>> raw;
+//                        raw.resize(dataPoints[jj]);
 
-                        // Raw data points copy
-                        Eigen::VectorXf yVals(dataPoints[jj]);
-                        CUDA_CALL(cudaMemcpy(yVals.data(),d_yvals + jj*noPaths,
-                                dataPoints[jj]*sizeof(float),
-                                cudaMemcpyDeviceToHost));
+//                        // Raw data points copy
+//                        Eigen::VectorXf yVals(dataPoints[jj]);
+//                        CUDA_CALL(cudaMemcpy(yVals.data(),d_yvals + jj*noPaths,
+//                                dataPoints[jj]*sizeof(float),
+//                                cudaMemcpyDeviceToHost));
 
-                        for (int kk = 0; kk < dataPoints[jj]; kk++) {
-                            raw[kk].resize(noDims+1);
-                            raw[kk][0] = ref.data()[kk];
-                            raw[kk][1] = ref.data()[dataPoints[jj] + kk];
-                            raw[kk][2] = yVals(kk);
-                        }
+//                        for (int kk = 0; kk < dataPoints[jj]; kk++) {
+//                            raw[kk].resize(noDims+1);
+//                            raw[kk][0] = ref.data()[kk];
+//                            raw[kk][1] = ref.data()[dataPoints[jj] + kk];
+//                            raw[kk][2] = yVals(kk);
+//                        }
 
-                        // Regressed data points
-                        // XVALS
-                        Eigen::MatrixXf regX(dimRes,noDims);
-                        CUDA_CALL(cudaMemcpy(regX.data(),d_regression + ii*
-                                noControls*(dimRes*noDims + (int)pow(dimRes,noDims)
-                                *2) + jj*(dimRes*noDims + (int)pow(dimRes,noDims)
-                                *2),dimRes*noDims*sizeof(float),
-                                cudaMemcpyDeviceToHost));
-                        // YVALS
-                        Eigen::VectorXf surrogate((int)pow(dimRes,noDims));
-                        CUDA_CALL(cudaMemcpy(surrogate.data(),d_regression + ii*
-                                noControls*(dimRes*noDims + (int)pow(dimRes,noDims)
-                                *2) + jj*(dimRes*noDims + (int)pow(dimRes,noDims)
-                                *2) + dimRes*noDims,pow(dimRes,noDims)*sizeof(
-                                float),cudaMemcpyDeviceToHost));
+//                        // Regressed data points
+//                        // XVALS
+//                        Eigen::MatrixXf regX(dimRes,noDims);
+//                        CUDA_CALL(cudaMemcpy(regX.data(),d_regression + ii*
+//                                noControls*(dimRes*noDims + (int)pow(dimRes,noDims)
+//                                *2) + jj*(dimRes*noDims + (int)pow(dimRes,noDims)
+//                                *2),dimRes*noDims*sizeof(float),
+//                                cudaMemcpyDeviceToHost));
+//                        // YVALS
+//                        Eigen::VectorXf surrogate((int)pow(dimRes,noDims));
+//                        CUDA_CALL(cudaMemcpy(surrogate.data(),d_regression + ii*
+//                                noControls*(dimRes*noDims + (int)pow(dimRes,noDims)
+//                                *2) + jj*(dimRes*noDims + (int)pow(dimRes,noDims)
+//                                *2) + dimRes*noDims,pow(dimRes,noDims)*sizeof(
+//                                float),cudaMemcpyDeviceToHost));
 
-                        // Prepare regressed data
-                        std::vector<std::vector<std::vector<double>>> reg;
-                        reg.resize(dimRes);
+//                        // Prepare regressed data
+//                        std::vector<std::vector<std::vector<double>>> reg;
+//                        reg.resize(dimRes);
 
-                        for (int kk = 0; kk < dimRes; kk++) {
-                            reg[kk].resize(dimRes);
-                            for (int ll = 0; ll < dimRes; ll++) {
-                                reg[kk][ll].resize(noDims+1);
-                            }
-                        }
+//                        for (int kk = 0; kk < dimRes; kk++) {
+//                            reg[kk].resize(dimRes);
+//                            for (int ll = 0; ll < dimRes; ll++) {
+//                                reg[kk][ll].resize(noDims+1);
+//                            }
+//                        }
 
-                        for (int kk = 0; kk < dimRes; kk++) {
-                            for (int ll = 0; ll < dimRes; ll++) {
-                                reg[kk][ll][0] = regX(ll,0);
-                                reg[kk][ll][1] = regX(kk,1);
-                                reg[kk][ll][2] = surrogate(kk + ll*dimRes);
-                            }
-                        }
+//                        for (int kk = 0; kk < dimRes; kk++) {
+//                            for (int ll = 0; ll < dimRes; ll++) {
+//                                reg[kk][ll][0] = regX(ll,0);
+//                                reg[kk][ll][1] = regX(kk,1);
+//                                reg[kk][ll][2] = surrogate(kk + ll*dimRes);
+//                            }
+//                        }
 
-                        // Plot 2 (Multiple linear regression model)
-                        (*plotPtr) << "set title 'Multiple regression'\n";
-                        (*plotPtr) << "set grid\n";
-                    //    (*plotPtr) << "set hidden3d\n";
-                        (*plotPtr) << "unset key\n";
-                        (*plotPtr) << "unset view\n";
-                        (*plotPtr) << "unset pm3d\n";
-                        (*plotPtr) << "unset xlabel\n";
-                        (*plotPtr) << "unset ylabel\n";
-                        (*plotPtr) << "set xrange [*:*]\n";
-                        (*plotPtr) << "set yrange [*:*]\n";
-                        (*plotPtr) << "set view 45,45\n";
-    //                    (*plotPtr) << "splot '-' with points pointtype 7\n";
-    //                  (*plotPtr) << "splot '-' with lines,\n";
-                        (*plotPtr) << "splot '-' with lines, '-' with points pointtype 7\n";
-                        (*plotPtr).send2d(reg);
-                        (*plotPtr).send1d(raw);
-                        (*plotPtr).flush();
+//                        // Plot 2 (Multiple linear regression model)
+//                        (*plotPtr) << "set title 'Multiple regression'\n";
+//                        (*plotPtr) << "set grid\n";
+//                    //    (*plotPtr) << "set hidden3d\n";
+//                        (*plotPtr) << "unset key\n";
+//                        (*plotPtr) << "unset view\n";
+//                        (*plotPtr) << "unset pm3d\n";
+//                        (*plotPtr) << "unset xlabel\n";
+//                        (*plotPtr) << "unset ylabel\n";
+//                        (*plotPtr) << "set xrange [*:*]\n";
+//                        (*plotPtr) << "set yrange [*:*]\n";
+//                        (*plotPtr) << "set view 45,45\n";
+//    //                    (*plotPtr) << "splot '-' with points pointtype 7\n";
+//    //                  (*plotPtr) << "splot '-' with lines,\n";
+//                        (*plotPtr) << "splot '-' with lines, '-' with points pointtype 7\n";
+//                        (*plotPtr).send2d(reg);
+//                        (*plotPtr).send1d(raw);
+//                        (*plotPtr).flush();
 
                         ///////////////////////////////////////////////////////
                     }
 
                     free(dataPoints);
 
-                    if (ii == 1) {
-                        std::cout << "final step" << std::endl;
-                    } else if (ii == 0) {
-                        std::cout << "final step" << std::endl;
-                    }
+//                    if (ii == 1) {
+//                        std::cout << "final step" << std::endl;
+//                    } else if (ii == 0) {
+//                        std::cout << "final step" << std::endl;
+//                    }
 
                     backwardInduction<<<noBlocks,maxThreadsPerBlock1>>>(ii,
                             noPaths,nYears,srp.size(),noControls,noUncertainties,
@@ -4187,6 +4243,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                     CUDA_CALL(cudaFree(d_xvals));
                     CUDA_CALL(cudaFree(d_yvals));
                     CUDA_CALL(cudaFree(d_dataPoints));
+                    CUDA_CALL(cudaFree(d_xin));
+                    CUDA_CALL(cudaFree(d_controlsTemp));
                 }
 
                 // Compute the average expected payoff for each control by
@@ -4194,13 +4252,12 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 // adding the first period's payoff for that control. As we do
                 // not perform forward path recomputation, we simply take the
                 // average across all paths for each control.
-                backwardInduction<<<noBlocks,maxThreadsPerBlock1>>>(0,
-                        noPaths,nYears,srp.size(),noControls,noUncertainties,
-                        stepSize,unitCost,unitRevenue,rrr,fuels.size(),
-                        commodities.size(),dimRes,d_flowRates,d_fuelCosts,
+                firstPeriodInduction<<<1,1>>>(noPaths,nYears,srp.size(),
+                        noControls,stepSize,unitCost,unitRevenue,rrr,fuels.
+                        size(),commodities.size(),d_flowRates,d_fuelCosts,
                         d_totalPops,d_speciesParams,d_controls,d_aars,
-                        d_regression,d_uComposition,d_uResults,d_fuelIdx,
-                        d_condExp,d_optCont,d_adjPops,d_unitProfits);
+                        d_uComposition,d_uResults,d_fuelIdx,d_condExp,
+                        d_optCont,d_stats);
                 CUDA_CALL(cudaPeekAtLastError());
                 CUDA_CALL(cudaDeviceSynchronize());
 
@@ -4209,7 +4266,6 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 CUDA_CALL(cudaDeviceSynchronize());
                 CUDA_CALL(cudaFree(d_xmaxes));
                 CUDA_CALL(cudaFree(d_xmins));
-                CUDA_CALL(cudaFree(d_adjPops));
             }
             break;
 
@@ -4475,100 +4531,100 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                         CUDA_CALL(cudaFree(d_xminsN));
                         CUDA_CALL(cudaFree(d_xmaxesN));
 
-                        // Test plots /////////////////////////////////////////////
-                        // Prepare raw data
-                        for(int kk = 0; kk < (noDims-1); kk++) {
-                            ref.block(0,kk,dataPoints[jj],1) = (ref.block(0,kk,
-                                    dataPoints[jj],1)*(xmaxes(kk) - xmins(kk)))
-                                    .array() + xmins(kk);
-                        }
+//                        // Test plots /////////////////////////////////////////////
+//                        // Prepare raw data
+//                        for(int kk = 0; kk < (noDims-1); kk++) {
+//                            ref.block(0,kk,dataPoints[jj],1) = (ref.block(0,kk,
+//                                    dataPoints[jj],1)*(xmaxes(kk) - xmins(kk)))
+//                                    .array() + xmins(kk);
+//                        }
 
-                        ref.block(0,noDims-1,dataPoints[jj],1) = (ref.block(0,
-                                noDims-1,dataPoints[jj],1)*(scaling*(xmaxes(noDims
-                                -1) - xmins(noDims-1)))).array() + xmins(noDims-1);
+//                        ref.block(0,noDims-1,dataPoints[jj],1) = (ref.block(0,
+//                                noDims-1,dataPoints[jj],1)*(scaling*(xmaxes(noDims
+//                                -1) - xmins(noDims-1)))).array() + xmins(noDims-1);
 
-    //                    ref.block(0,1,dataPoints[jj],1) = (-1*((ref.block(0,1,
-    //                            dataPoints[jj],1)*(xmaxes(1) - xmins(1)))
-    //                            .array() + xmins(1) -1)).array().log();
+//    //                    ref.block(0,1,dataPoints[jj],1) = (-1*((ref.block(0,1,
+//    //                            dataPoints[jj],1)*(xmaxes(1) - xmins(1)))
+//    //                            .array() + xmins(1) -1)).array().log();
 
-                        std::vector<std::vector<double>> raw;
-                        raw.resize(dataPoints[jj]);
+//                        std::vector<std::vector<double>> raw;
+//                        raw.resize(dataPoints[jj]);
 
-                        // Raw data points copy
-                        Eigen::VectorXf yVals(dataPoints[jj]);
-                        CUDA_CALL(cudaMemcpy(yVals.data(),d_yvals + jj*noPaths,
-                                dataPoints[jj]*sizeof(float),
-                                cudaMemcpyDeviceToHost));
+//                        // Raw data points copy
+//                        Eigen::VectorXf yVals(dataPoints[jj]);
+//                        CUDA_CALL(cudaMemcpy(yVals.data(),d_yvals + jj*noPaths,
+//                                dataPoints[jj]*sizeof(float),
+//                                cudaMemcpyDeviceToHost));
 
-                        for (int kk = 0; kk < dataPoints[jj]; kk++) {
-                            raw[kk].resize(noDims+1);
-                            raw[kk][0] = ref.data()[kk];
-                            raw[kk][1] = ref.data()[dataPoints[jj] + kk];
-                            raw[kk][2] = yVals(kk);
-                        }
+//                        for (int kk = 0; kk < dataPoints[jj]; kk++) {
+//                            raw[kk].resize(noDims+1);
+//                            raw[kk][0] = ref.data()[kk];
+//                            raw[kk][1] = ref.data()[dataPoints[jj] + kk];
+//                            raw[kk][2] = yVals(kk);
+//                        }
 
-                        // Regressed data points
-                        // XVALS
-                        Eigen::MatrixXf regX(dimRes,noDims);
-                        CUDA_CALL(cudaMemcpy(regX.data(),d_regression + ii*
-                                noControls*(dimRes*noDims + (int)pow(dimRes,noDims)
-                                *2) + jj*(dimRes*noDims + (int)pow(dimRes,noDims)
-                                *2),dimRes*noDims*sizeof(float),
-                                cudaMemcpyDeviceToHost));
-                        // YVALS
-                        Eigen::VectorXf surrogate((int)pow(dimRes,noDims));
-                        CUDA_CALL(cudaMemcpy(surrogate.data(),d_regression + ii*
-                                noControls*(dimRes*noDims + (int)pow(dimRes,noDims)
-                                *2) + jj*(dimRes*noDims + (int)pow(dimRes,noDims)
-                                *2) + dimRes*noDims,pow(dimRes,noDims)*sizeof(
-                                float),cudaMemcpyDeviceToHost));
+//                        // Regressed data points
+//                        // XVALS
+//                        Eigen::MatrixXf regX(dimRes,noDims);
+//                        CUDA_CALL(cudaMemcpy(regX.data(),d_regression + ii*
+//                                noControls*(dimRes*noDims + (int)pow(dimRes,noDims)
+//                                *2) + jj*(dimRes*noDims + (int)pow(dimRes,noDims)
+//                                *2),dimRes*noDims*sizeof(float),
+//                                cudaMemcpyDeviceToHost));
+//                        // YVALS
+//                        Eigen::VectorXf surrogate((int)pow(dimRes,noDims));
+//                        CUDA_CALL(cudaMemcpy(surrogate.data(),d_regression + ii*
+//                                noControls*(dimRes*noDims + (int)pow(dimRes,noDims)
+//                                *2) + jj*(dimRes*noDims + (int)pow(dimRes,noDims)
+//                                *2) + dimRes*noDims,pow(dimRes,noDims)*sizeof(
+//                                float),cudaMemcpyDeviceToHost));
 
-                        // Prepare regressed data
-                        std::vector<std::vector<std::vector<double>>> reg;
-                        reg.resize(dimRes);
+//                        // Prepare regressed data
+//                        std::vector<std::vector<std::vector<double>>> reg;
+//                        reg.resize(dimRes);
 
-                        for (int kk = 0; kk < dimRes; kk++) {
-                            reg[kk].resize(dimRes);
-                            for (int ll = 0; ll < dimRes; ll++) {
-                                reg[kk][ll].resize(noDims+1);
-                            }
-                        }
+//                        for (int kk = 0; kk < dimRes; kk++) {
+//                            reg[kk].resize(dimRes);
+//                            for (int ll = 0; ll < dimRes; ll++) {
+//                                reg[kk][ll].resize(noDims+1);
+//                            }
+//                        }
 
-                        for (int kk = 0; kk < dimRes; kk++) {
-                            for (int ll = 0; ll < dimRes; ll++) {
-                                reg[kk][ll][0] = regX(ll,0);
-                                reg[kk][ll][1] = regX(kk,1);
-                                reg[kk][ll][2] = surrogate(kk + ll*dimRes);
-                            }
-                        }
+//                        for (int kk = 0; kk < dimRes; kk++) {
+//                            for (int ll = 0; ll < dimRes; ll++) {
+//                                reg[kk][ll][0] = regX(ll,0);
+//                                reg[kk][ll][1] = regX(kk,1);
+//                                reg[kk][ll][2] = surrogate(kk + ll*dimRes);
+//                            }
+//                        }
 
-                        // Plot 2 (Multiple linear regression model)
-                        (*plotPtr) << "set title 'Multiple regression'\n";
-                        (*plotPtr) << "set grid\n";
-                    //    (*plotPtr) << "set hidden3d\n";
-                        (*plotPtr) << "unset key\n";
-                        (*plotPtr) << "unset view\n";
-                        (*plotPtr) << "unset pm3d\n";
-                        (*plotPtr) << "unset xlabel\n";
-                        (*plotPtr) << "unset ylabel\n";
-                        (*plotPtr) << "set xrange [*:*]\n";
-                        (*plotPtr) << "set yrange [*:*]\n";
-                        (*plotPtr) << "set view 45,45\n";
-    //                    (*plotPtr) << "splot '-' with points pointtype 7\n";
-    //                  (*plotPtr) << "splot '-' with lines,\n";
-                        (*plotPtr) << "splot '-' with lines, '-' with points pointtype 7\n";
-                        (*plotPtr).send2d(reg);
-                        (*plotPtr).send1d(raw);
-                        (*plotPtr).flush();
+//                        // Plot 2 (Multiple linear regression model)
+//                        (*plotPtr) << "set title 'Multiple regression'\n";
+//                        (*plotPtr) << "set grid\n";
+//                    //    (*plotPtr) << "set hidden3d\n";
+//                        (*plotPtr) << "unset key\n";
+//                        (*plotPtr) << "unset view\n";
+//                        (*plotPtr) << "unset pm3d\n";
+//                        (*plotPtr) << "unset xlabel\n";
+//                        (*plotPtr) << "unset ylabel\n";
+//                        (*plotPtr) << "set xrange [*:*]\n";
+//                        (*plotPtr) << "set yrange [*:*]\n";
+//                        (*plotPtr) << "set view 45,45\n";
+//    //                    (*plotPtr) << "splot '-' with points pointtype 7\n";
+//    //                  (*plotPtr) << "splot '-' with lines,\n";
+//                        (*plotPtr) << "splot '-' with lines, '-' with points pointtype 7\n";
+//                        (*plotPtr).send2d(reg);
+//                        (*plotPtr).send1d(raw);
+//                        (*plotPtr).flush();
 
                         ///////////////////////////////////////////////////////
                     }
 
                     free(dataPoints);
 
-                    if (ii == 0) {
-                        std::cout << "final step" << std::endl;
-                    }
+//                    if (ii == 0) {
+//                        std::cout << "final step" << std::endl;
+//                    }
 
                     // Recompute forward paths
                     ///////////////////////////////////////////////////////////////////////////
@@ -4602,23 +4658,38 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                     CUDA_CALL(cudaFree(d_xvals));
                     CUDA_CALL(cudaFree(d_yvals));
                     CUDA_CALL(cudaFree(d_dataPoints));
+                    CUDA_CALL(cudaFree(d_xin));
+                    CUDA_CALL(cudaFree(d_controlsTemp));
                 }
 
+                // Compute the optimal control, overall value and overall value
+                // standard deviation at the first time period.
                 firstPeriodInduction<<<1,1>>>(noPaths,nYears,srp.size(),
                         noControls,stepSize,unitCost,unitRevenue,rrr,fuels.
                         size(),commodities.size(),d_flowRates,d_fuelCosts,
                         d_totalPops,d_speciesParams,d_controls,d_aars,
                         d_uComposition,d_uResults,d_fuelIdx,d_condExp,
-                        d_optCont);
+                        d_optCont,d_stats);
                 CUDA_CALL(cudaPeekAtLastError());
                 CUDA_CALL(cudaDeviceSynchronize());
 
                 // Recompute the full forward paths
+                optimalForwardPaths<<<noBlocks,maxThreadsPerBlock1,maxElems
+                        *maxThreadsPerBlock1*sizeof(float)>>>(0,noPaths,nYears,
+                        srp.size(),patches,noControls,noUncertainties,stepSize,
+                        unitCost,unitRevenue,rrr,fuels.size(),
+                        commodities.size(),dimRes,d_flowRates,d_fuelCosts,
+                        d_tempPops,d_totalPops,d_sparseOut,d_rowIdx,
+                        d_elemsPerCol,maxElements,d_speciesParams,d_growthRate,
+                        d_capacities,d_controls,d_aars,d_regression,
+                        d_uComposition,d_uResults,d_fuelIdx,d_condExp,
+                        d_optCont,d_adjPops,d_unitProfits);
+                CUDA_CALL(cudaPeekAtLastError());
+                CUDA_CALL(cudaDeviceSynchronize());
 
                 // Free memory
                 CUDA_CALL(cudaFree(d_xmaxes));
                 CUDA_CALL(cudaFree(d_xmins));
-                CUDA_CALL(cudaFree(d_adjPops));
             }
             break;
 
@@ -4663,12 +4734,22 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
             adjPops[ii] = adjPopsF[ii].cast<double>();
         }
 
+        CUDA_CALL(cudaMemcpy(stats.data(),d_stats,3*sizeof(float),
+                cudaMemcpyDeviceToHost));
+
+        // Save the attributes to the road
+        sim->getRoad()->getAttributes()->setVarProfitIC(condExp(0));
+        sim->getRoad()->getAttributes()->setTotalUtilisationROV(stats(0));
+        sim->getRoad()->getAttributes()->setTotalUtilisationROVSD(stats(2));
+
         // Free remaining device memory
         CUDA_CALL(cudaFree(d_unitProfits));
         CUDA_CALL(cudaFree(d_initPops));
         CUDA_CALL(cudaFree(d_tempPops));
         CUDA_CALL(cudaFree(d_capacities));
+        CUDA_CALL(cudaFree(d_noPatches));
         CUDA_CALL(cudaFree(d_speciesParams));
+        CUDA_CALL(cudaFree(d_uncertParams));
         CUDA_CALL(cudaFree(d_fuelCosts));
         CUDA_CALL(cudaFree(d_growthRate));
         CUDA_CALL(cudaFree(d_uResults));
@@ -4676,6 +4757,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         CUDA_CALL(cudaFree(d_flowRates));
         CUDA_CALL(cudaFree(d_controls));
         CUDA_CALL(cudaFree(d_regression));
+        CUDA_CALL(cudaFree(d_adjPops));
 
         CUDA_CALL(cudaFree(d_condExp));
         CUDA_CALL(cudaFree(d_optCont));
@@ -4684,6 +4766,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         // Remove these here?
         CUDA_CALL(cudaFree(d_totalPops));
         CUDA_CALL(cudaFree(d_aars));
+        CUDA_CALL(cudaFree(d_stats));
     } catch (const char* err) {
         throw err;
     }
@@ -4885,12 +4968,15 @@ void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
             k = (int)ceil(log(samples)+8);
         }
 
+        k = min(samples,k);
+
         // Adjust for the number of dimensions
         k = k*pow(2,noDims-1);
 
         // Convert to floating point
         Eigen::VectorXf surrogateF(dimRes*noDims+pow(dimRes,noDims));
         Eigen::VectorXf predictors(noDims*samples);
+        Eigen::VectorXf ref = predictors;
         Eigen::VectorXf values = op->getValues().segment(0,samples).
                 cast<float>();
         Eigen::VectorXf valuesSD = op->getValuesSD().segment(0,samples)
@@ -4941,10 +5027,10 @@ void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
         // the slowest component.
 
         // Use 5% of the nearest points for now
-        // We first need to perform a k nearest neighbour search
-        float *query, *dist;
+        // We first need to perform a k nearest neighbour search        
+        Eigen::MatrixXf query((int)pow(dimRes,noDims),noDims);
+        float *dist;
         int *ind;
-        query = (float*)malloc(pow(dimRes,noDims)*noDims*sizeof(float));
         dist = (float*)malloc(pow(dimRes,noDims)*noDims*k*sizeof(float));
         ind = (int*)malloc(pow(dimRes,noDims)*noDims*k*sizeof(int));
 
@@ -4963,12 +5049,33 @@ void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
         CUDA_CALL(cudaPeekAtLastError());
         CUDA_CALL(cudaDeviceSynchronize());
 
-        CUDA_CALL(cudaMemcpy(query,d_queryPts,pow(dimRes,noDims)*noDims*sizeof(
-                float),cudaMemcpyDeviceToHost));
+        CUDA_CALL(cudaMemcpy(query.data(),d_queryPts,pow(dimRes,noDims)*noDims*
+                sizeof(float),cudaMemcpyDeviceToHost));
         CUDA_CALL(cudaFree(d_queryPts));
 
+        // We need to normalise in each dimension before performing the
+        // regression. (We also convert the unit profit component to a log
+        // scale. NOT IMPLEMENTED YET). As the profit component is not as
+        // important as the population component for making immediate
+        // decisions, we give it a smaller scale. We arbitrarily choose a
+        // factor of 4 for now.
+        Eigen::VectorXf xmins(noDims);
+        Eigen::VectorXf xmaxes(noDims);
+
+        for (int ii = 0; ii < noDims; ii++) {
+            xmins(ii) = predictors.segment(ii*samples,samples).minCoeff();
+            xmaxes(ii) = predictors.segment(ii*samples,samples).maxCoeff();
+
+            predictors.segment(ii*samples,samples) = (predictors.segment(ii*
+                    samples,samples).array() - xmins(ii))/(xmaxes(ii) -
+                    xmins(ii));
+            query.block(0,ii,pow(dimRes,noDims),1) = (query.block(0,ii,pow(
+                    dimRes,noDims),1).array() - xmins(ii))/(xmaxes(ii) -
+                    xmins(ii));
+        }
+
         // Compute the knn searches
-        knn_cuda_with_indexes::knn(predictors.data(),samples,query,pow(
+        knn_cuda_with_indexes::knn(predictors.data(),samples,query.data(),pow(
                 dimRes,noDims),noDims,k,dist,ind);
         CUDA_CALL(cudaPeekAtLastError());
         CUDA_CALL(cudaDeviceSynchronize());
@@ -4979,7 +5086,22 @@ void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
         CUDA_CALL(cudaMemcpy(d_ind,ind,pow(dimRes,noDims)*k*sizeof(float),
                 cudaMemcpyHostToDevice));
 
-        free(query);
+        // Due to normalisation, we need to make the minimum
+        // and maximum values for each dimension 0 and 1,
+        // respectively.
+        float *d_xminsN, *d_xmaxesN;
+        Eigen::VectorXf xminsN = Eigen::VectorXf::Zero(noDims);
+        Eigen::VectorXf xmaxesN = Eigen::VectorXf::Constant(
+                noDims,1);
+        CUDA_CALL(cudaMalloc((void**)&d_xminsN,noDims*sizeof(
+                float)));
+        CUDA_CALL(cudaMalloc((void**)&d_xmaxesN,noDims*sizeof(
+                float)));
+        CUDA_CALL(cudaMemcpy(d_xminsN,xminsN.data(),noDims*
+                sizeof(float),cudaMemcpyHostToDevice));
+        CUDA_CALL(cudaMemcpy(d_xmaxesN,xmaxesN.data(),noDims*
+                sizeof(float),cudaMemcpyHostToDevice));
+
         free(dist);
         free(ind);
 
@@ -4989,9 +5111,15 @@ void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
 
         multiLocLinReg<<<noBlocks,maxThreadsPerBlock>>>(pow(dimRes,noDims),
                 noDims,dimRes,1,1,0,0,k,d_samples,d_xvals,d_yvals,d_surrogate,
-                d_xmins,d_xmaxes,d_dist,d_ind);
+                d_xminsN,d_xmaxesN,d_dist,d_ind);
         CUDA_CALL(cudaPeekAtLastError());
         CUDA_CALL(cudaDeviceSynchronize());
+
+        // As we are using ROV, we know by definition that the operating cost/
+        // benefit cannot be above zero. Therefore, we convert all positive
+        // values to zero.
+        rovCorrection<<<noBlocks,maxThreadsPerBlock>>>(pow(dimRes,noDims),
+                noDims,dimRes,1,1,0,0,d_surrogate);
 
         CUDA_CALL(cudaMemcpy(surrogateF.data(),d_surrogate,(dimRes*noDims+pow(
                 dimRes,noDims))*sizeof(float),cudaMemcpyDeviceToHost));
@@ -5007,7 +5135,7 @@ void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
 
         multiLocLinReg<<<noBlocks,maxThreadsPerBlock>>>(pow(dimRes,noDims),
                 noDims,dimRes,1,1,0,0,k,d_samples,d_xvals,d_yvals,d_surrogate,
-                d_xmins,d_xmaxes,d_dist,d_ind);
+                d_xminsN,d_xmaxesN,d_dist,d_ind);
         CUDA_CALL(cudaPeekAtLastError());
         CUDA_CALL(cudaDeviceSynchronize());
 
@@ -5024,9 +5152,14 @@ void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
 
         CUDA_CALL(cudaFree(d_xmaxes));
         CUDA_CALL(cudaFree(d_xmins));
+        CUDA_CALL(cudaFree(d_xmaxesN));
+        CUDA_CALL(cudaFree(d_xminsN));
+        CUDA_CALL(cudaFree(d_ind));
+        CUDA_CALL(cudaFree(d_dist));
         CUDA_CALL(cudaFree(d_xvals));
         CUDA_CALL(cudaFree(d_yvals));
         CUDA_CALL(cudaFree(d_surrogate));
+        CUDA_CALL(cudaFree(d_samples));
     } catch (const char* err) {
         throw err;
     }

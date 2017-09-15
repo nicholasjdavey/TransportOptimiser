@@ -12,13 +12,14 @@ VariableParameters::VariableParameters() {
     this->commoditySD = Eigen::VectorXd::Zero(0);
     this->commodity = Eigen::VectorXd::Zero(0);
     this->commodityPropSD = Eigen::VectorXd::Zero(0);
+    this->compRoad = Eigen::VectorXd::Zero(0);
 }
 
 VariableParameters::VariableParameters(const Eigen::VectorXd& popLevels, const
         Eigen::VectorXi& bridge, const Eigen::VectorXd& hp, const
         Eigen::VectorXd& l, const Eigen::VectorXd& b, const Eigen::VectorXd&
         pgr, const Eigen::VectorXd& pgrsd, const Eigen::VectorXd& c, const
-        Eigen::VectorXd& csd, Eigen::VectorXd &cpsd) {
+        Eigen::VectorXd& csd, Eigen::VectorXd &cpsd, Eigen::VectorXd& crvcm) {
 	
 	// Initialise object
     this->populationLevels = popLevels;
@@ -31,6 +32,7 @@ VariableParameters::VariableParameters(const Eigen::VectorXd& popLevels, const
     this->commoditySD = csd;
     this->commodity = c;
     this->commodityPropSD = cpsd;
+    this->compRoad = crvcm;
 }
 
 VariableParameters::~VariableParameters() {

@@ -10,6 +10,8 @@ PolicyMap::PolicyMap(ProgramPtr program, unsigned long noYears, unsigned long
         PolicyMapYearPtr year(new PolicyMapYear(noPaths,noDims));
         years[ii] = year;
     }
+
+    this->setPolicyMapYear(years);
 }
 
 PolicyMap::PolicyMap(ProgramPtr program, const std::vector<PolicyMapYearPtr>

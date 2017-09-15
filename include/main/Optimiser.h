@@ -989,6 +989,32 @@ public:
         this->speciesFiles = sf;
     }
 
+    /**
+     * Returns the comparison road for ROV profit computation (if exists)
+     *
+     * @return Comparison road as RoadPtr
+     */
+    RoadPtr getComparisonRoad() {
+        return this->comparisonRoad;
+    }
+    /**
+     * Sets the comparison road for ROV profit computation
+     *
+     * If there is a comparison road, the algorithm does not take into account
+     * commodity sales revenue as it is assumed to continue due to traffic
+     * being diverted to the alternate road. Instead, the difference in unit
+     * traffic along this road and the candidate road being evaluated is the
+     * unit profit for the candidate road. If no comparison road is provided,
+     * it is assumed that none exists and the reduction in traffic (and
+     * therefore sales revenue) is lost completely.
+     *
+     * @param cr as RoadPtr
+     */
+    void setComparisonRoad(RoadPtr cr) {
+        this->comparisonRoad.reset();
+        this->comparisonRoad = cr;
+    }
+
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -1167,6 +1193,7 @@ public:
 protected:
     std::vector<std::vector<std::vector<alglib::spline1dinterpolant>>> surrogate;   /**< MTE Surrogate model for evaluating road (for each run) stored as a collection of splines (To be deprecated) */
     std::vector<std::vector<std::vector<Eigen::VectorXd>>> surrogateML;             /**< Surrogate models based on multiple local linear regression */
+    RoadPtr comparisonRoad;                                                         /**< Alternative road for ROV */
     ExperimentalScenarioPtr scenario;                                               /**< Current experiment */
     Optimiser::Type type;                                                           /**< Type of ecological incorporation */
     Optimiser::StoppingCriterion stop;                                              /**< Reason for ending optimisation process */

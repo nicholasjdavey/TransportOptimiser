@@ -114,6 +114,10 @@ void Road::evaluateRoad(bool learning, bool saveResults) {
 
     this->attributes->setTotalValueMean(this->attributes->
             getVarProfitIC() + this->attributes->getFixedCosts());
+//    this->attributes->setTotalUtilisationROV(this->attributes->
+//            getVarProfitIC());
+//    this->attributes->setTotalUtilisationROVSD(this->attributes->
+//            getTotalValueSD());
 
 //    if (std::isnan(this->attributes->getVarProfitIC())) {
 //        std::cout << "Invalid operating" << std::endl;
@@ -251,28 +255,28 @@ void Road::computeOperating(bool learning, bool saveResults) {
 
                 // Call the surrogate model or full simulation.
                 if (learning) {
-                    // Full simulation
-                    ////////////////////////
-                    time_t begin = clock();
-                    ////////////////////////
+//                    // Full simulation
+//                    ////////////////////////
+//                    time_t begin = clock();
+//                    ////////////////////////
                     this->computeSimulationPatches(saveResults);
-                    ////////////////////////
-                    time_t end = clock();double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-                    std::cout << "Patches build time " << elapsed_secs << " s" << std::endl;
-                    ////////////////////////
+//                    ////////////////////////
+//                    time_t end = clock();double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//                    std::cout << "Patches build time " << elapsed_secs << " s" << std::endl;
+//                    ////////////////////////
                     SimulatorPtr simulator(new Simulator(this->me()));
                     this->simulator.reset();
                     this->simulator = simulator;
 
-                    ////////////////////////
-                    begin = clock();
-                    ////////////////////////
+//                    ////////////////////////
+//                    begin = clock();
+//                    ////////////////////////
                     this->simulator->simulateROVCR(saveResults);
-                    ////////////////////////
-                    end = clock();
-                    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-                    std::cout << "Road crossings time " << elapsed_secs << " s" << std::endl;
-                    ////////////////////////
+//                    ////////////////////////
+//                    end = clock();
+//                    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//                    std::cout << "Road crossings time " << elapsed_secs << " s" << std::endl;
+//                    ////////////////////////
                     // We use this to determine the relationships between the
                     // input variables and the expected operating values.
 
@@ -284,23 +288,23 @@ void Road::computeOperating(bool learning, bool saveResults) {
                     // current unit profit (in terms of per unit fuel cost and
                     // other variable costs). These become inputs for the
                     // surrogate model.
-                    ////////////////////////
-                    time_t begin = clock();
-                    ////////////////////////
+//                    ////////////////////////
+//                    time_t begin = clock();
+//                    ////////////////////////
                     this->computeSimulationPatches();
-                    ////////////////////////
-                    time_t end = clock();double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-                    std::cout << "Patches build time " << elapsed_secs << " s" << std::endl;
-                    ////////////////////////
+//                    ////////////////////////
+//                    time_t end = clock();double elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//                    std::cout << "Patches build time " << elapsed_secs << " s" << std::endl;
+//                    ////////////////////////
                     int noSpecies = this->optimiser.lock()->getSpecies().size();
 
                     int noControls = this->optimiser.lock()->getPrograms()[
                             this->optimiser.lock()->getScenario()->
                             getProgram()]->getFlowRates().size();
 
-                    ////////////////////////
-                    begin = clock();
-                    ////////////////////////
+//                    ////////////////////////
+//                    begin = clock();
+//                    ////////////////////////
                     Eigen::MatrixXd aar(noSpecies,noControls);
 
                     for (int ii = 0; ii < noSpecies; ii++) {
@@ -315,11 +319,11 @@ void Road::computeOperating(bool learning, bool saveResults) {
                     double value, valuesd;
                     this->optimiser.lock()->evaluateSurrogateModelROVCR(this->
                             me(),value,valuesd);
-                    ////////////////////////
-                    end = clock();
-                    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
-                    std::cout << "Surrogate evaluation time " << elapsed_secs << " s" << std::endl;
-                    ////////////////////////
+//                    ////////////////////////
+//                    end = clock();
+//                    elapsed_secs = double(end - begin) / CLOCKS_PER_SEC;
+//                    std::cout << "Surrogate evaluation time " << elapsed_secs << " s" << std::endl;
+//                    ////////////////////////
 
                     // We pick the operating value as the path value that has X%
                     // of path values below it.

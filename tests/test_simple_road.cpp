@@ -19,7 +19,7 @@ int main(int argc, char **argv) {
     roadGA->setRootFolder(root.c_str());
 
     ExperimentalScenarioPtr scenario(new ExperimentalScenario(roadGA,0,0,0,0,0,
-            0,0,0,0,0,0,0));
+            0,0,0,0,0,0,0,0));
     scenario->setCurrentScenario(0);
 
     roadGA->initialiseFromTextInput(inputFile);

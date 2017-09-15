@@ -283,15 +283,15 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
 
     // Now that we have all the index requirements, let's interpolate.
     // Get the lowermost dimension x value
-    double x0 = surrogate(lowerIdx(predictors.size()-1));
-    double x1 = surrogate(lowerIdx(predictors.size()-1)+1);
+    double x0 = surrogate(lowerIdx(0));
+    double x1 = surrogate(lowerIdx(0)+1);
     double xd;
 
     if ((fabs(x1 - x0) < std::numeric_limits<double>::epsilon()) ||
             x0 == x1) {
         xd = 0.0;
     } else {
-        xd = (predictors(predictors.size()-1) - x0)/(x1 - x0);
+        xd = (predictors(0) - x0)/(x1 - x0);
     }
 
     // First, assign the yvalues to the coefficients matrix
@@ -315,7 +315,7 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
         }
 
         // Now add the lowest dimension's lower index
-        idxL += lowerIdx(predictors.size() - 1);
+//        idxL += lowerIdx(predictors.size() - 1);
 
         coeffs[ii] = surrogate(idxL)*(1 - xd) + surrogate(idxL + 1)*xd;
 
@@ -344,10 +344,8 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
     // to get the interpolated value.
     for (int ii = 1; ii < predictors.size(); ii++) {
         // Get the current dimensions x value
-        x0 = surrogate(lowerIdx(predictors.size() - 1 - ii) + dimRes*(
-                predictors.size() - 1 - ii));
-        x1 = surrogate(lowerIdx(predictors.size() - 1 - ii) + 1 + dimRes*(
-                predictors.size() - 1 - ii));
+        x0 = surrogate(lowerIdx(ii) + dimRes*ii);
+        x1 = surrogate(lowerIdx(ii) + 1 + dimRes*(ii));
 
         if ((fabs(x1 - x0) < std::numeric_limits<double>::epsilon()) ||
                 x0 == x1) {
