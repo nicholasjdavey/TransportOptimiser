@@ -46,6 +46,10 @@ int main(int argc, char **argv) {
     int cr = roadGA->getVariableParams()->getCompRoad().size();
     int runs = roadGA->getNoRuns();
 
+    // Ensure we have enough storage available for experimental results for
+    // every experiment and run carried out.
+    roadGA->initialiseExperimentStorage();
+
     for (int ii = 0; ii < programs; ii++) {
         for (int jj = 0; jj < popLevels; jj++) {
             for (int kk = 0; kk < habPrefs; kk++) {
@@ -73,8 +77,21 @@ int main(int argc, char **argv) {
                                                         roadGA->setScenario(scenario);
                                                         roadGA->initialiseStorage();
                                                         roadGA->getExistingSurrogateData();
-                                                        // Optimise
-                                                        roadGA->optimise(true);
+
+                                                        // Check if the results exist already for this scenario and run.
+                                                        // If they do, continue, otherwise, run the optimisation.
+                                                        // At this stage we do not save the existing results into the
+                                                        // best roads object.
+                                                        std::string scenarioFolder = roadGA->getRootFolder() + "/" +
+                                                                "Scenario_" + std::to_string(roadGA->getScenario()->
+                                                                getCurrentScenario());
+                                                        std::string runFolder = scenarioFolder + "/" + std::to_string(
+                                                                roadGA->getScenario()->getRun());
+
+                                                        if(!(boost::filesystem::exists(runFolder))) {
+                                                            // Optimise
+                                                            roadGA->optimise(true);
+                                                        }
                                                     }
                                                 }
                                             }

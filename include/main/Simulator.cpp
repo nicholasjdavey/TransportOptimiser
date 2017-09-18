@@ -394,7 +394,14 @@ void Simulator::simulateROVCR(bool policyMap) {
                         SimulateGPU::simulateROVCUDA(this->me(),srp,adjPops,
                                 unitProfits,condExp,optCont,regressions,
                                 policyMap);
-                        success = true;
+                        // Sense check the optimal value computed (sometimes
+                        // we can get anomalous results)
+                        double threshold = unitProfits(0,0)*(nYears+1)*
+                                program->getFlowRates()(program->
+                                getFlowRates().size()-1)*10;
+                        if (condExp(0,0) <= threshold) {
+                            success = true;
+                        }
                     } catch (...) {
                         counter++;
                     }
@@ -417,7 +424,14 @@ void Simulator::simulateROVCR(bool policyMap) {
                         SimulateGPU::simulateROVCUDA(this->me(),srp,adjPops,
                                 unitProfits,condExp,optCont,regressions,
                                 policyMap);
-                        success = true;
+                        // Sense check the optimal value computed (sometimes
+                        // we can get anomalous results)
+                        double threshold = unitProfits(0,0)*(nYears+1)*
+                                program->getFlowRates()(program->
+                                getFlowRates().size()-1)*10;
+                        if (condExp(0,0) <= threshold) {
+                            success = true;
+                        }
                     } catch (...) {
                         counter++;
                     }

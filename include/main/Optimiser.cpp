@@ -42,26 +42,26 @@ OptimiserPtr Optimiser::me() {
     return shared_from_this();
 }
 
-void Optimiser::initialiseStorage() {
-    //	std::vector<RoadPtr>* crp(new std::vector<RoadPtr>());
+void Optimiser::initialiseExperimentStorage() {
+    int prog = this->getPrograms().size();
+    int pl = this->variableParams->getPopulationLevels().rows();
+    int hp = this->variableParams->getHabPref().rows();
+    int lambda = this->variableParams->getLambda().rows();
+    int beta = this->variableParams->getBeta().rows();
+    int ab = this->variableParams->getAnimalBridge().rows();
+    int grm = this->variableParams->getGrowthRatesMultipliers().rows();
+    int grsd = this->variableParams->getGrowthRateSDMultipliers().rows();
+    int comm = this->variableParams->getCommodityMultipliers().rows();
+    int commSDM = this->variableParams->getCommoditySDMultipliers().rows();
+    int commProp = this->variableParams->getCommodityPropSD().rows();
+    int compRoad = this->variableParams->getCompRoad().rows();
 
-    Eigen::MatrixXd currPop(this->populationSizeGA,3*(this->designParams->
-            getIntersectionPoints()+2));
-    this->currentRoadPopulation = currPop;
+    unsigned long noTests = prog*pl*hp*lambda*beta*ab*grm*grsd*comm*commSDM*
+            commProp*compRoad;
 
-    unsigned long noTests = (this->variableParams->getPopulationLevels().
-            size())*(this->variableParams->getHabPref().size())*(this->
-            variableParams->getLambda().size())*(this->variableParams->
-            getBeta().size())*(this->variableParams->
-            getGrowthRatesMultipliers().size())*
-            (this->variableParams->getGrowthRateSDMultipliers().size())*
-            (this->variableParams->getCommodityMultipliers().size())*
-            (this->variableParams->getCommoditySDMultipliers().size())*
-            (this->variableParams->getAnimalBridge().size());
+    std::vector< std::vector<RoadPtr> > br(noTests);
 
-    std::vector< std::vector<RoadPtr> > br(this->noRuns);
-
-    for(unsigned int ii=0; ii<this->noRuns;ii++) {
+    for(unsigned int ii=0; ii< noTests;ii++) {
             std::vector<RoadPtr> brr(this->noRuns);
             br[ii] = brr;
     }
@@ -76,6 +76,14 @@ void Optimiser::initialiseStorage() {
                 Eigen::VectorXd>>(noRuns,std::vector<Eigen::VectorXd>(this->
                 getSpecies().size())));
     }
+}
+
+void Optimiser::initialiseStorage() {
+    //	std::vector<RoadPtr>* crp(new std::vector<RoadPtr>());
+
+    Eigen::MatrixXd currPop(this->populationSizeGA,3*(this->designParams->
+            getIntersectionPoints()+2));
+    this->currentRoadPopulation = currPop;
 }
 
 void Optimiser::computeHabitatMaps() {

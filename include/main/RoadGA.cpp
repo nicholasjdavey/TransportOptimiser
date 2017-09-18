@@ -41,6 +41,10 @@ RoadGA::RoadGA(double mr, double cf, unsigned long gens, unsigned long popSize,
     this->tournamentSize = ts;
 }
 
+void RoadGA::initialiseExperimentStorage() {
+    Optimiser::initialiseExperimentStorage();
+}
+
 void RoadGA::initialiseStorage() {
     Optimiser::initialiseStorage();
 

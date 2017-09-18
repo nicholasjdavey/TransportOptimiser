@@ -148,7 +148,7 @@ public:
      * @return Growth rate standard deviation multiplier as const Eigen::VectorXd&
      */
     const Eigen::VectorXd& getGrowthRateSDMultipliers() {
-        return this->popGR;
+        return this->popGRSD;
     }
     /**
      * Sets the population growth rate standard deviation multiplier
@@ -156,7 +156,7 @@ public:
      * @param rate as const Eigen::VectorXd&
      */
     void setGrowthRateSDMultipliers(const Eigen::VectorXd rate) {
-        this->popGR = rate;
+        this->popGRSD = rate;
     }
 
     /**

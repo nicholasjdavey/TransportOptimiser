@@ -397,6 +397,12 @@ public:
     /** Virtual Routines *****************************************************/
 
     /**
+     * Extends the 'initialiseExperimentsStorage' routine of Optimiser to
+     * include RoadGA specific initialisations.
+     */
+    virtual void initialiseExperimentStorage();
+
+    /**
      * Extends the 'initialiseStorage' routine of Optimiser to include RoadGA
      * specific initialisations.
      */

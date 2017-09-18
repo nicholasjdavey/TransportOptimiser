@@ -1020,6 +1020,15 @@ public:
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
 
     /**
+     * Initialises the experimental results storage for retaining data between
+     * runs
+     *
+     * @note This function must be called once all object attributes such as
+     * VarParams have been assigned non-null pointers
+     */
+    virtual void initialiseExperimentStorage();
+
+    /**
      * Initialises the storage containers in the object (bestRoads etc.)
      *
      * @note This function must be called once all object attributes such as
@@ -1231,6 +1240,7 @@ protected:
     GnuplotPtr plothandle;                                                          /**< Pipe for plotting results */
     GnuplotPtr surrPlotHandle;                                                      /**< Pipe for plotting surrogate model results */
     bool gpu;                                                                       /**< If we are using GPUs to assist computing */
+    int gpus;                                                                       /**< The number of GPUs available to use */
     Optimiser::ROVType method;                                                      /**< ROV algorithm */
     Optimiser::InterpolationRoutine interp;                                         /**< Interpolation routine (only used for MTE) */
     std::string rootFolder;                                                         /**< Root folder of the experiments (Input file location) */
