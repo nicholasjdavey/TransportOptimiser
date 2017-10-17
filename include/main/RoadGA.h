@@ -87,7 +87,8 @@ public:
             long learnPeriod, double surrThresh, unsigned long maxLearnNo,
             unsigned long minLearnNo, unsigned long sg, RoadGA::Selection
             selector, RoadGA::Scaling fitscale, double topProp, double
-            maxSurvivalRate, int ts, double msr, bool gpu = false,
+            maxSurvivalRate, int ts, double msr, unsigned long learnSamples,
+            bool gpu = false,
             Optimiser::ROVType rovType = Optimiser::ALGO5,
             Optimiser::InterpolationRoutine interp =
             Optimiser::MULTI_LOC_LIN_REG);
@@ -516,23 +517,25 @@ public:
      * Computes the data from a full simulation of one road for building the
      * surrogate model for the full traffic flow case.
      *
-     * @param road as RoadPtr
-     * @return Matrix of data for building surrogate function for MTE
-     * @return Error code as Optimiser::ComputationStatus
+     * @param (input) road as RoadPtr
+     * @param (input) CUDA device number as int (default = 0)
+     * @param (output) Matrix of data for building surrogate function for MTE
+     * @param (output) Error code as Optimiser::ComputationStatus
      */
     virtual Optimiser::ComputationStatus surrogateResultsMTE(RoadPtr road,
-            Eigen::MatrixXd &mteResult);
+            Eigen::MatrixXd &mteResult, int device = 0);
 
     /**
      * Computes the data from a full simulation of one road for building the
      * surrogate model for the optimally-controllable traffic flow case.
      *
-     * @param road as RoadPtr
-     * @return Matrix of data for building surrogate function for ROVCR
-     * @return Error code as Optimiser::ComputationStatus
+     * @param (input) road as RoadPtr
+     * @param (input) device as int (default = 0)
+     * @param (output) Matrix of data for building surrogate function for ROVCR
+     * @param (output) Error code as Optimiser::ComputationStatus
      */
     virtual Optimiser::ComputationStatus surrogateResultsROVCR(RoadPtr road,
-            Eigen::MatrixXd &rovResult);
+            Eigen::MatrixXd &rovResult, int device = 0);
 
     /**
      * Writes out the surrogate results for a road calculation immediately
@@ -591,6 +594,11 @@ public:
      * Saves the results of the experiment to an external source
      */
     virtual void saveExperimentalResults();
+
+    /**
+     * Saves the IARS, Initial Unit Profits, Fixed Costs and Operating Values for all roads
+     */
+    virtual void saveRunPopulation();
 
 private:
     double scale;               /**< Cooling rate for mutation */

@@ -32,6 +32,8 @@ void Costs::computeUnitRevenue(OptimiserPtr optimiser) {
     const std::vector<VehiclePtr>& vehicles = optimiser->getTraffic()->
             getVehicles();
 
+    Costs::unitRevenueVar = 0;
+
     for (int ii = 0; ii < vehicles.size(); ii++) {
         Costs::unitRevenueVar += 6570*(vehicles[ii]->getProportion()
                 *vehicles[ii]->getMaximumLoad());

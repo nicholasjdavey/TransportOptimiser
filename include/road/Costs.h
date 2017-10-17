@@ -64,7 +64,7 @@ public:
      * @return Road fixed costs as RoadPtr
      */
     RoadPtr getRoad() {
-    return this->road.lock();
+        return this->road.lock();
     }
     /**
      * Sets the road
@@ -73,7 +73,7 @@ public:
      */
     void setRoad(RoadPtr road) {
     this->road.reset();
-            this->road = road;
+        this->road = road;
     }
 
     /**
@@ -82,7 +82,7 @@ public:
      * @return Accident fixed costs as double
      */
     double getAccidentFixed() {
-            return this->accidentFixed;
+        return this->accidentFixed;
     }
     /**
      * Sets the fixed component of accident costs
@@ -90,7 +90,7 @@ public:
      * @param af as double
      */
     void setAccidentFixed(double af) {
-            this->accidentFixed = af;
+        this->accidentFixed = af;
     }
 
     /**
@@ -99,7 +99,7 @@ public:
      * @return Accident variable costs as double
      */
     double getAccidentVariable() {
-            return this->accidentVar;
+        return this->accidentVar;
     }
     /**
      * Sets the variable component of accident costs
@@ -107,7 +107,7 @@ public:
      * @param av as double
      */
     void setAccidentVariable(double av) {
-            this->accidentVar = av;
+        this->accidentVar = av;
     }
 
     /**
@@ -116,7 +116,7 @@ public:
      * @return Earthwork costs as double
      */
     double getEarthwork() {
-            return this->earthwork;
+        return this->earthwork;
     }
     /**
      * Sets earthwork costs
@@ -124,7 +124,7 @@ public:
      * @param e as double
      */
     void setEarthwork(double e) {
-            this->earthwork = e;
+        this->earthwork = e;
     }
 
     /**
@@ -133,7 +133,7 @@ public:
      * @return Fixed length-based as double
      */
     double getLengthFixed() {
-            return this->lengthFixed;
+        return this->lengthFixed;
     }
     /**
      * Sets fixed length-based costs
@@ -141,7 +141,7 @@ public:
      * @param lf as double
      */
     void setLengthFixed(double lf) {
-            this->lengthFixed = lf;
+        this->lengthFixed = lf;
     }
 
     /**
@@ -150,7 +150,7 @@ public:
      * @return Variable length-based costs as double
      */
     double getLengthVariable() {
-            return this->lengthVar;
+        return this->lengthVar;
     }
     /**
      * Sets variable length-based costs
@@ -158,7 +158,7 @@ public:
      * @param lv as double
      */
     void setLengthVariable(double lv) {
-            this->lengthVar = lv;
+        this->lengthVar = lv;
     }
 
     /**
@@ -167,7 +167,7 @@ public:
      * @return Location-based costs as double
      */
     double getLocation() {
-            return this->location;
+        return this->location;
     }
     /**
      * Sets location-based costs
@@ -175,7 +175,7 @@ public:
      * @param loc as double
      */
     void setLocation(double loc) {
-            this->location = loc;
+        this->location = loc;
     }
 
     /**
@@ -184,7 +184,7 @@ public:
      * @return Animal mortality penalty costs as double
      */
     double getPenalty() {
-            return this->penaltyCost;
+        return this->penaltyCost;
     }
     /**
      * Sets animal mortality penalty costs
@@ -192,7 +192,7 @@ public:
      * @param penalty as double
      */
     void setPenalty(double penalty) {
-            this->penaltyCost = penalty;
+        this->penaltyCost = penalty;
     }
 
     /**

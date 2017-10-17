@@ -282,7 +282,7 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
     }
 
     // Now that we have all the index requirements, let's interpolate.
-    // Get the lowermost dimension x value
+    // Get the uppermost dimension x value
     double x0 = surrogate(lowerIdx(0));
     double x1 = surrogate(lowerIdx(0)+1);
     double xd;
@@ -315,7 +315,7 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
         }
 
         // Now add the lowest dimension's lower index
-//        idxL += lowerIdx(predictors.size() - 1);
+        idxL += lowerIdx(predictors.size() - 1);
 
         coeffs[ii] = surrogate(idxL)*(1 - xd) + surrogate(idxL + 1)*xd;
 

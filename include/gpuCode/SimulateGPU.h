@@ -36,21 +36,31 @@ namespace SimulateGPU {
     // CUDA WRAPPERS //////////////////////////////////////////////////////////
 
     /**
+     * Returns the non-cuda code the number of GPUs of compute capability > 1.0
+     * available for use.
+     *
+     * @return Number of GPUs as int
+     */
+    int deviceCount();
+
+    /**
      * Computes the expected present value for an uncertain parameter (e.g.
      * a commodity) given fixed usage over time.
      *
      * @param uncertainty as UncertaintyPtr
+     * @param device as int (default = 0)
      */
-    void expPV(UncertaintyPtr uncertainty);
+    void expPV(UncertaintyPtr uncertainty, int device = 0);
 
     /**
      * Multiplication of two floating point matrices (naive)
      * @param (input) A as Eigen::MatrixXd&
      * @param (input) B as Eigen::MatrixXd&
+     * @param (input) device as int (default = 0)
      * @param (output) C as Eigen::MatrixXd&
      */
     void eMMN(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
-            Eigen::MatrixXd& C);
+            Eigen::MatrixXd& C, int device = 0);
 
     /**
      * Multiplication of two floating point matrices
@@ -59,28 +69,31 @@ namespace SimulateGPU {
      * above.
      * @param (input) A as Eigen::MatrixXd&
      * @param (input) B as Eigen::MatrixXd&
+     * @param (input) device as int (default = 0)
      * @param (output) C as Eigen::MatrixXd&
      */
     void eMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
-            Eigen::MatrixXd& C);
+            Eigen::MatrixXd& C, int device = 0);
 
     /**
      * Element-wise multiplication of two floating point matrices
      * @param (input) A as Eigen::MatrixXd&
      * @param (input) B as Eigen::MatrixXd&
+     * @param (input) device as int (default = 0)
      * @param (output) C as Eigen::MatrixXd&
      */
     void ewMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
-            Eigen::MatrixXd& C);
+            Eigen::MatrixXd& C, int device = 0);
 
     /**
      * Element-wise dividion of two floating point matrices
      * @param (input) A as Eigen::MatrixXd&
      * @param (input) B as Eigen::MatrixXd&
+     * @param (input) devie as int (default = 0)
      * @param (output) C as Eigen::MatrixXd&
      */
     void ewMD(const Eigen::MatrixXd &A, const Eigen::MatrixXd &B,
-            Eigen::MatrixXd &C);
+            Eigen::MatrixXd &C, int device = 0);
 
     /**
      * Computes the number of times the lines in XY1 intersect the curve
@@ -89,9 +102,10 @@ namespace SimulateGPU {
      * @param XY1 as const Eigen::MatrixXd&
      * @param XY2 as const Eigen::MatrixXd&
      * @param crossings as Eigen::VectorXi&
+     * @param device as int (default = 0)
      */
     void lineSegmentIntersect(const Eigen::MatrixXd& XY1, const
-            Eigen::MatrixXd& XY2, Eigen::VectorXi &crossings);
+            Eigen::MatrixXd& XY2, Eigen::VectorXi &crossings, int device = 0);
 
     /**
      * Generates the habitat patches using CUDA for a specific habitat type
@@ -112,6 +126,7 @@ namespace SimulateGPU {
      * @param (input) habTyp as HabitatTypePtr
      * @param (input) labelledImage as const Eigen::MatrixXi&
      * @param (input) populations as const Eigen::MatrixXf&
+     * @param (intput) device as int (default = 0)
      * @param (output) patches as std::vector<HabitatPatchPtr>&
      * @param (output) initPop as double
      * @param (output) noPatches as int
@@ -121,7 +136,8 @@ namespace SimulateGPU {
             subPatchArea, HabitatTypePtr habTyp, const Eigen::MatrixXi&
             labelledImage, const Eigen::MatrixXd &populations,
             std::vector<HabitatPatchPtr>& patches, double& initPop,
-            Eigen::VectorXd &initPops, Eigen::VectorXd &capacities, int& noPatches);
+            Eigen::VectorXd &initPops, Eigen::VectorXd &capacities, int&
+            noPatches, int device = 0);
 
     /**
      * Runs the simulation for the fixed traffic flow model in CUDA
@@ -129,6 +145,7 @@ namespace SimulateGPU {
      * @param (input) srp as std::vector<SpeciesRoadPatchesPtr>&
      * @param (input) initPops as std::vector<Eigen::VectorXd>&
      * @param (input) capacities as std::vector<Eigen::VectorXd>&
+     * @param (input) device as int (default = 0)
      * @param (output) endPops as Eigen::MatrixXd& (output)
      * @return Computation status as Optimiser::ComputationStatus
      */
@@ -136,7 +153,7 @@ namespace SimulateGPU {
             std::vector<SpeciesRoadPatchesPtr>& srp,
             std::vector<Eigen::VectorXd>& initPops,
             std::vector<Eigen::VectorXd>& capacities,
-            Eigen::MatrixXd &endPops);
+            Eigen::MatrixXd &endPops, int device = 0);
 
     /**
      * Runs the simulation for the controlled traffic flow model in CUDA.
@@ -150,6 +167,7 @@ namespace SimulateGPU {
      * @param optCont as Eigen::MatrixXi&
      * @param regressions as Eigen::VectorXd&
      * @param plotResults as bool
+     * @param device as int (default = 0)
      *
      * The shape of the regressions is as follows:
      *
@@ -170,7 +188,7 @@ namespace SimulateGPU {
             std::vector<SpeciesRoadPatchesPtr>& srp,
             std::vector<Eigen::MatrixXd> &adjPops, Eigen::MatrixXd &
             unitProfits, Eigen::MatrixXd& condExp, Eigen::MatrixXi& optCont,
-            Eigen::VectorXd& regressions, bool plotResults);
+            Eigen::VectorXd& regressions, bool plotResults, int device = 0);
 
 //    /**
 //     * Simulates a single ROV path for the road using the optimal control map
@@ -212,16 +230,18 @@ namespace SimulateGPU {
      *
      * @param op as RoadGAPtr
      * @param speciesID as int
+     * @param device as int
      */
-    void buildSurrogateMTECUDA(RoadGAPtr op, int speciesID);
+    void buildSurrogateMTECUDA(RoadGAPtr op, int speciesID, int device = 0);
 
     /**
      * Builds the ROV surrogate using CUDA
      *
      * @param op as OptimiserPtr
      * @param surrogate as Eigen::VectorXd&
+     * @param device as int (default = 0)
      */
-    void buildSurrogateROVCUDA(RoadGAPtr op);
+    void buildSurrogateROVCUDA(RoadGAPtr op, int device = 0);
 
     /**
      * Interpolates a surrogate model at many points using the GPU. This is
@@ -232,10 +252,11 @@ namespace SimulateGPU {
      * @param results as Eigen::VectorXd&
      * @param dimRes as int
      * @param noDims as int
+     * @param device as int (default = 0)
      */
     void interpolateSurrogateMulti(Eigen::VectorXd& surrogate,
             Eigen::VectorXd &predictors, Eigen::VectorXd &results, int dimRes,
-            int noDims);
+            int noDims, int device = 0);
 
     //  HELPER ROUTINES (COMPUTED ON CPU) /////////////////////////////////////
 

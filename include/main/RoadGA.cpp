@@ -19,11 +19,12 @@ RoadGA::RoadGA(double mr, double cf, unsigned long gens, unsigned long popSize,
     Optimiser::Type type, double scale, unsigned long learnPeriod, double
     surrThresh, unsigned long maxLearnNo, unsigned long minLearnNo, unsigned
     long sg, RoadGA::Selection selector, RoadGA::Scaling fitscale, double
-    topProp, double maxSurvivalRate, int ts, double msr, bool gpu,
-    Optimiser::ROVType rovType, Optimiser::InterpolationRoutine interp) :
+    topProp, double maxSurvivalRate, int ts, double msr, unsigned long
+    learnSamples, bool gpu, Optimiser::ROVType rovType,
+    Optimiser::InterpolationRoutine interp) :
     Optimiser(mr, cf, gens, popSize, stopTol, confInt, confLvl, habGridRes,
-            surrDimRes, solScheme, noRuns, type, sg, msr, gpu, rovType,
-            interp) {
+            surrDimRes, solScheme, noRuns, type, sg, msr, learnSamples, gpu,
+            rovType, interp) {
 
     this->theta = 0;
     this->generation = 0;
@@ -696,6 +697,7 @@ void RoadGA::optimise(bool plot) {
 
         Optimiser::optimise(plot);
         this->plotResults(plot);
+        this->saveRunPopulation();
 
         status = this->stopCheck();
 
@@ -855,6 +857,7 @@ void RoadGA::initialPlots(bool plot) {
                 blankData[0][0] = 1;
                 blankData[0][1] = 1;
                 (*this->surrPlotHandle) << "plot '-' with lines linecolor rgb'#ffffff'\n";
+                (*this->surrPlotHandle).send1d(blankData);
                 (*this->surrPlotHandle).flush();
 
                 // Plot 5ii (Surrogate Model Error)
@@ -1526,7 +1529,8 @@ void RoadGA::computeSurrogate() {
         // MTE can support around 50 roads per generation at maximum learning,
         // 10 at minimum learning (during learning period) or 3 (after learning
         // period).
-        if (this->generation < this->learnPeriod) {
+        if ((this->generation < this->learnPeriod) && (this->noSamples <
+                this->learnSamples)) {
             pFull = std::max((this->maxLearnNo/this->populationSizeGA)*
                     std::min((this->surrErr.maxCoeff() - this->surrThresh)*(
                     (double)(this->surrErr.maxCoeff() > this->surrThresh))*
@@ -1535,7 +1539,8 @@ void RoadGA::computeSurrogate() {
         } else {
             // Beyond the learning period, we will only use the minimum
             // learning number
-            pFull = this->minLearnNo/this->populationSizeGA;
+            pFull = (double)(((double)this->minLearnNo)/((double)this->
+                    populationSizeGA));
 //            pFull = std::max((this->maxLearnNo/this->populationSizeGA)*
 //                    std::min((this->surrErr.maxCoeff() - this->surrThresh)*(
 //                    (double)(this->surrErr.maxCoeff() > this->surrThresh))*
@@ -1546,7 +1551,8 @@ void RoadGA::computeSurrogate() {
         // We treat ROV the same as MTE for now even though it should be much
         // much slower (we may have to resort to ignoring forward path
         // recomputation to improve speed at the expense of accuracy.
-        if (this->generation < this->learnPeriod) {
+        if ((this->generation < this->learnPeriod) && (this->noSamples <
+                this->learnSamples)) {
             pFull = std::max((this->maxLearnNo/this->populationSizeGA)*
                     std::min((this->surrErr.maxCoeff() - this->surrThresh)*(
                     (double)(this->surrErr.maxCoeff() > this->surrThresh))*
@@ -1555,7 +1561,8 @@ void RoadGA::computeSurrogate() {
         } else {
             // Beyond the learning period, we will only use the minimum
             // learning number
-            pFull = this->minLearnNo/this->populationSizeGA;
+            pFull = (double)(((double)this->minLearnNo)/((double)this->
+                    populationSizeGA));
 //            pFull = std::max((this->maxLearnNo/this->populationSizeGA)*
 //                    std::min((this->surrErr.maxCoeff() - this->surrThresh)*(
 //                    (double)(this->surrErr.maxCoeff() > this->surrThresh))*
@@ -1639,56 +1646,141 @@ void RoadGA::computeSurrogate() {
         int validCounter = 0;
         Eigen::VectorXd currErr = Eigen::VectorXd::Zero(this->species.size());
 
-        for (unsigned long ii = 0; ii < newSamples; ii++) {
-            // As each full model requires its own parallel routine and this
-            // routine is quite intensive, we call the full model for each
-            // road serially. Furthermore, we do not want to add new roads to
-            // the threadpool
-            //      endPop_i = f_i(aar_i)
-            RoadPtr road(new Road(this->me(),this->currentRoadPopulation
-                    .row(sampleRoads(ii))));
-            Eigen::MatrixXd mteResult(3,this->species.size());
-            Optimiser::ComputationStatus fullStatus = this->
-                    surrogateResultsMTE(road,mteResult);
+        if ((this->threader != nullptr) && (this->gpus > 1)) {
 
-            if (fullStatus == Optimiser::COMPUTATION_SUCCESS) {
-                this->iars.row(this->noSamples + validCounter) = mteResult
-                        .row(0);
-                this->pops.row(this->noSamples + validCounter) = mteResult
-                        .row(1);
-                this->popsSD.row(this->noSamples + validCounter) = mteResult
-                        .row(2);
+            // If multithreading is enabled
+            std::vector<Optimiser::ComputationStatus> statuses(newSamples);
+            Eigen::MatrixXd iarsTemp(newSamples,this->iars.cols());
+            Eigen::MatrixXd popsTemp(newSamples,this->pops.cols());
+            Eigen::MatrixXd popsSDTemp(newSamples,this->popsSD.cols());
+            Eigen::MatrixXd errors(newSamples,this->species.size());
 
-                // We need to compute the current period error by evaluating the
-                // sample roads against the new surrogate. We compute the error
-                // of the mean population. For now we just compute the error of
-                // the current samples, not all that have been computed to date
-                // (although we could easily do this if desired). We use the
-                // old surrogate here for the comparison.
-                road->evaluateRoad();
+            // We need to use a GPU thread pool to ensure the number of threads
+            // does not exceed the number of GPUs.
+            threaderGPU = this->threaderGPU;
 
-                for (int jj = 0; jj < this->species.size(); jj++) {
-                    currErr(jj) += pow((pops(this->noSamples + validCounter,jj)
-                            - this->popsCurr(sampleRoads(ii),jj))/pops(this->
-                            noSamples + validCounter,jj),2);
+            int sentSamples = 0;
+            int loops = (int)ceil((double)newSamples/((double)this->gpus));
+            std::vector<std::future<void>> results(newSamples);
 
-//                    std::cout << sampleRoads(ii) << " " << this->pops(this->noSamples + validCounter,jj) << " "
-//                            << this->popsCurr(sampleRoads(ii),jj) << " "
-//                            << road->getAttributes()->getEndPopMTE()(jj) << " "
-//                            << this->iars(this->noSamples + validCounter,jj) << " "
-//                            << this->iarsCurr(sampleRoads(ii),jj) << " "
-//                            << road->getAttributes()->getIAR()(jj)
-//                            << std::endl;
+            for (unsigned long ii = 0; ii < loops; ii++) {
+                int noRuns = (std::min(newSamples-sentSamples,this->gpus));
 
-//                    std::cout << this->iars(this->noSamples + validCounter,jj) << std::endl;
+                for (unsigned long jj = 0; jj < noRuns; jj++) {
+                    if (sentSamples < newSamples) {
+                        results[sentSamples] = threaderGPU->push([this,ii,jj,
+                                &statuses,&iarsTemp,&popsTemp,&popsSDTemp,
+                                &sampleRoads,&errors,sentSamples](int id) {
+                            RoadPtr road(new Road(this->me(),this->
+                                    currentRoadPopulation.row(sampleRoads(
+                                    sentSamples))));
+                            Eigen::MatrixXd mteResult(3,this->species.size());
+                            Optimiser::ComputationStatus fullStatus = this->
+                                    surrogateResultsMTE(road,mteResult,jj);
 
-//                    std::cout << this->popsCurr(sampleRoads(ii),jj) << std::endl;
+                            if (fullStatus == Optimiser::COMPUTATION_SUCCESS) {
+                                iarsTemp.row(sentSamples) = mteResult.row(0);
+                                popsTemp.row(sentSamples) = mteResult.row(1);
+                                popsSDTemp.row(sentSamples) = mteResult.row(2);
 
-//                    // Try 1
-//                    road->evaluateRoad();
-//                    std::cout << road->getAttributes()->getIAR()(jj) << " " << road->getAttributes()->getTotalValueMean() << std::endl;
+                                for (int kk = 0; kk < this->species.size();
+                                        kk++) {
+                                    errors(sentSamples,kk) = pow((popsTemp(
+                                            sentSamples,kk) - this->
+                                            popsCurr(sampleRoads(sentSamples),
+                                            kk)/this->species[ii]->
+                                            getInitialPopulation())/popsTemp(
+                                            sentSamples,kk),2);
+                                }
+
+                                statuses[sentSamples] =
+                                        Optimiser::COMPUTATION_SUCCESS;
+                            } else {
+                                statuses[sentSamples] =
+                                        Optimiser::COMPUTATION_FAILED;
+                            }
+                        });
+                        sentSamples++;
+                    }
                 }
-                validCounter++;
+            }
+
+            for (unsigned long jj = 0; jj < sentSamples; jj++) {
+                results[jj].get();
+            }
+
+            // Save only the valid results
+            for (unsigned long ii = 0; ii < newSamples; ii++) {
+                if (statuses[ii] == Optimiser::COMPUTATION_SUCCESS) {
+                    this->iars.row(this->noSamples + validCounter) = iarsTemp
+                            .row(ii);
+                    this->pops.row(this->noSamples + validCounter) = popsTemp
+                            .row(ii);
+                    this->popsSD.row(this->noSamples + validCounter) =
+                            popsSDTemp.row(ii);
+
+                    for (int jj = 0; jj < this->species.size(); jj++) {
+                        currErr(jj) += errors(ii,jj);
+                    }
+
+                    validCounter++;
+                }
+            }
+
+        } else {
+            for (unsigned long ii = 0; ii < newSamples; ii++) {
+                // As each full model requires its own parallel routine and this
+                // routine is quite intensive, we call the full model for each
+                // road serially. Furthermore, we do not want to add new roads to
+                // the threadpool
+                //      endPop_i = f_i(aar_i)
+                // Run serially
+                RoadPtr road(new Road(this->me(),this->currentRoadPopulation
+                        .row(sampleRoads(ii))));
+                Eigen::MatrixXd mteResult(3,this->species.size());
+                Optimiser::ComputationStatus fullStatus = this->
+                        surrogateResultsMTE(road,mteResult);
+
+                if (fullStatus == Optimiser::COMPUTATION_SUCCESS) {
+                    this->iars.row(this->noSamples + validCounter) = mteResult
+                            .row(0);
+                    this->pops.row(this->noSamples + validCounter) = mteResult
+                            .row(1);
+                    this->popsSD.row(this->noSamples + validCounter) = mteResult
+                            .row(2);
+
+                    // We need to compute the current period error by evaluating the
+                    // sample roads against the new surrogate. We compute the error
+                    // of the mean population. For now we just compute the error of
+                    // the current samples, not all that have been computed to date
+                    // (although we could easily do this if desired). We use the
+                    // old surrogate here for the comparison.
+                    road->evaluateRoad();
+
+                    for (int jj = 0; jj < this->species.size(); jj++) {
+                        currErr(jj) += pow((pops(this->noSamples + validCounter,jj)
+                                - this->popsCurr(sampleRoads(ii),jj)/this->
+                                species[ii]->getInitialPopulation())/pops(this->
+                                noSamples + validCounter,jj),2);
+
+    //                    std::cout << sampleRoads(ii) << " " << this->pops(this->noSamples + validCounter,jj) << " "
+    //                            << this->popsCurr(sampleRoads(ii),jj) << " "
+    //                            << road->getAttributes()->getEndPopMTE()(jj) << " "
+    //                            << this->iars(this->noSamples + validCounter,jj) << " "
+    //                            << this->iarsCurr(sampleRoads(ii),jj) << " "
+    //                            << road->getAttributes()->getIAR()(jj)
+    //                            << std::endl;
+
+    //                    std::cout << this->iars(this->noSamples + validCounter,jj) << std::endl;
+
+    //                    std::cout << this->popsCurr(sampleRoads(ii),jj) << std::endl;
+
+    //                    // Try 1
+    //                    road->evaluateRoad();
+    //                    std::cout << road->getAttributes()->getIAR()(jj) << " " << road->getAttributes()->getTotalValueMean() << std::endl;
+                    }
+                    validCounter++;
+                }
             }
         }
 
@@ -1725,44 +1817,136 @@ void RoadGA::computeSurrogate() {
                     values.segment(0,this->noSamples).minCoeff();
         }
 
-        for (unsigned long ii = 0; ii < newSamples; ii++) {
+        if ((this->threader != nullptr) && (this->gpus > 1)) {
 
-            // As each full model requires its own parallel routine and this
-            // routine is quite intensive, we call the full model for each
-            // road serially. Furthermore, we do not want to add new roads to
-            // the threadpool
-            //      endPop_i = f_i(aar_i)
-            RoadPtr road(new Road(this->me(),this->currentRoadPopulation
-                    .row(sampleRoads(ii))));
-            Eigen::MatrixXd rovResult(1,this->species.size()+3);
-            Optimiser::ComputationStatus fullStatus = this->
-                    surrogateResultsROVCR(road,rovResult);
+            // If multithreading is enabled
+            std::vector<Optimiser::ComputationStatus> statuses(newSamples);
+            Eigen::MatrixXd iarsTemp(newSamples,this->iars.cols());
+            Eigen::VectorXd valuesTemp(newSamples);
+            Eigen::VectorXd valuesSDTemp(newSamples);
+            Eigen::VectorXd useTemp(newSamples);
+            Eigen::VectorXd errors(newSamples);
 
-            // Outputs
-            if (fullStatus == Optimiser::COMPUTATION_SUCCESS) {
-                this->values(this->noSamples + validCounter) = rovResult(0,0);
-                this->valuesSD(this->noSamples + validCounter) =
-                        rovResult(0,1);
-                // IAR predictors
-                this->iars.row(this->noSamples + validCounter) = rovResult
-                        .block(0,2,1,this->species.size());
-                // Unit profit predictors
-                this->use(this->noSamples + validCounter) = rovResult(0,this->
-                        species.size()+2);
+            // We need to use a GPU thread pool to ensure the number of threads
+            // does not exceed the number of GPUs.
+            threaderGPU = this->threaderGPU;
 
-                // We need to compute the current period error by evaluating the
-                // sample roads against the new surrogate. We compute the error
-                // of the mean population. For now we just compute the error of
-                // the current samples, not all that have been computed to date
-                // (although we could easily do this if desired). We use the
-                // old surrogate here for the comparison.
+            int sentSamples = 0;
+            int loops = (int)ceil((double)newSamples/((double)this->gpus));
+            std::vector<std::future<void>> results(newSamples);
 
-                // For now we normalise the error by the difference between the
-                // maximum and minimum cost values
+            for (unsigned long ii = 0; ii < loops; ii++) {
+                int noRuns = (std::min(newSamples-sentSamples,this->gpus));
 
-                currErr(0) += fabs((this->values(this->noSamples + validCounter)
-                        - this->rovCurr(sampleRoads(ii)))/range);
-                validCounter++;
+                for (unsigned long jj = 0; jj < noRuns; jj++) {
+                    if (sentSamples < newSamples) {
+                        results[sentSamples] = threaderGPU->push([this,ii,jj,
+                                &statuses,&iarsTemp,&valuesTemp,&valuesSDTemp,
+                                &useTemp,&sampleRoads,&errors,sentSamples,
+                                range]
+                                (int id) {
+                            RoadPtr road(new Road(this->me(),this->
+                                    currentRoadPopulation.row(sampleRoads(
+                                    sentSamples))));
+                            Eigen::MatrixXd rovResult(1,this->species.size()
+                                    + 3);
+                            Optimiser::ComputationStatus fullStatus = this->
+                                    surrogateResultsROVCR(road,rovResult,jj);
+
+                            if (fullStatus == Optimiser::COMPUTATION_SUCCESS) {
+                                valuesTemp(sentSamples) = rovResult(0,0);
+                                valuesSDTemp(sentSamples) = rovResult(0,1);
+                                // IAR Predictors
+                                iarsTemp.row(sentSamples) = rovResult.block(0,
+                                        2,1,this->species.size());
+                                // Unit Profit Predictors
+                                useTemp(sentSamples) = rovResult(0,this->
+                                        species.size()+2);
+
+                                errors(sentSamples) = pow((valuesTemp(
+                                        sentSamples) - this->rovCurr(
+                                        sentSamples))/valuesTemp(sentSamples),
+                                        2);
+
+                                statuses[sentSamples] =
+                                        Optimiser::COMPUTATION_SUCCESS;
+                            } else {
+                                statuses[sentSamples] =
+                                        Optimiser::COMPUTATION_FAILED;
+                            }
+                        });
+                        sentSamples++;
+                    }
+                }
+            }
+
+            for (unsigned long jj = 0; jj < sentSamples; jj++) {
+                results[jj].get();
+            }
+
+            // Save only the valid results
+            for (unsigned long ii = 0; ii < newSamples; ii++) {
+                if (statuses[ii] == Optimiser::COMPUTATION_SUCCESS) {
+                    this->values(this->noSamples + validCounter) =
+                            valuesTemp(ii);
+                    this->valuesSD(this->noSamples + validCounter) =
+                            valuesSDTemp(ii);
+                    // IAR predictors
+                    this->iars.row(this->noSamples + validCounter) =
+                            iarsTemp.row(ii);
+                    // Unit profit predictors
+                    this->use(this->noSamples + validCounter) =
+                            useTemp(ii);
+
+                    currErr(0) += fabs((this->values(this->noSamples +
+                            validCounter) - this->rovCurr(sampleRoads(ii)))/
+                            range);
+
+                    validCounter++;
+                }
+            }
+
+        } else {
+
+            for (unsigned long ii = 0; ii < newSamples; ii++) {
+
+                // As each full model requires its own parallel routine and this
+                // routine is quite intensive, we call the full model for each
+                // road serially. Furthermore, we do not want to add new roads to
+                // the threadpool
+                //      endPop_i = f_i(aar_i)
+                RoadPtr road(new Road(this->me(),this->currentRoadPopulation
+                        .row(sampleRoads(ii))));
+                Eigen::MatrixXd rovResult(1,this->species.size()+3);
+                Optimiser::ComputationStatus fullStatus = this->
+                        surrogateResultsROVCR(road,rovResult);
+
+                // Outputs
+                if (fullStatus == Optimiser::COMPUTATION_SUCCESS) {
+                    this->values(this->noSamples + validCounter) = rovResult(0,0);
+                    this->valuesSD(this->noSamples + validCounter) =
+                            rovResult(0,1);
+                    // IAR predictors
+                    this->iars.row(this->noSamples + validCounter) = rovResult
+                            .block(0,2,1,this->species.size());
+                    // Unit profit predictors
+                    this->use(this->noSamples + validCounter) = rovResult(0,this->
+                            species.size()+2);
+
+                    // We need to compute the current period error by evaluating the
+                    // sample roads against the new surrogate. We compute the error
+                    // of the mean population. For now we just compute the error of
+                    // the current samples, not all that have been computed to date
+                    // (although we could easily do this if desired). We use the
+                    // old surrogate here for the comparison.
+
+                    // For now we normalise the error by the difference between the
+                    // maximum and minimum cost values
+
+                    currErr(0) += fabs((this->values(this->noSamples + validCounter)
+                            - this->rovCurr(sampleRoads(ii)))/range);
+                    validCounter++;
+                }
             }
         }
 
@@ -2661,11 +2845,11 @@ void RoadGA::curveEliminationProcedure(int ii, int jj, int kk, int ll,
 }
 
 RoadGA::ComputationStatus RoadGA::surrogateResultsMTE(RoadPtr road,
-        Eigen::MatrixXd& mteResult) {
+        Eigen::MatrixXd& mteResult, int device) {
 
     try {
         road->designRoad();
-        road->evaluateRoad(true);
+        road->evaluateRoad(true,device);
         std::vector<SpeciesRoadPatchesPtr> species =
                 road->getSpeciesRoadPatches();
 
@@ -2692,11 +2876,11 @@ RoadGA::ComputationStatus RoadGA::surrogateResultsMTE(RoadPtr road,
 }
 
 RoadGA::ComputationStatus RoadGA::surrogateResultsROVCR(RoadPtr road,
-        Eigen::MatrixXd& rovResult) {
+        Eigen::MatrixXd& rovResult, int device) {
 
     try {
         road->designRoad();
-        road->evaluateRoad(true);
+        road->evaluateRoad(true,device);
         std::vector<SpeciesRoadPatchesPtr> species =
                 road->getSpeciesRoadPatches();
 
@@ -2722,7 +2906,9 @@ RoadGA::ComputationStatus RoadGA::surrogateResultsROVCR(RoadPtr road,
 
         rovResult(0,this->species.size()+2) = unitCost;
 
+        this->threader->lock();
         this->writeOutSurrogateData(rovResult);
+        this->threader->unlock();
 
         return RoadGA::COMPUTATION_SUCCESS;
 
@@ -2802,16 +2988,28 @@ void RoadGA::writeOutSurrogateData(Eigen::MatrixXd &data) {
         outputFile2 << std::endl;
 
     } else if (this->type == Optimiser::CONTROLLED) {
-        // RAW DATA
-        for (int jj = 0; jj < this->species.size(); jj++) {
-            outputFile2 << std::setw(20) << data(jj+2);
-        }
+        // Check if data is clean
+        double initialProfit = data(this->species.size()+2);
+        double avValue = data(0,0);
+        double valueSD = data(0,1);
+        double multiplier = (this->economic->getYears()+1)*this->programs[this->
+                scenario->getProgram()]->getFlowRates()(this->programs[this->
+                scenario->getProgram()]->getFlowRates().size()-1)*100;
 
-        outputFile2 << std::setw(20) << data(this->species.size()+2) <<
-                std::setw(20) << data(0,0) << std::setw(20) << data(0,1);
+        if (std::isfinite(initialProfit) && std::isfinite(avValue) &&
+                std::isfinite(valueSD) && (fabs(avValue) <
+                multiplier*fabs(initialProfit))) {
+            // RAW DATA SAVE
+            for (int jj = 0; jj < this->species.size(); jj++) {
+                outputFile2 << std::setw(20) << data(jj+2);
+            }
+
+            outputFile2 << std::setw(20) << data(this->species.size()+2) <<
+                    std::setw(20) << data(0,0) << std::setw(20) << data(0,1);            
+            outputFile2 << std::endl;
+        }
     }
 
-    outputFile2 << std::endl;
     outputFile2.close();
 }
 
@@ -3296,6 +3494,9 @@ void RoadGA::initialiseFromTextInput(std::string inputFile) {
     getline(input,line);
     values = Utility::getDictionary(line,":");
     this->setMaxLearnNo(::atoi(values[1].c_str()));
+    getline(input,line);
+    values = Utility::getDictionary(line,":");
+    this->setLearnSamples(::atoi(values[1].c_str()));
     getline(input,line);
     values = Utility::getDictionary(line,":");
     this->setMinLearnNo(::atoi(values[1].c_str()));
@@ -4340,6 +4541,87 @@ void RoadGA::getExistingSurrogateData() {
     }
 }
 
+void RoadGA::saveRunPopulation() {
+
+    std::string scenarioFolder = this->getRootFolder() + "/" + "Scenario_" +
+            std::to_string(this->scenario->getCurrentScenario());
+    std::string runFolder = scenarioFolder + "/" + std::to_string(this->
+            scenario->getRun());
+
+    if(!(boost::filesystem::exists(scenarioFolder))) {
+        boost::filesystem::create_directory(scenarioFolder);
+    }
+
+    if(!(boost::filesystem::exists(runFolder))) {
+        boost::filesystem::create_directory(runFolder);
+    }
+
+    std::ifstream outputFileCheck;
+    std::ofstream outputFile2;
+
+    std::string allRoadResults = runFolder + "/" + "allRoadResults";
+    outputFileCheck.open(allRoadResults);
+
+    int existingLines = 0;
+
+    if (outputFileCheck.good()) {
+        std::string templLine;
+        while (getline(outputFileCheck,templLine)) {
+            existingLines++;
+        }
+        outputFileCheck.close();
+
+        existingLines -= 4;
+
+        outputFile2.open(allRoadResults,std::ios::app);
+    } else {
+        outputFileCheck.close();
+
+        outputFile2.open(allRoadResults);
+
+        // Prepare header details for raw data files
+        outputFile2 << "####################################################################################################" << std::endl;
+        outputFile2 << "######################################## ALL ROADS RESULTS #########################################" << std::endl;
+        outputFile2 << "####################################################################################################" << std::endl;
+        std::setprecision(12);
+
+        if (this->type == Optimiser::MTE) {
+            for (int ii = 0; ii < this->species.size(); ii++) {
+                outputFile2 << "IAR_" << std::setw(3) << std::setfill('0') <<
+                        ii;
+            }
+        } else if (this->type == Optimiser::CONTROLLED) {
+            for (int ii = 0; ii < this->species.size(); ii++) {
+                outputFile2 << "IAR_" << std::setw(3) << ii <<
+                        "                  ";
+            }
+
+            outputFile2 << "INITIAL_UNIT_PROFIT      ";
+        }
+
+        outputFile2 << "      COST        " << std::endl;
+    }
+
+    // SAVE RESULTS
+    for (int ii = 0; ii < this->populationSizeGA; ii++) {
+        if (this->type == Optimiser::MTE) {
+            for (int jj = 0; jj < this->species.size(); jj++) {
+                outputFile2 << this->iarsCurr(ii,jj) << "      ";
+            }
+        } else if (this->type == Optimiser::CONTROLLED) {
+            for (int jj = 0; jj < this->species.size(); jj++) {
+                outputFile2 << this->iarsCurr(ii,jj) << "      ";
+            }
+
+            outputFile2 << this->useCurr(ii) << "       ";
+        }
+
+        outputFile2 << this->costs(ii) << std::endl;
+    }
+
+    outputFile2.close();
+}
+
 void RoadGA::saveExperimentalResults() {
 
     Optimiser::saveExperimentalResults();
@@ -4618,7 +4900,7 @@ void RoadGA::saveExperimentalResults() {
             }
         }
 
-//        outputFile2.close();
+        outputFile1.close();
 
         outputFile1.open(runResults,std::ios::out);
         outputFile1 << "####################################################################################################" << std::endl;
@@ -4626,10 +4908,11 @@ void RoadGA::saveExperimentalResults() {
         outputFile1 << "####################################################################################################" << std::endl;
         outputFile1 << "GENERATION              BEST ROAD FITNESS       AVERAGE ROAD FITNESS    SURROGATE FITNESS" << std::endl;
         std::setprecision(6);
-        std::setw(12);
+        std::setw(20);
 
         for (int ii = 0; ii < this->generation; ii++) {
-            outputFile1 << ii << this->best(ii) << this->av(ii) << this->surrFit(ii) << std::endl;
+            outputFile1 << ii << std::setw(20) << this->best(ii) <<
+                    std::setw(20) << this->av(ii) << std::setw(20) << this->surrFit(ii) << std::endl;
         }
 
         outputFile1.close();
@@ -4641,10 +4924,11 @@ void RoadGA::saveExperimentalResults() {
         outputFile1 << "####################################################################################################" << std::endl;
         outputFile1 << "GENERATION              BEST ROAD FITNESS       AVERAGE ROAD FITNESS" << std::endl;
         std::setprecision(6);
-        std::setw(12);
+        std::setw(20);
 
         for (int ii = 0; ii < this->generation; ii++) {
-            outputFile1 << ii << this->best(ii) << this->av(ii) << std::endl;
+            outputFile1 << ii << std::setw(20) << this->best(ii) <<
+                    std::setw(20) << this->av(ii) << std::endl;
         }
 
         outputFile1.close();

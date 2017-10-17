@@ -10,7 +10,7 @@
 ## GENERAL OPTIMISATION PARAMETERS
 Mutation Rate                                   : 0.6
 Crossover Fraction                              : 0.375
-Max Generations                                 : 400
+Max Generations                                 : 500
 Population Size                                 : 400
 Stopping Tolerance                              : 1e-4
 Confidence Interval                             : 0.95
@@ -43,6 +43,7 @@ CPU Threads (min = 1)                           : 6
 Surrogate Dimension Resolution                  : 30
 Surrogate Threshold                             : 0.05
 Max Learning Samples per Generation             : 10
+Total Max Learning Samples                      : 300
 Minimum Learning Samples per Generation         : 1
 # Interpolation Routine
 # Cubic Spline                          = 0
@@ -118,12 +119,12 @@ Minimum Viable Y Value                          : 0
 Maximum Viable Y Value                          : 1
 Number of X Points                              : 20
 Numner of Y Points                              : 20
-Number of Simulation Paths                      : 50000
+Number of Simulation Paths                      : 75000
 ROV Dimension Resolution                        : 40
 
 ###################################################################################################
 ## EXPERIMENTAL PARAMETERS
-Number of Runs per Experiment                   : 3
+Number of Runs per Experiment                   : 4
 # Optimisation methods
 #    no penalty     = 0
 #    simple penalty = 1
@@ -147,13 +148,13 @@ Animal Bridges to Build                         : 0
 Habitat Preference SD Multipliers               : 0
 Movement Propensity SD Multipliers              : 0
 Ranging Coefficient SD Multipliers              : 0
-Population Growth Rate Mean Multipliers         : 0.5,1,1.5
+Population Growth Rate Mean Multipliers         : 1
 Population Growth Rate SD Multipliers           : 1
 Commodity Price Mean Multipliers                : 1
-Commodity Price SD Multipliers                  : 1,2,3
+Commodity Price SD Multipliers                  : 1
 Ore Composition SD Multipliers                  : 1
-Minimum Population Levels (proportion of min)   : 0.5,0.7,0.9
-Comparison Road Variable Cost Multipliers       : 0.5,1,1.5
+Minimum Population Levels (proportion of min)   : 0.9
+Comparison Road Variable Cost Multipliers       : 0.5
 
 ###################################################################################################
 ## TRAFFIC PROGRAMS

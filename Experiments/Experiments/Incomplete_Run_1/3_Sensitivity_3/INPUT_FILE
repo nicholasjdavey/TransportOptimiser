@@ -10,7 +10,7 @@
 ## GENERAL OPTIMISATION PARAMETERS
 Mutation Rate                                   : 0.6
 Crossover Fraction                              : 0.375
-Max Generations                                 : 2
+Max Generations                                 : 500
 Population Size                                 : 400
 Stopping Tolerance                              : 1e-4
 Confidence Interval                             : 0.95
@@ -18,7 +18,7 @@ Confidence Level                                : 0.95
 Solution Scheme                                 : void
 Stall Generations                               : 5
 Cooling Rate                                    : 1.0
-Learning Period                                 : 50
+Learning Period                                 : 20
 # GA Selection Routine
 # Stochastic Uniform                    = 0
 # Remainder                             = 1
@@ -44,7 +44,7 @@ Surrogate Dimension Resolution                  : 30
 Surrogate Threshold                             : 0.05
 Max Learning Samples per Generation             : 10
 Total Max Learning Samples                      : 300
-Minimum Learning Samples per Generation         : 3
+Minimum Learning Samples per Generation         : 1
 # Interpolation Routine
 # Cubic Spline                          = 0
 # Multiple Local Linear Regression      = 1
@@ -119,18 +119,18 @@ Minimum Viable Y Value                          : 0
 Maximum Viable Y Value                          : 1
 Number of X Points                              : 20
 Numner of Y Points                              : 20
-Number of Simulation Paths                      : 50000
+Number of Simulation Paths                      : 100000
 ROV Dimension Resolution                        : 40
 
 ###################################################################################################
 ## EXPERIMENTAL PARAMETERS
-Number of Runs per Experiment                   : 3
+Number of Runs per Experiment                   : 4
 # Optimisation methods
 #    no penalty     = 0
 #    simple penalty = 1
 #    mte            = 2
 #    controlled     = 3
-Optimisation Method                             : 0
+Optimisation Method                             : 3
 # ROV Method
 #    Regression Monte Carlo (Tsitsiklis and Van Roy)                                        = 0
 #    Regression Monte Carlo (Longstaff and Schwartz)                                        = 1
@@ -148,19 +148,19 @@ Animal Bridges to Build                         : 0
 Habitat Preference SD Multipliers               : 0
 Movement Propensity SD Multipliers              : 0
 Ranging Coefficient SD Multipliers              : 0
-Population Growth Rate Mean Multipliers         : 0.5,1,1.5
-Population Growth Rate SD Multipliers           : 1
+Population Growth Rate Mean Multipliers         : 1
+Population Growth Rate SD Multipliers           : 0.5,1,1.5
 Commodity Price Mean Multipliers                : 1
-Commodity Price SD Multipliers                  : 1,2,3
+Commodity Price SD Multipliers                  : 0.5,1,1.5
 Ore Composition SD Multipliers                  : 1
-Minimum Population Levels (proportion of min)   : 0.5,0.7,0.9
-Comparison Road Variable Cost Multipliers       : 0.5,1,1.5
+Minimum Population Levels (proportion of min)   : 0.9
+Comparison Road Variable Cost Multipliers       : 0.5
 
 ###################################################################################################
 ## TRAFFIC PROGRAMS
 # Add traffic program flow rates after the first ":" and the corresponding switching costs after
 # the second ":". Separate flow rates (veh/hr) and switching costs by ",". The number of switching
-# costs should be 2^N where N is the number of flow rates.
+# costs should be 2^N where N is the number of flow rates. Flows MUST be in ASCENDING order.
 Programs                                        : 1
 Program 1   : 0,75,150 : 0,0,0,0,0,0,0,0 : FALSE
 

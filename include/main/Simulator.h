@@ -130,9 +130,10 @@ public:
      * then we only produce the end metrics but not a realised simulation path
      * that can be visualised via a post-processing routine.
      *
+     * @param device as int (default = 0)
      * @return Computation status as Optimiser::ComputationStatus
      */
-    Optimiser::ComputationStatus simulateMTE();
+    Optimiser::ComputationStatus simulateMTE(int device = 0);
 
     /**
      * Overloaded version of the preceding function for storing an entire
@@ -149,8 +150,9 @@ public:
      * We want to override the parent class function
      *
      * @param policyMap as bool (default = false)
+     * @param device as int (default = 0)
      */
-    virtual void simulateROVCR(bool policyMap = false);
+    virtual void simulateROVCR(bool policyMap = false, int device = 0);
 
     /**
      * Overloaded version of the preceding function for storing an entire

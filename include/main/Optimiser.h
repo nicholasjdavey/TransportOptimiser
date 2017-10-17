@@ -143,9 +143,9 @@ public:
             popSize, double stopTol, double confInt, double confLvl, unsigned
             long habGridRes, unsigned long surrDimRes, std::string solScheme,
             unsigned long noRuns, Optimiser::Type type, unsigned long sg,
-            double msr, bool gpu=false, Optimiser::ROVType method =
-            Optimiser::ALGO5, InterpolationRoutine interp =
-            Optimiser::MULTI_LOC_LIN_REG);
+            double msr, unsigned long learnSamples, bool gpu=false,
+            Optimiser::ROVType method = Optimiser::ALGO5, InterpolationRoutine
+            interp = Optimiser::MULTI_LOC_LIN_REG);
     /**
      * Destructor
      */
@@ -480,6 +480,23 @@ public:
     }
 
     /**
+     * Returns the maximum number of desired samples for building the surrogate
+     *
+     * @return Maximum learning samples as unsigned long
+     */
+    unsigned long getLearnSamples() {
+        return this->learnSamples;
+    }
+    /**
+     * Sets the maximum number of desired samples for building the surrogate
+     *
+     * @param ls as unsigned long
+     */
+    void setLearnSamples(unsigned long ls) {
+        this->learnSamples = ls;
+    }
+
+    /**
      * Returns the GA crossover fraction
      *
      * @return Crossover fraction as double
@@ -675,6 +692,24 @@ public:
     void setThreadManager(ThreadManagerPtr threader) {
         this->threader.reset();
         this->threader = threader;
+    }
+
+    /**
+     * Returns the thread manager for the GPUs
+     *
+     * @return threader as ThreadManagerPtr
+     */
+    ThreadManagerPtr getThreadManagerGPU() {
+        return this->threaderGPU;
+    }
+    /**
+     * Sets the thread manager for GPUs
+     *
+     * @param threader as ThreadManagerPtr
+     */
+    void setThreadManagerGPU(ThreadManagerPtr threader) {
+        this->threaderGPU.reset();
+        this->threaderGPU = threader;
     }
 
     /**
@@ -1015,6 +1050,23 @@ public:
         this->comparisonRoad = cr;
     }
 
+    /**
+     * Returns the maximum possible benefit of using an alternative road
+     *
+     * @return Max benefit as double
+     */
+    double getMaxROVBenefit() {
+        return this->maxROVBenefit;
+    }
+    /**
+     * Sets the maximum possible benefit of using an alternative road
+     *
+     * @param benefit as double
+     */
+    void setMaxROVBenefit(double benefit) {
+        this->maxROVBenefit = benefit;
+    }
+
     // STATIC ROUTINES ////////////////////////////////////////////////////////
 
     // CALCULATION ROUTINES ///////////////////////////////////////////////////
@@ -1184,6 +1236,11 @@ public:
     void saveExperimentalResults();
 
     /**
+     * Saves the values for the total population at every generation
+     */
+    void saveRunPopulation();
+
+    /**
      * Saves the best road data by recomputing all important aspects and saving
      * the data to an external source (on disk).
      *
@@ -1203,6 +1260,7 @@ protected:
     std::vector<std::vector<std::vector<alglib::spline1dinterpolant>>> surrogate;   /**< MTE Surrogate model for evaluating road (for each run) stored as a collection of splines (To be deprecated) */
     std::vector<std::vector<std::vector<Eigen::VectorXd>>> surrogateML;             /**< Surrogate models based on multiple local linear regression */
     RoadPtr comparisonRoad;                                                         /**< Alternative road for ROV */
+    double maxROVBenefit;                                                           /**< Logical ceiling for the ROV value */
     ExperimentalScenarioPtr scenario;                                               /**< Current experiment */
     Optimiser::Type type;                                                           /**< Type of ecological incorporation */
     Optimiser::StoppingCriterion stop;                                              /**< Reason for ending optimisation process */
@@ -1232,10 +1290,12 @@ protected:
     unsigned long habGridRes;                                                       /**< Habitat grid 1D resolution */
     unsigned long surrDimRes;                                                       /**< Resolution along each dimension of the surrogate */
     unsigned long noRuns;                                                           /**< Number of runs to perform */
+    unsigned long learnSamples;                                                     /**< Maximum number of samples required by user */
     double eliteIndividuals;                                                        /**< Proportion of elite individuals to retain each generation */
     double maxSampleRate;                                                           /**< Maximum rate at which to perform sampling for surrogate models */
     std::string solutionScheme;                                                     /**< Solution scheme used (i.e. name of experiment) */
     ThreadManagerPtr threader;                                                      /**< Thread manager used for multithreading computations */
+    ThreadManagerPtr threaderGPU;                                                   /**< The thread pool for parallel calls to GPUs cannot exceed the number of GPUs */
     OptimiserPtr me();                                                              /**< Creates a shared pointer from this */
     GnuplotPtr plothandle;                                                          /**< Pipe for plotting results */
     GnuplotPtr surrPlotHandle;                                                      /**< Pipe for plotting surrogate model results */

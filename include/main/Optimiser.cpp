@@ -2,13 +2,20 @@
 
 Optimiser::Optimiser() {
     // Initialise nothing. All parameters must be assigned manually.
+
+    // Determine the number of devices in the machine
+    this->gpus = SimulateGPU::deviceCount();
+
+    // This may never be called if CPU threading is not enabled
+    ThreadManagerPtr threaderGPU(new ThreadManager(this->gpus));
+    this->setThreadManagerGPU(threaderGPU);
 }
 
 Optimiser::Optimiser(double mr, double cf, unsigned long gens, unsigned
         long popSize, double stopTol, double confInt, double confLvl, unsigned
         long habGridRes, unsigned long surrDimRes, std::string solScheme,
         unsigned long noRuns, Optimiser::Type type, unsigned long sg, double
-        msr, bool gpu, Optimiser::ROVType method,
+        msr, unsigned long learnSamples, bool gpu, Optimiser::ROVType method,
         Optimiser::InterpolationRoutine interp) {
 
 //	std::vector<ProgramPtr>* programs(new std::vector<ProgramPtr>());
@@ -33,6 +40,13 @@ Optimiser::Optimiser(double mr, double cf, unsigned long gens, unsigned
     this->method = method;
     this->surrDimRes = surrDimRes;
     this->interp = interp;
+    this->learnSamples = learnSamples;
+
+    // Determine the number of devices in the machine
+    this->gpus = SimulateGPU::deviceCount();
+
+    ThreadManagerPtr threaderGPU(new ThreadManager(this->gpus));
+    this->setThreadManagerGPU(threaderGPU);
 }
 
 Optimiser::~Optimiser() {
@@ -68,11 +82,11 @@ void Optimiser::initialiseExperimentStorage() {
     this->bestRoads = br;
 
     if (this->interp == Optimiser::CUBIC_SPLINE) {
-        this->surrogate.resize(noTests,std::vector<std::vector<
+        this->surrogate.resize(noTests*2,std::vector<std::vector<
                 alglib::spline1dinterpolant>>(noRuns,std::vector<
                 alglib::spline1dinterpolant>(this->getSpecies().size())));
     } else if (this->interp == Optimiser::MULTI_LOC_LIN_REG) {
-        this->surrogateML.resize(noTests,std::vector<std::vector<
+        this->surrogateML.resize(noTests*2,std::vector<std::vector<
                 Eigen::VectorXd>>(noRuns,std::vector<Eigen::VectorXd>(this->
                 getSpecies().size())));
     }
@@ -135,6 +149,20 @@ void Optimiser::optimise(bool plot) {
         for (int ii = 0; ii < fuels.size(); ii++) {
             fuels[ii]->computeExpPV();
         }
+    }
+
+    // If we have a comparison road, we know that the maximum operating value
+    // for ROV cannot exceed the total operating cost for this road (this would
+    // imply that the company is PAID to use fuel, which is illogical).
+    if (this->comparisonRoad != nullptr) {
+        AttributesPtr attributes(new Attributes(comparisonRoad));
+        comparisonRoad->setAttributes(attributes);
+
+        comparisonRoad->computeVarProfitICFixedFlow();
+
+        this->maxROVBenefit = comparisonRoad->getAttributes()->getVarProfitIC()
+                *this->getVariableParams()->getCompRoad()(this->getScenario()->
+                getCompRoad());
     }
 
     Costs::computeUnitRevenue(this->me());
@@ -248,6 +276,10 @@ void Optimiser::evaluateSurrogateModelROVCR(RoadPtr road, double& value,
             predictors,this->surrDimRes);
 }
 
+void Optimiser::saveRunPopulation() {
+
+}
+
 void Optimiser::saveExperimentalResults() {
     // Save Experimental Scenario
     // Ensure results folder is created in the correct location
@@ -258,11 +290,16 @@ void Optimiser::saveExperimentalResults() {
 
     if(!(boost::filesystem::exists(scenarioFolder))) {
         boost::filesystem::create_directory(scenarioFolder);
+    }
+    std::ifstream outputFileCheck;
+    std::ofstream outputFile;
 
-        std::ofstream outputFile;
+    outputFileCheck.open(scenarioFile);
 
-        outputFile.open(scenarioFile,std::ios::out);
+    if (!(outputFileCheck.good())) {
+        outputFileCheck.close();
 
+        outputFile.open(scenarioFile);
         outputFile << "####################################################################################################" << std::endl;
         outputFile << "##################################### SCENARIO CONFIGURATION #######################################" << std::endl;
         outputFile << "####################################################################################################" << std::endl;
@@ -270,13 +307,13 @@ void Optimiser::saveExperimentalResults() {
 
         // Save scenario details
         // Input files
-        outputFile << "ROOT FOLDER                  : " << this->rootFolder;
-        outputFile << "X VALUES FILE                : " << this->xValuesFile;
-        outputFile << "Y VALUES FILE                : " << this->yValuesFile;
-        outputFile << "Z VALUES FILE                : " << this->zValuesFile;
-        outputFile << "VEGETATION FILE              : " << this->vegetationFile;
-        outputFile << "ACQUISITION FILE             : " << this->acquisitionFile;
-        outputFile << "SOIL FILE                    : " << this->soilFile;
+        outputFile << "ROOT FOLDER                  : " << this->rootFolder << std::endl;
+        outputFile << "X VALUES FILE                : " << this->xValuesFile << std::endl;
+        outputFile << "Y VALUES FILE                : " << this->yValuesFile << std::endl;
+        outputFile << "Z VALUES FILE                : " << this->zValuesFile << std::endl;
+        outputFile << "VEGETATION FILE              : " << this->vegetationFile << std::endl;
+        outputFile << "ACQUISITION FILE             : " << this->acquisitionFile << std::endl;
+        outputFile << "SOIL FILE                    : " << this->soilFile << std::endl;
         outputFile << "COMMODITIES FILES            : ";
 
         for (int ii = 0; ii < this->commoditiesFiles.size(); ii++) {
@@ -320,31 +357,31 @@ void Optimiser::saveExperimentalResults() {
 
         // Scenario configuration
         outputFile << "# See variable parameters in the input file for the values corresponding to the below indices" << std::endl;
-        outputFile << "PROGRAM                      : " << this->scenario->getProgram();
-        outputFile << "POPULATION THRESHOLD         : " << this->scenario->getPopLevel();
-        outputFile << "HABITAT PREFERENCE           : " << this->scenario->getHabPref();
-        outputFile << "MOVEMENT PROPENSITY          : " << this->scenario->getLambda();
-        outputFile << "RANGING COEFFICIENT          : " << this->scenario->getRangingCoeff();
-        outputFile << "ANIMAL BRIDGE USE            : " << this->scenario->getAnimalBridge();
-        outputFile << "POPULATION GROWTH RATE       : " << this->scenario->getPopGR();
-        outputFile << "POPULATION GROWTH RATE SD    : " << this->scenario->getPopGRSD();
-        outputFile << "COMMODITY MEAN               : " << this->scenario->getCommodity();
-        outputFile << "COMMODITY SD                 : " << this->scenario->getCommoditySD();
-        outputFile << "ORE COMPOSITION SD           : " << this->scenario->getOreCompositionSD();
-        outputFile << "SCENARIO NUMBER              : " << this->scenario->getCurrentScenario();
+        outputFile << "PROGRAM                      : " << this->scenario->getProgram() << std::endl;
+        outputFile << "POPULATION THRESHOLD         : " << this->scenario->getPopLevel() << std::endl;
+        outputFile << "HABITAT PREFERENCE           : " << this->scenario->getHabPref() << std::endl;
+        outputFile << "MOVEMENT PROPENSITY          : " << this->scenario->getLambda() << std::endl;
+        outputFile << "RANGING COEFFICIENT          : " << this->scenario->getRangingCoeff() << std::endl;
+        outputFile << "ANIMAL BRIDGE USE            : " << this->scenario->getAnimalBridge() << std::endl;
+        outputFile << "POPULATION GROWTH RATE       : " << this->scenario->getPopGR() << std::endl;
+        outputFile << "POPULATION GROWTH RATE SD    : " << this->scenario->getPopGRSD() << std::endl;
+        outputFile << "COMMODITY MEAN               : " << this->scenario->getCommodity() << std::endl;
+        outputFile << "COMMODITY SD                 : " << this->scenario->getCommoditySD() << std::endl;
+        outputFile << "ORE COMPOSITION SD           : " << this->scenario->getOreCompositionSD() << std::endl;
+        outputFile << "SCENARIO NUMBER              : " << this->scenario->getCurrentScenario() << std::endl;
     }
+
+    outputFile.close();
 }
 
 void Optimiser::saveBestRoadResults() {
     // Computes the values
+    // (First compute using MTE)
     this->computeBestRoadResults();
 
     // Save generic road data
     RoadPtr road = this->bestRoads[this->scenario->getCurrentScenario()][this->
             scenario->getRun()];
-
-    road->designRoad();
-    road->evaluateRoad(true,true);
 
     // Ensure results folder is created in the correct location
     std::string scenarioFolder = this->getRootFolder() + "/" + "Scenario_" +
@@ -838,7 +875,7 @@ void Optimiser::saveBestRoadResults() {
     // Attributes
     outputFile << "####################################################################################################" << std::endl;
     outputFile << "# ROAD ATTRIBUTES ##################################################################################" << std::endl;
-    outputFile << "# INITIAL ANIMALS AT RISK (ROWS = SPECIES, COLUMNS = CONTROL) " << std::endl;
+    outputFile << "# INITIAL ANIMALS AT RISK UNDER FULL FLOW (ROWS = SPECIES) " << std::endl;
     for (int ii = 0; ii < road->getAttributes()->getIAR().rows(); ii++) {
         for (int jj = 0; jj < road->getAttributes()->getIAR().cols(); jj++) {
             outputFile << road->getAttributes()->getIAR()(ii,jj);
@@ -850,7 +887,7 @@ void Optimiser::saveBestRoadResults() {
     }
     outputFile << std::endl;
 
-    outputFile << "# END POPULATIONS" << std::endl;
+    outputFile << "# END POPULATIONS (MTE)" << std::endl;
     for (int ii = 0; ii < road->getAttributes()->getEndPopMTE().size(); ii++) {
         outputFile << road->getAttributes()->getEndPopMTE()(ii);
         if (ii < (road->getAttributes()->getEndPopMTE().size() - 1)) {
@@ -859,7 +896,7 @@ void Optimiser::saveBestRoadResults() {
     }
     outputFile << std::endl << std::endl;
 
-    outputFile << "# END POPULATION STANDARD DEVIATIONS" << std::endl;
+    outputFile << "# END POPULATION (MTE) STANDARD DEVIATIONS" << std::endl;
     for (int ii = 0; ii < road->getAttributes()->getEndPopMTESD().size(); ii++) {
         outputFile << road->getAttributes()->getEndPopMTESD()(ii);
         if (ii < (road->getAttributes()->getEndPopMTESD().size() - 1)) {
@@ -871,14 +908,14 @@ void Optimiser::saveBestRoadResults() {
     outputFile << "# OTHER ROAD ATTRIBUTES ############################################################################" << std::endl;
     outputFile << "Fixed Costs                                   : " << road->getAttributes()->getFixedCosts() << std::endl;
     outputFile << "Unit Variable Costs                           : " << road->getAttributes()->getUnitVarCosts() << std::endl;
-    outputFile << "Unit Variable Revenue                         : " << road->getAttributes()->getUnitVarRevenue() << std::endl;
+    outputFile << "Tonnes of Ore Per Unit Traffic                : " << road->getAttributes()->getUnitVarRevenue() << std::endl;
     outputFile << "Length                                        : " << road->getAttributes()->getLength() << std::endl;
-    outputFile << "Operating Profit                              : " << road->getAttributes()->getVarProfitIC() << std::endl;
     outputFile << "Initial Unit Cost                             : " << road->getAttributes()->getInitialUnitCost() << std::endl;
     outputFile << "Total Value Mean                              : " << road->getAttributes()->getTotalValueMean() << std::endl;
     outputFile << "Total Value Standard Deviation                : " << road->getAttributes()->getTotalValueSD() << std::endl;
-    outputFile << "Total Utilisation ROV                         : " << road->getAttributes()->getTotalUtilisationROV() << std::endl;
-    outputFile << "Total Utilisation ROV Standard Dev            : " << road->getAttributes()->getTotalUtilisationROVSD() << std::endl;
+    outputFile << "Operating Profit (Full Flow)                  : " << road->getAttributes()->getVarProfitIC() << std::endl;
+    outputFile << "Operating Profit (ROV)                        : " << road->getAttributes()->getTotalUtilisationROV() << std::endl;
+    outputFile << "Operating Profit (ROV) Standard Dev           : " << road->getAttributes()->getTotalUtilisationROVSD() << std::endl;
     outputFile << std::endl;
 
     // Costs
@@ -1210,18 +1247,74 @@ void Optimiser::computeBestRoadResults() {
     this->bestRoads[this->scenario->getCurrentScenario()][this->
             scenario->getRun()]->designRoad();
 
-    // First, compute the road using MTE
+    // First, compute the road using ROV
     Optimiser::Type tempType = this->type;
 
-    // Temporarily alter the type to MTE to compute under MTE
-    this->type = Optimiser::MTE;
+    // Temporarily alter the type to MTE to compute under MTE (if using original tests)
+    this->type = Optimiser::CONTROLLED;
+
     this->bestRoads[this->scenario->getCurrentScenario()][this->
             scenario->getRun()]->evaluateRoad(true,true);
+
+    // Now save all of the predictors and other details
+
+    // PREDICTORS /////////////////////////////////////////////////////////////
+
+    // INITIAL PERIOD UNIT PROFIT
+    // For now, we use the initial unit profit. This is saved as a road
+    // attribute.
+
+    // Fixed cost per unit traffic
+    double unitCost = this->bestRoads[this->scenario->getCurrentScenario()]
+            [this->scenario->getRun()]->getAttributes()->getUnitVarCosts();
+    // Fuel consumption per vehicle class per unit traffic (L)
+    Eigen::VectorXd fuelCosts = this->bestRoads[this->scenario->
+            getCurrentScenario()][this->scenario->getRun()]->getCosts()->
+            getUnitFuelCost();
+    Eigen::VectorXd currentFuelPrice(fuelCosts.size());
+
+    for (int ii = 0; ii < fuelCosts.size(); ii++) {
+        currentFuelPrice(ii) = (this->bestRoads[this->scenario->
+                getCurrentScenario()][this->scenario->getRun()]->getOptimiser()
+                ->getTraffic()->getVehicles())[ii]->getFuel()->getCurrent();
+    }
+
+    unitCost += fuelCosts.transpose()*currentFuelPrice;
+    double rovalue = this->bestRoads[this->scenario->getCurrentScenario()]
+            [this->scenario->getRun()]->getAttributes()->
+            getTotalUtilisationROV();
+    double rovalueSD = this->bestRoads[this->scenario->getCurrentScenario()]
+            [this->scenario->getRun()]->getAttributes()->
+            getTotalUtilisationROVSD();
+
+//    // As the revenue per unit traffic is the same for each road, we leave it
+//    // out for now.
+//    // Load per unit traffic
+//    // double unitRevenue = road->getCosts()->getUnitRevenue();
+
+//    this->bestRoads[this->scenario->getCurrentScenario()][this->
+//            scenario->getRun()]->getAttributes()->setInitialUnitCost(unitCost);
 
 //    // Temporarily alter the type to CONTROLLED to compute under ROV
 //    this->type = Optimiser::CONTROLLED;
 //    this->bestRoads[this->scenario->getCurrentScenario()][this->
 //            scenario->getRun()]->evaluateRoad(true,true);
+
+    // We also need to compute the model using MTE to know what the full
+    // traffic situation looks like
+    this->type = Optimiser::MTE;
+    this->bestRoads[this->scenario->getCurrentScenario()][this->
+            scenario->getRun()]->evaluateRoad(true,true);
+
+    // Assign the values that were overwritten
+    this->bestRoads[this->scenario->getCurrentScenario()][this->
+            scenario->getRun()]->getAttributes()->setInitialUnitCost(unitCost);
+    this->bestRoads[this->scenario->getCurrentScenario()]
+                [this->scenario->getRun()]->getAttributes()->
+                setTotalUtilisationROV(rovalue);
+    this->bestRoads[this->scenario->getCurrentScenario()]
+                [this->scenario->getRun()]->getAttributes()->
+                setTotalUtilisationROVSD(rovalueSD);
 
     // Finally, reset the type
     this->type = tempType;

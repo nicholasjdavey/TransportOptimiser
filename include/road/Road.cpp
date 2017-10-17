@@ -56,6 +56,8 @@ RoadPtr Road::me() {
 }
 
 void Road::designRoad() {
+    // We can do everything on the same device as this is not that
+    // intensive.
     AttributesPtr att(new Attributes(this->me()));
     this->attributes = att;
     this->computeAlignment();
@@ -66,7 +68,7 @@ void Road::designRoad() {
     this->computeCostElements();
 }
 
-void Road::evaluateRoad(bool learning, bool saveResults) {
+void Road::evaluateRoad(bool learning, bool saveResults, int device) {
     // Compute unit cost and revenue
     // Compute the following line only once
     this->attributes->setFixedCosts(1.05*(this->getCosts()->getEarthwork()
@@ -110,10 +112,13 @@ void Road::evaluateRoad(bool learning, bool saveResults) {
 //        std::cout << "Invalid unit var rev" << std::endl;
 //    }
 
-    this->computeOperating(learning,saveResults);
+    // This component can be intensive if calling gpus for the full
+    // model, therefore we pass a gpu preference.
+    this->computeOperating(learning,saveResults,device);
 
     this->attributes->setTotalValueMean(this->attributes->
-            getVarProfitIC() + this->attributes->getFixedCosts());
+            getVarProfitIC() + this->attributes->getFixedCosts() +
+            this->costs->getPenalty());
 //    this->attributes->setTotalUtilisationROV(this->attributes->
 //            getVarProfitIC());
 //    this->attributes->setTotalUtilisationROVSD(this->attributes->
@@ -124,7 +129,7 @@ void Road::evaluateRoad(bool learning, bool saveResults) {
 //    }
 }
 
-void Road::computeOperating(bool learning, bool saveResults) {
+void Road::computeOperating(bool learning, bool saveResults, int device) {
 
     OptimiserPtr optPtrShared = this->optimiser.lock();
     ExperimentalScenarioPtr sc = this->optimiser.lock()->getScenario();
@@ -161,7 +166,7 @@ void Road::computeOperating(bool learning, bool saveResults) {
 
                     // Find out the greatest number of patches for each of the
                     // species.
-                    this->simulator->simulateMTE();
+                    this->simulator->simulateMTE(device);
 
                     // Need to write the routine for full simulation in the
                     // Simulation class
@@ -204,9 +209,6 @@ void Road::computeOperating(bool learning, bool saveResults) {
                                 this->me(),endPops,endPopsSD);
                     }
 
-                    this->attributes->setEndPopMTE(endPops);
-                    this->attributes->setEndPopMTESD(endPopsSD);
-
                     // Call the routine to evaluate the operating costs
                     this->computeVarProfitICFixedFlow();
 
@@ -221,9 +223,8 @@ void Road::computeOperating(bool learning, bool saveResults) {
                         double roadPopXconf = Utility::NormalCDFInverse((1 -
                                 this->optimiser.lock()->
                                 getConfidenceInterval()));
-                        double threshold = this->optimiser.lock()->
-                                getSpecies()[ii]->getThreshold()*vp->
-                                getPopulationLevels()(sc->getPopLevel());
+                        double threshold = vp->getPopulationLevels()(sc->
+                                getPopLevel());
                         double perAnimalPenalty = (this->optimiser.lock())->
                                 getSpecies()[ii]->getCostPerAnimal();
 
@@ -232,7 +233,15 @@ void Road::computeOperating(bool learning, bool saveResults) {
                                 (roadPopXconf*endPopsSD(ii) + endPops(ii)))*
                                 optPtrShared->getSpecies()[ii]->
                                 getInitialPopulation()*perAnimalPenalty;
-                    }
+
+                        endPops(ii) = endPops(ii)*optPtrShared->getSpecies()
+                                [ii]->getInitialPopulation();
+                        endPopsSD(ii) = endPopsSD(ii)*optPtrShared->getSpecies()
+                                [ii]->getInitialPopulation();
+                    }                    
+                    this->attributes->setEndPopMTE(endPops);
+                    this->attributes->setEndPopMTESD(endPopsSD);
+
                     this->costs->setPenalty(penalty);
                     this->attributes->setTotalValueSD(0.0);
                 }

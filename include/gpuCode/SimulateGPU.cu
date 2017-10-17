@@ -1439,6 +1439,9 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                                 }
                             }
 
+                            // Now add the lowest dimension's lower index
+                            idxL += lowerInd[noSpecies];
+
                             coeffs[jj] = regression[idxL]*(1 - xd) +
                                     regression[idxL + 1]*xd;
                         }
@@ -1836,6 +1839,9 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                                     }
                                 }
 
+                                // Now add the lowest dimension's lower index
+                                idxL += lowerInd[noSpecies];
+
                                 coeffs[kk] = regression[idxL]*(1 - xd) +
                                         regression[idxL + 1]*xd;
 
@@ -1991,8 +1997,8 @@ __global__ void firstPeriodInduction(int noPaths, int nYears, int noSpecies,
         // population is below the threshold, then the payoff is
         // invalid.
         if (dataPoints[ii] > 0) {
-            payoffs[ii] = payoffs[ii]/(dataPoints[ii]*(1+rrr/(100*
-                    timeStep)));
+            payoffs[ii] = payoffs[ii]/(dataPoints[ii]*(1+rrr*timeStep/
+                    100));
         } else {
             break;
         }
@@ -2349,6 +2355,9 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                             }
                         }
 
+                        // Now add the lowest dimension's lower index
+                        idxL += lowerInd[noSpecies];
+
                         coeffs[jj] = regression[idxL]*(1 - xd) +
                                 regression[idxL + 1]*xd;
                     }
@@ -2379,8 +2388,8 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                         }
                     }
 
-                    payoffs[ii] = currPayoffs[ii] + coeffs[0]/(1+rrr/(100*
-                            timeStep));
+                    payoffs[ii] = currPayoffs[ii] + coeffs[0]/(1+rrr*timeStep/
+                            100);
 
                     free(lower);
                     free(upper);
@@ -2673,12 +2682,14 @@ __global__ void interpolateMulti(int points, int noDims, int dimRes, float*
 // compiled with nvcc).
 
 // Computes the expected present value of an uncertain price.
-void SimulateGPU::expPV(UncertaintyPtr uncertainty) {
+void SimulateGPU::expPV(UncertaintyPtr uncertainty, int device) {
     // Get device properties
-    int device = 0;
     struct cudaDeviceProp properties;
     CUDA_CALL(cudaGetDeviceProperties(&properties, device));
     int maxThreadsPerBlock = properties.maxThreadsPerBlock;
+    CUDA_CALL(cudaSetDevice(device));
+    CUDA_CALL(cudaPeekAtLastError());
+    CUDA_CALL(cudaDeviceSynchronize());
 
     OptimiserPtr optimiser = uncertainty->getOptimiser();
     EconomicPtr economic = optimiser->getEconomic();
@@ -2771,12 +2782,12 @@ void SimulateGPU::expPV(UncertaintyPtr uncertainty) {
 
 // Matrix multiplication (Naive)
 void SimulateGPU::eMMN(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
-        Eigen::MatrixXd& C) {
+        Eigen::MatrixXd& C, int device) {
 
-    int device = 0;
     struct cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties, device);
     int maxThreadsPerBlock = properties.maxThreadsPerBlock;
+    CUDA_CALL(cudaSetDevice(device));
 
     if (A.cols() != B.rows()) {
         throw "SimulateGPU: matrixMultiplication: Inner dimensions do not match!";
@@ -2831,11 +2842,11 @@ void SimulateGPU::eMMN(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
 
 // Performs matrix multiplication using shared memory
 void SimulateGPU::eMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
-        Eigen::MatrixXd& C) {
+        Eigen::MatrixXd& C, int device) {
 
-    int device = 0;
     struct cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties, device);
+    CUDA_CALL(cudaSetDevice(device));
 
     if (A.cols() != B.rows()) {
         throw "SimulateGPU: matrixMultiplication: Inner dimensions do not match!";
@@ -2885,11 +2896,11 @@ void SimulateGPU::eMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
 // Performs element-wise matrix multiplication. Does not require shared
 // memory.
 void SimulateGPU::ewMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd &B,
-        Eigen::MatrixXd &C) {
+        Eigen::MatrixXd &C, int device) {
 
-    int device = 0;
     struct cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties, device);
+    CUDA_CALL(cudaSetDevice(device));
 
     if ((A.cols() != B.cols()) || (A.rows() != B.rows())) {
         throw "SimulateGPU: matrixMultiplication: Matrix dimensions do not match!";
@@ -2936,11 +2947,11 @@ void SimulateGPU::ewMM(const Eigen::MatrixXd& A, const Eigen::MatrixXd &B,
 
 // Performs element-wise matrix division
 void SimulateGPU::ewMD(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
-        Eigen::MatrixXd& C) {
+        Eigen::MatrixXd& C, int device) {
 
-    int device = 0;
     struct cudaDeviceProp properties;
     cudaGetDeviceProperties(&properties, device);
+    CUDA_CALL(cudaSetDevice(device));
 
     if ((A.cols() != B.cols()) || (A.rows() != B.rows())) {
         throw "SimulateGPU: matrixMultiplication: Matrix dimensions do not match!";
@@ -2987,14 +2998,14 @@ void SimulateGPU::ewMD(const Eigen::MatrixXd& A, const Eigen::MatrixXd& B,
 // Computes the number of times each line in XY2 crosses the parametrised line
 // XY1.
 void SimulateGPU::lineSegmentIntersect(const Eigen::MatrixXd& XY1, const
-        Eigen::MatrixXd& XY2, Eigen::VectorXi& crossings) {
+        Eigen::MatrixXd& XY2, Eigen::VectorXi& crossings, int device) {
 
     try {
-        int device = 0;
         struct cudaDeviceProp properties;
         cudaGetDeviceProperties(&properties, device);
         int maxThreadsPerBlock = properties.maxThreadsPerBlock;
         int maxBlocksPerGrid = 65536;
+        CUDA_CALL(cudaSetDevice(device));
 
         // Precompute necessary vectors to be shared across threads
         Eigen::VectorXf X4_X3 = (XY2.block(0,2,XY2.rows(),1) -
@@ -3087,14 +3098,14 @@ void SimulateGPU::buildPatches(int W, int H, int skpx, int skpy, int xres,
         labelledImage, const Eigen::MatrixXd& populations,
         std::vector<HabitatPatchPtr>& patches, double& initPop,
         Eigen::VectorXd& initPops, Eigen::VectorXd& capacities, int&
-        noPatches) {
+        noPatches, int device) {
 
     try {
         // Get device properties
-        int device = 0;
         struct cudaDeviceProp properties;
         cudaGetDeviceProperties(&properties, device);
-        int maxThreadsPerBlock = properties.maxThreadsPerBlock;
+        int maxThreadsPerBlock = properties.maxThreadsPerBlock;        
+        CUDA_CALL(cudaSetDevice(device));
 
         Eigen::MatrixXf popsFloat = populations.cast<float>();
 
@@ -3162,14 +3173,14 @@ void SimulateGPU::simulateMTECUDA(SimulatorPtr sim,
         std::vector<SpeciesRoadPatchesPtr>& srp,
         std::vector<Eigen::VectorXd>& initPops,
         std::vector<Eigen::VectorXd>& capacities,
-        Eigen::MatrixXd& endPops) {
+        Eigen::MatrixXd& endPops, int device) {
 
     try {
         // Get device properties
-        int device = 0;
         struct cudaDeviceProp properties;
         cudaGetDeviceProperties(&properties, device);
         int maxThreadsPerBlock = properties.maxThreadsPerBlock;
+        CUDA_CALL(cudaSetDevice(device));
 
         // We convert all inputs to floats from double as CUDA is much faster
         // in single precision than double precision
@@ -3382,7 +3393,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         std::vector<SpeciesRoadPatchesPtr>& srp,
         std::vector<Eigen::MatrixXd> &adjPops, Eigen::MatrixXd& unitProfits,
         Eigen::MatrixXd& condExp, Eigen::MatrixXi& optCont, Eigen::VectorXd&
-        regressions, bool plotResults) {
+        regressions, bool plotResults, int device) {
     // Currently there is no species interaction. This can be a future question
     // and would be an interesting extension on how it can be implemented,
     // what the surrogate looks like and how the patches are formed.
@@ -3401,14 +3412,14 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
     try {
         // Get device properties
-        int device = 0;
         struct cudaDeviceProp properties;
         cudaGetDeviceProperties(&properties, device);
         int maxThreadsPerBlock = properties.maxThreadsPerBlock;
+        CUDA_CALL(cudaSetDevice(device));
 
         // Scaling for relative importance of species population to unit profit
         // used in regressions.
-        float scaling = 2.0;
+        float scaling = 1.0;
 
         // Get general properties
         OptimiserPtr optimiser = sim->getRoad()->getOptimiser();
@@ -3433,11 +3444,13 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         int noControls = program->getFlowRates().size();
         int noUncertainties = commodities.size() + fuels.size();
 
+        // CLEAR THE FACTOR OF 2 BELOW ONCE WE FIGURE OUT WHERE THE DOUBLING IS OCCURING ////////////////////////////////
         // Fixed cost per unit traffic
-        double unitCost = sim->getRoad()->getAttributes()->getUnitVarCosts();
+        double unitCost = sim->getRoad()->getAttributes()->getUnitVarCosts()*2;
         // Fuel consumption per vehicle class per unit traffic (L)
         Eigen::VectorXf fuelCosts = sim->getRoad()->getCosts()->
-                getUnitFuelCost().cast<float>();
+                getUnitFuelCost().cast<float>()*2;
+        /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Load per unit traffic
         float unitRevenue = (float)sim->getRoad()->getCosts()->
                 getUnitRevenue();
@@ -4778,14 +4791,13 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
 //}
 
-void SimulateGPU::buildSurrogateMTECUDA(RoadGAPtr op, int speciesID) {
+void SimulateGPU::buildSurrogateMTECUDA(RoadGAPtr op, int speciesID, int device) {
 
     try {
-        // Get device properties
-        int device = 0;
         struct cudaDeviceProp properties;
         cudaGetDeviceProperties(&properties, device);
         int maxThreadsPerBlock = properties.maxThreadsPerBlock;
+        CUDA_CALL(cudaSetDevice(device));
 
         // Pertinent parameters
         int dimRes = op->getSurrDimRes();
@@ -4940,14 +4952,14 @@ void SimulateGPU::buildSurrogateMTECUDA(RoadGAPtr op, int speciesID) {
     }
 }
 
-void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
+void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op, int device) {
 
     try {
         // Get device properties
-        int device = 0;
         struct cudaDeviceProp properties;
         cudaGetDeviceProperties(&properties, device);
         int maxThreadsPerBlock = properties.maxThreadsPerBlock;
+        CUDA_CALL(cudaSetDevice(device));
 
         // --- CUBLAS initialization
 
@@ -5167,14 +5179,14 @@ void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op) {
 
 void SimulateGPU::interpolateSurrogateMulti(Eigen::VectorXd& surrogate,
         Eigen::VectorXd &predictors, Eigen::VectorXd &results, int dimRes,
-        int noDims) {
+        int noDims, int device) {
 
     try {
         // Get device properties
-        int device = 0;
         struct cudaDeviceProp properties;
         cudaGetDeviceProperties(&properties, device);
         int maxThreadsPerBlock = properties.maxThreadsPerBlock;
+        CUDA_CALL(cudaSetDevice(device));
 
         int noBlocks = (int)((int)results.size() % maxThreadsPerBlock) ?
                 (int)((int)results.size()/maxThreadsPerBlock + 1) : (int)((int)
@@ -5351,4 +5363,11 @@ void SimulateGPU::solveLinearSystem(int dims, float *A, float *B, float *C) {
             C[jj] -= C[ii]*A[ii*dims+jj];
         }
     }
+}
+
+int SimulateGPU::deviceCount() {
+    int devCount;
+    CUDA_CALL(cudaGetDeviceCount(&devCount));
+
+    return devCount;
 }

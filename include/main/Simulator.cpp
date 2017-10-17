@@ -14,7 +14,7 @@ SimulatorPtr Simulator::me() {
     return shared_from_this();
 }
 
-Optimiser::ComputationStatus Simulator::simulateMTE() {
+Optimiser::ComputationStatus Simulator::simulateMTE(int device) {
     // This routine computes the animal costs based on mean time to extinction.
     // We use Monte Carlo simulation (if any uncertainty) where we run the road
     // at full flow until the end of the design horizon. This is used for
@@ -109,14 +109,14 @@ Optimiser::ComputationStatus Simulator::simulateMTE() {
 
         if (threader != nullptr) {
             // If we have access to GPU-enabled computing, we exploit it
-            // here and at the calling function in the GA optimiser, we
+            // here and at the calling function in the GA optimiser we
             // implement the standard multi-threading on the host. If not,
             // we do not implement multi-threading at the higher level and
             // instead implement it here.
             if (gpu) {
                 // Call the external, CUDA-compiled code
                 SimulateGPU::simulateMTECUDA(this->me(),srp,initPops,
-                            capacities,endPopulations);
+                            capacities,endPopulations,device);
 
             } else {
                 // We evaluate the actual road using Monte Carlo simulation
@@ -152,7 +152,7 @@ Optimiser::ComputationStatus Simulator::simulateMTE() {
             if (gpu) {
                 // Call the external, CUDA-compiled code
                 SimulateGPU::simulateMTECUDA(this->me(),srp,initPops,
-                        capacities,endPopulations);
+                        capacities,endPopulations,device);
             } else {
 
                 for (unsigned long ii = 0; ii < noPaths; ii++) {
@@ -178,7 +178,9 @@ Optimiser::ComputationStatus Simulator::simulateMTE() {
         Eigen::VectorXd endPopMean(srp.size());
         Eigen::VectorXd endPopSD(srp.size());
         Eigen::MatrixXd variances(noPaths,srp.size());
-
+        // Later on we can alter the below line to account for a desired
+        // percentage of simulation paths to be above the threshold. For now,
+        // we simply use the mean.
         for (int ii = 0; ii < srp.size(); ii++) {
             endPopMean(ii) = endPopulations.col(ii).mean();
             variances.col(ii) = endPopulations.col(ii).array() -
@@ -190,7 +192,30 @@ Optimiser::ComputationStatus Simulator::simulateMTE() {
 
         road->getAttributes()->setEndPopMTE(endPopMean);
         road->getAttributes()->setEndPopMTESD(endPopSD);
-        road->getCosts()->setPenalty(0.0);
+        double penalty = 0.0;
+
+        // Set the penalty
+        for (int ii = 0; ii < srp.size(); ii++) {
+            double roadPopXconf = Utility::NormalCDFInverse((1 -
+                    optimiser->getConfidenceInterval()));
+            double threshold = optimiser->getSpecies()[ii]->getThreshold()
+                    *varParams->getPopulationLevels()(
+                    scenario->getPopLevel());
+            double perAnimalPenalty = optimiser->getSpecies()[ii]->
+                    getCostPerAnimal();
+
+            penalty += (double)(threshold > (roadPopXconf*
+                    endPopSD(ii) + endPopMean(ii)))*(threshold -
+                    (roadPopXconf*endPopSD(ii) + endPopMean(ii)))*
+                    optimiser->getSpecies()[ii]->getInitialPopulation()*
+                    perAnimalPenalty;
+        }
+
+        road->getCosts()->setPenalty(penalty);
+        road->getAttributes()->setTotalValueSD(0.0);
+
+        // Call the routine to evaluate the operating costs
+        road->computeVarProfitICFixedFlow();
         road->getAttributes()->setTotalValueSD(0.0);
     }
 }
@@ -251,7 +276,7 @@ void Simulator::simulateMTE(std::vector<Eigen::MatrixXd>& visualiseResults) {
     this->simulateMTEPath(srp,initPops,capacities,visualiseResults);
 }
 
-void Simulator::simulateROVCR(bool policyMap) {
+void Simulator::simulateROVCR(bool policyMap, int device) {
     // For now, this method only considers a single species
 
     // SIM ROVCR (we cannot use the base Monte Carlo routine for this method)
@@ -389,19 +414,29 @@ void Simulator::simulateROVCR(bool policyMap) {
                 int counter = 0;
                 bool success = false;
 
-                while (!success && counter < 5) {
+                while (!success && counter < 3) {
                     try {
                         SimulateGPU::simulateROVCUDA(this->me(),srp,adjPops,
                                 unitProfits,condExp,optCont,regressions,
-                                policyMap);
+                                policyMap,device);
                         // Sense check the optimal value computed (sometimes
                         // we can get anomalous results)
-                        double threshold = unitProfits(0,0)*(nYears+1)*
-                                program->getFlowRates()(program->
-                                getFlowRates().size()-1)*10;
-                        if (condExp(0,0) <= threshold) {
-                            success = true;
+//                        double threshold = unitProfits.mean()*(nYears+1)*
+//                                program->getFlowRates()(program->
+//                                getFlowRates().size()-1)*20;
+                        double threshold = optimiser->getMaxROVBenefit();
+
+                        if (std::isfinite(threshold)) {
+                            if ((fabs(this->getRoad()->getAttributes()->
+                                    getTotalUtilisationROV()) <=
+                                    fabs(threshold)) &&
+                                    (fabs(this->getRoad()->getAttributes()->
+                                    getTotalUtilisationROVSD()) <=
+                                    fabs(threshold))) {
+                                success = true;
+                            }
                         }
+                        counter++;
                     } catch (...) {
                         counter++;
                     }
@@ -419,19 +454,30 @@ void Simulator::simulateROVCR(bool policyMap) {
                 int counter = 0;
                 bool success = false;
 
-                while (!success && counter < 5) {
+                while (!success && counter < 3) {
                     try {
                         SimulateGPU::simulateROVCUDA(this->me(),srp,adjPops,
                                 unitProfits,condExp,optCont,regressions,
-                                policyMap);
+                                policyMap,device);
                         // Sense check the optimal value computed (sometimes
                         // we can get anomalous results)
-                        double threshold = unitProfits(0,0)*(nYears+1)*
+//                        double threshold = unitProfits.minCoeff()*(nYears+1)*
+//                                program->getFlowRates()(program->
+//                                getFlowRates().size()-1);
+                        double threshold = unitProfits.mean()*(nYears+1)*
                                 program->getFlowRates()(program->
-                                getFlowRates().size()-1)*10;
-                        if (condExp(0,0) <= threshold) {
-                            success = true;
+                                getFlowRates().size()-1)*20;
+                        if (std::isfinite(threshold)) {
+                            if ((fabs(this->getRoad()->getAttributes()->
+                                    getTotalUtilisationROV()) <=
+                                    fabs(threshold)) &&
+                                    (fabs(this->getRoad()->getAttributes()->
+                                    getTotalUtilisationROVSD()) <=
+                                    fabs(threshold))) {
+                                success = true;
+                            }
                         }
+                        counter++;
                     } catch (...) {
                         counter++;
                     }
@@ -526,6 +572,8 @@ void Simulator::simulateROVCR(bool policyMap) {
 void Simulator::simulateROVCR(std::vector<Eigen::MatrixXd>& visualisePops,
         Eigen::VectorXi &visualiseFlows, Eigen::VectorXd&
         visualiseUnitProfits) {
+    // TO BE COMPLETED ////////////////////////////////////////////////////////
+
     // If an alternate route is provided, we do not bother computing the
     // commodity as it is always present (throughput is unchanged overall).
     bool comparisonRoad = false;

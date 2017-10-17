@@ -79,10 +79,24 @@ public:
         this->pool->clear_queue();
     }
 
+    /**
+     * Locks the access to parallel code to prevent concurrent access
+     */
+    void lock() {
+        this->mtx.lock();
+    }
+    /**
+     * Unlocks to allow concurrent access
+     */
+    void unlock() {
+        this->mtx.unlock();
+    }
+
 ///////////////////////////////////////////////////////////////////////////////
 private:
     unsigned long max_threads;      /**< User-defined number of threads */
     unsigned long noThreads;        /**< Actual number of threads */
+    std::mutex mtx;                 /**< Mutex for writing out information */
     PoolPtr pool;                   /**< Pool for managing threads */
 };
 #endif

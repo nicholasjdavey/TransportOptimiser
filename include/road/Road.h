@@ -359,8 +359,11 @@ public:
      * are learning the surrogate model, this function is passed the value
      * TRUE
      * @param learning as bool (default = false)
+     * @param saveResults as bool (default = false)
+     * @param device as int (default = 0)
      */
-    void evaluateRoad(bool learning = false, bool saveResults = false);
+    void evaluateRoad(bool learning = false, bool saveResults = false, int
+            device = 0);
 
     /**
      * Builds the road alignment using the points of intersection. In order,
@@ -384,8 +387,13 @@ public:
      * full simulation model for the optimisation scenario is called.
      * Otherwise, the default of using the surrogate function contained in
      * Optimiser->ExperimentalScenario is used.
+     *
+     * @param learning as bool (default = false)
+     * @param saveResults as bool (default = false)
+     * @param device as int (default = 0)
      */
-    void computeOperating(bool learning = false, bool saveResults = false);
+    void computeOperating(bool learning = false, bool saveResults = false,
+            int device = 0);
 
     /**
      * Adds simulation patches for a given Species
@@ -393,6 +401,11 @@ public:
      * @param srp as SpeciesRoadPatchesPtr
      */
     void addSpeciesPatches(SpeciesPtr species);
+
+    /**
+     * Computes the operating profit for fixed traffic flow
+     */
+    void computeVarProfitICFixedFlow();
 
 private:
     std::weak_ptr<Optimiser> optimiser;         /**< Calling Optimisation object */
@@ -461,11 +474,6 @@ private:
      * @return iar as Eigen::VectorXd&
      */
     void compueteInitialAAR(SpeciesRoadPatchesPtr srp, Eigen::VectorXd& iar);
-
-    /**
-     * Computes the operating profit for fixed traffic flow
-     */
-    void computeVarProfitICFixedFlow();
 };
 
 #endif
