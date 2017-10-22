@@ -924,11 +924,19 @@ __global__ void computePathStates(int noPaths, int noDims, int nYears, int
     if (idx < noPaths) {
 
         // 1. Adjusted population for each species
+        // We only take the highest flow's adjusted population as this is a
+        // measure of how damaging the road is. If we instead used the aar of
+        // the random control selected, we would get overlaps in the optimal
+        // control map.
         for (int ii = 0; ii < noDims-1; ii++) {
+//            xin[idx*noDims + ii] = totalPops[idx*(noDims-1)*(nYears+1) + year*
+//                    (noDims-1) + ii]*aars[idx*(nYears+1)*noControls*(noDims-1)
+//                    + year*noControls*(noDims-1) + ii*noControls + controls[
+//                    idx*nYears + year]];
             xin[idx*noDims + ii] = totalPops[idx*(noDims-1)*(nYears+1) + year*
                     (noDims-1) + ii]*aars[idx*(nYears+1)*noControls*(noDims-1)
-                    + year*noControls*(noDims-1) + ii*noControls + controls[
-                    idx*nYears + year]];
+                    + year*noControls*(noDims-1) + ii*noControls + (noControls
+                    - 1)];
         }
 
         // 2. Unit profit
@@ -1215,10 +1223,14 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
             // the current year. We only compute the values here for
             // completeness. They have no bearing on the results.
             for (int ii = 0; ii < noSpecies; ii++) {
+//                adjPops[ii*noPaths+idx] = totalPops[idx*noSpecies*(nYears+1) +
+//                        start*noSpecies + ii]*aars[idx*(nYears+1)*noSpecies*
+//                        noControls + start*noControls*noSpecies + ii*noControls
+//                        + controls[optCont[nYears*noPaths + idx]]];
                 adjPops[ii*noPaths+idx] = totalPops[idx*noSpecies*(nYears+1) +
                         start*noSpecies + ii]*aars[idx*(nYears+1)*noSpecies*
                         noControls + start*noControls*noSpecies + ii*noControls
-                        + controls[optCont[nYears*noPaths + idx]]];
+                        + (noControls - 1)];
             }
 
             // The prevailing unit profit
@@ -1244,10 +1256,12 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
 
             // Find the current state through multilinear interpolation. The
             // state consists of the current period unit profit and the
-            // adjusted population for each species under the chosen control.
-            // As it is endogenous, the adjusted populations components of the
-            // state are different for each control and must be dealt with
-            // accordingly.
+            // adjusted population for each species under the maximum flow
+            // control. We use this flow, irrespective of the actual control
+            // selected as it ensures a consistent comparison.
+
+            // We keep the adjusted population under each control for
+            // validation purposes, however.
             float *state;
             state = (float*)malloc((noSpecies*noControls+1)*sizeof(float));
 
@@ -1391,7 +1405,9 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                         if ((fabs(x1 - x0) < FLT_EPSILON) || x0 == x1) {
                             xd = 0.0;
                         } else {
-                            xd = (state[ii*noSpecies] - x0)/(x1-x0);
+//                            xd = (state[ii*noSpecies] - x0)/(x1-x0);
+                            xd = (state[(noControls - 1)*noSpecies] - x0)/
+                                    (x1-x0);
                         }
 
                         // First, assign the yvalues to the coefficients matrix
@@ -1464,7 +1480,9 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                             if ((fabs(x1 - x0) < FLT_EPSILON) || x0 == x1) {
                                 xd = 0.0;
                             } else {
-                                xd = (state[ii*noSpecies + jj] - x0)/(x1-x0);
+//                                xd = (state[ii*noSpecies + jj] - x0)/(x1-x0);
+                                xd = (state[(noControls - 1)*noSpecies + jj] -
+                                        x0)/(x1-x0);
                             }
 
                             for (int kk = 0; kk < (int)pow(2,jj); kk++) {
@@ -1664,8 +1682,9 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
 
                             totalPop += population;
 
-                            state[jj*noControls + kk] = totalPop/
-                                    initialPopulation;
+//                            state[kk*noControls + jj] = totalPop/
+//                                    initialPopulation;
+                            state[kk*noSpecies + jj] = totalPop;
                         }
                     }
                 }
@@ -1810,7 +1829,8 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                             if ((fabs(x1 - x0) < FLT_EPSILON) || x0 == x1) {
                                 xd = 0.0;
                             } else {
-                                xd = (state[jj*noSpecies] - x0)/(x1-x0);
+                                xd = (state[(noControls - 1)*noSpecies] - x0)/
+                                        (x1-x0);
                             }
 
                             // First, assign the yvalues to the coefficients
@@ -1885,7 +1905,8 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                                 if ((fabs(x1 - x0) < FLT_EPSILON) || x0 == x1) {
                                     xd = 0.0;
                                 } else {
-                                    xd = (state[jj*noSpecies + kk] - x0)/(x1-x0);
+                                    xd = (state[(noControls - 1)*noSpecies +
+                                            kk] - x0)/(x1-x0);
                                 }
 
                                 for (int ll = 0; ll < (int)pow(2,kk); ll++) {
@@ -2173,14 +2194,18 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
             // INITIAL STATES //
             // The states are the adjusted populations per unit traffic for
             // each species and the current period unit profit. We use the
-            // aar of the selected control to compute this. AdjPops is only for
-            // the current year. We only compute the values here for
+            // aar of the highest flow control to compute this. AdjPops is only
+            // for the current year. We only compute the values here for
             // completeness. They have no bearing on the results.
             for (int ii = 0; ii < noSpecies; ii++) {
+//                adjPops[ii*noPaths+idx] = totalPops[idx*noSpecies*(nYears+1) +
+//                        start*noSpecies + ii]*aars[idx*(nYears+1)*noSpecies*
+//                        noControls + start*noControls*noSpecies + ii*noControls
+//                        + controls[optCont[nYears*noPaths + idx]]];
                 adjPops[ii*noPaths+idx] = totalPops[idx*noSpecies*(nYears+1) +
                         start*noSpecies + ii]*aars[idx*(nYears+1)*noSpecies*
                         noControls + start*noControls*noSpecies + ii*noControls
-                        + controls[optCont[nYears*noPaths + idx]]];
+                        + (noControls - 1)];
             }
 
             // The prevailing unit profit
@@ -2198,6 +2223,14 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
             // As it is endogenous, the adjusted populations components of the
             // state are different for each control and must be dealt with
             // accordingly.
+
+            // The state is the current period unit profit as well as a measure
+            // of the potential damage of the current distribution of animals.
+            // This measure is the adjusted population under the highest flow
+            // control.
+
+            // We also retain the adjusted population under the other controls
+            // to determine if they are valid.
             float *state;
             state = (float*)malloc((noSpecies*noControls+1)*sizeof(float));
 
@@ -2210,6 +2243,18 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                             noControls*noSpecies + start*noControls*noSpecies +
                             jj*noControls + ii];
                 }
+            }
+
+            // Save the adjusted populations for the control chosen
+            for (int ii = 0; ii < noSpecies; ii++) {
+//                adjPops[ii*noPaths+idx] = totalPops[idx*noSpecies*(nYears+1) +
+//                        start*noSpecies + ii]*aars[idx*(nYears+1)*noSpecies*
+//                        noControls + start*noControls*noSpecies + ii*noControls
+//                        + controls[optCont[nYears*noPaths + idx]]];
+                adjPops[ii*noPaths+idx] = totalPops[idx*noSpecies*(nYears+1) +
+                        start*noSpecies + ii]*aars[idx*(nYears+1)*noSpecies*
+                        noControls + start*noControls*noSpecies + ii*noControls
+                        + (noControls - 1)];
             }
 
             // 2. Unit profit is the same for each control
@@ -2237,9 +2282,9 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
             // control for this period.
             for (int ii = 0; ii < noControls; ii++) {
                 // Compute the single period financial payoff for each control
-                // for this period and the adjusted profit. If any adjusted
-                // population is below the threshold, then the payoff is
-                // invalid.
+                // for this period and the adjusted profit. If the adjusted
+                // population for the control is below the threshold, then the
+                // payoff is invalid.
                 valid[ii] = true;
                 for (int jj = 0; jj < noSpecies; jj++) {
                     float adjPop = state[ii*noSpecies + jj];
@@ -2329,7 +2374,8 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                     if ((fabs(x1 - x0) < FLT_EPSILON) || x0 == x1) {
                         xd = 0.0;
                     } else {
-                        xd = (state[ii*noSpecies] - x0)/(x1-x0);
+//                        xd = (state[ii*noSpecies] - x0)/(x1-x0);
+                        xd = (state[(noControls-1)*noSpecies] - x0)/(x1-x0);
                     }
 
                     // First, assign the yvalues to the coefficients matrix
@@ -2378,7 +2424,9 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                         if ((fabs(x1 - x0) < FLT_EPSILON) || x0 == x1) {
                             xd = 0.0;
                         } else {
-                            xd = (state[ii*noSpecies + jj] - x0)/(x1-x0);
+//                            xd = (state[ii*noSpecies + jj] - x0)/(x1-x0);
+                            xd = (state[(noControls - 1)*noSpecies + jj] - x0)/
+                                    (x1-x0);
                         }
 
                         for (int kk = 0; kk < (int)pow(2,jj); kk++) {
@@ -3863,7 +3911,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         }
 
         // 2. Unit profits map inputs at each time step
-        Eigen::MatrixXf unitProfitsF(nYears+1,noPaths);
+        Eigen::MatrixXf unitProfitsF(noPaths,nYears+1);
 
         float *d_unitProfits;
         CUDA_CALL(cudaMalloc((void**)&d_unitProfits,unitProfitsF.rows()*

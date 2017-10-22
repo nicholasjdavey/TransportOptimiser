@@ -268,7 +268,7 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
                 upperVal(ii) - lowerVal(ii)));
         if (lowerIdx(ii) < 0) {
             lowerIdx(ii) = 0;
-        } else if (lowerIdx(ii) >= dimRes) {
+        } else if (lowerIdx(ii) >= (dimRes-1)) {
             lowerIdx(ii) = dimRes-2;
         }
         /*
@@ -351,7 +351,7 @@ double Utility::interpolateSurrogate(Eigen::VectorXd& surrogate,
                 x0 == x1) {
             xd = 0.0;
         } else {
-            xd = (predictors(predictors.size() - 1 - ii) - x0)/(x1 - x0);
+            xd = (predictors(predictors.size() - ii) - x0)/(x1 - x0);
         }
 
         for (int jj = 0; jj < (int)pow(2,predictors.size() - 1 - ii); jj++) {

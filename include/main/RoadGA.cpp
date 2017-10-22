@@ -2906,11 +2906,26 @@ RoadGA::ComputationStatus RoadGA::surrogateResultsROVCR(RoadPtr road,
 
         rovResult(0,this->species.size()+2) = unitCost;
 
-        this->threader->lock();
+        if (this->threader != nullptr) {
+            this->threader->lock();
+        }
         this->writeOutSurrogateData(rovResult);
-        this->threader->unlock();
+        if (this->threader != nullptr) {
+            this->threader->unlock();
+        }
 
-        return RoadGA::COMPUTATION_SUCCESS;
+        // Be careful we aren't using junk data
+        double threshold = this->getMaxROVBenefit();
+        if (std::isfinite(threshold)) {
+            if ((fabs(rovResult(0,0)) <= fabs(threshold)) &&
+                    (fabs(rovResult(0,1)) <= fabs(threshold))) {
+                return RoadGA::COMPUTATION_SUCCESS;
+            } else {
+                return RoadGA::COMPUTATION_FAILED;
+            }
+        } else {
+            return RoadGA::COMPUTATION_FAILED;
+        }
 
     } catch (int err) {
         return RoadGA::COMPUTATION_FAILED;
@@ -2988,26 +3003,42 @@ void RoadGA::writeOutSurrogateData(Eigen::MatrixXd &data) {
         outputFile2 << std::endl;
 
     } else if (this->type == Optimiser::CONTROLLED) {
-        // Check if data is clean
-        double initialProfit = data(this->species.size()+2);
-        double avValue = data(0,0);
-        double valueSD = data(0,1);
-        double multiplier = (this->economic->getYears()+1)*this->programs[this->
-                scenario->getProgram()]->getFlowRates()(this->programs[this->
-                scenario->getProgram()]->getFlowRates().size()-1)*100;
+//        // Check if data is clean
+//        double initialProfit = data(this->species.size()+2);
+//        double avValue = data(0,0);
+//        double valueSD = data(0,1);
+//        double multiplier = (this->economic->getYears()+1)*this->programs[this->
+//                scenario->getProgram()]->getFlowRates()(this->programs[this->
+//                scenario->getProgram()]->getFlowRates().size()-1)*100;
 
-        if (std::isfinite(initialProfit) && std::isfinite(avValue) &&
-                std::isfinite(valueSD) && (fabs(avValue) <
-                multiplier*fabs(initialProfit))) {
-            // RAW DATA SAVE
-            for (int jj = 0; jj < this->species.size(); jj++) {
-                outputFile2 << std::setw(20) << data(jj+2);
+        double threshold = this->getMaxROVBenefit();
+
+        if (std::isfinite(threshold)) {
+            if ((fabs(data(0,0)) <= fabs(threshold)) &&
+                    (fabs(data(0,1)) <= fabs(threshold))) {
+                // RAW DATA SAVE
+                for (int jj = 0; jj < this->species.size(); jj++) {
+                    outputFile2 << std::setw(20) << data(jj+2);
+                }
+
+                outputFile2 << std::setw(20) << data(this->species.size()+2) <<
+                        std::setw(20) << data(0,0) << std::setw(20) << data(0,1);
+                outputFile2 << std::endl;
             }
-
-            outputFile2 << std::setw(20) << data(this->species.size()+2) <<
-                    std::setw(20) << data(0,0) << std::setw(20) << data(0,1);            
-            outputFile2 << std::endl;
         }
+
+//        if (std::isfinite(initialProfit) && std::isfinite(avValue) &&
+//                std::isfinite(valueSD) && (fabs(avValue) <
+//                multiplier*fabs(initialProfit))) {
+//            // RAW DATA SAVE
+//            for (int jj = 0; jj < this->species.size(); jj++) {
+//                outputFile2 << std::setw(20) << data(jj+2);
+//            }
+
+//            outputFile2 << std::setw(20) << data(this->species.size()+2) <<
+//                    std::setw(20) << data(0,0) << std::setw(20) << data(0,1);
+//            outputFile2 << std::endl;
+//        }
     }
 
     outputFile2.close();

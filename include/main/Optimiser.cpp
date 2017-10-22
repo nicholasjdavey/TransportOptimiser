@@ -1184,7 +1184,7 @@ void Optimiser::saveBestRoadResults() {
             outputFile << "# YEAR " << ii << std::endl;
             // Species adjusted populations
             for (int jj = 0; jj < this->species.size(); jj++) {
-                outputFile << "SPECIES " << jj << " ADJUSTED POPULATIONS   : ";
+                outputFile << "SPECIES " << std::setw(3) << jj << " ADJUSTED POPULATIONS            : ";
 
                 for (int kk = 0; kk < this->otherInputs->getNoPaths(); kk++) {
                     outputFile << road->getPolicyMap()->getPolicyMapYear()[ii]

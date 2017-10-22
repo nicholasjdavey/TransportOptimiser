@@ -379,6 +379,7 @@ void Simulator::simulateROVCR(bool policyMap, int device) {
     }
 
     // 2. Unit profits map inputs at each time step
+    // Time step 0 will have junk data
     Eigen::MatrixXd unitProfits(noPaths,nYears+1);
 
     // 3. Optimal profit-to-go outputs matrix (along each path)
@@ -390,6 +391,10 @@ void Simulator::simulateROVCR(bool policyMap, int device) {
     // 5. Regression data
     Eigen::VectorXd regressions(nYears*controls*(dimRes*(srp.size() + 1) +
             pow(dimRes,(srp.size() + 1))*2));
+
+    // We need to know if the program successfully completed. If it did not, the
+    // ROV data created is useless.
+    bool success = false;
 
     if (varParams->getGrowthRateSDMultipliers()(scenario->getPopGRSD()) == 0) {
 
@@ -412,7 +417,6 @@ void Simulator::simulateROVCR(bool policyMap, int device) {
                 // We try 5 times to execute the code. If it fails, we
                 // continue.
                 int counter = 0;
-                bool success = false;
 
                 while (!success && counter < 3) {
                     try {
@@ -452,7 +456,6 @@ void Simulator::simulateROVCR(bool policyMap, int device) {
             if (gpu) {
                 // Call the external, CUDA-compiled code
                 int counter = 0;
-                bool success = false;
 
                 while (!success && counter < 3) {
                     try {
@@ -557,7 +560,7 @@ void Simulator::simulateROVCR(bool policyMap, int device) {
                 stateLevels.col(jj) = adjPops[ii+1].col(jj);
             }
 
-            stateLevels.col(srp.size()) = adjPops[ii].col(srp.size()-1);
+            stateLevels.col(srp.size()) = unitProfits.col(ii+1);
 
             policyMap->getPolicyMapYear()[ii]->setStateLevels(stateLevels);
             policyMap->getPolicyMapYear()[ii]->setProfits(condExp.col(ii));
