@@ -787,7 +787,7 @@ __global__ void forwardPathKernel(int noPaths, int nYears, int noSpecies,
         }
 
         // All future time periods
-        for (int ii = 0; ii <= nYears; ii++) {
+        for (int ii = 0; ii < nYears; ii++) {
             // Control to pick
             int control = controls[idx*nYears + ii];
 
@@ -989,6 +989,9 @@ __global__ void allocateXYRegressionData(int noPaths, int noControls, int
                     controls[ii]]] = xin[ii*noDims + jj];
         }
 
+//        printf("%6d | %3d: %6.0f %15.0f %15.0f\n",ii,controls[ii],xin[ii*noDims],
+//                xin[ii*noDims + 1],yvals[noPaths*controls[ii] + dataPoints[controls[ii]]]);
+
         // Increment the number of data points for this control
         dataPoints[controls[ii]] += 1;
 
@@ -1012,7 +1015,6 @@ __global__ void allocateXYRegressionData(int noPaths, int noControls, int
 //            // Increment the number of data points for this control
 //            dataPoints[controls[ii]] += 1;
 //        }
-//        printf("%6d | %3d: %6.0f %15.0f %15.0f\n",ii,controls[ii],xin[ii*noDims],xin[ii*noDims + 1],condExp[year*noPaths + ii]);
     }
 }
 
@@ -2041,10 +2043,17 @@ __global__ void firstPeriodInduction(int noPaths, int nYears, int noSpecies,
             // given the prevailing stochastic factors (undiscounted).
             payoffs[ii] += Q[ii]*(unitCost + unitFuel - unitRevenue*
                     orePrice);
+
+            // Take care of regression anomalies
+            if (payoffs[ii] > 0) {
+                payoffs[ii] = 0.0;
+            }
         } else {
             payoffs[ii] = NAN;
         }
     }
+
+//    printf("Pop: %6.2f %6.2f %6.2f\n", totalPops[0]*aars[0], totalPops[0]*aars[1],totalPops[0]*aars[2]);
 
     // The optimal value is the one with the lowest net present cost.
     // As the zero flow rate option is always available, we can
@@ -2130,7 +2139,7 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
             grMean[ii] = speciesParams[ii*8];
         }
 
-        if (start == nYears) {
+        if (start == (nYears-1)) {
             // At the last period we run the road if the adjusted population
             // for a particular control (pop-pop*aar_jj) is greater than the
             // minimum permissible population. This becomes the optimal
@@ -2138,6 +2147,8 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
             // the expected payoff at time T given a prevailing end adjusted
             // population. Everything is considered deterministic at this
             // stage. Therefore, we do not need to compute this section.
+            // The start of this period actually occurs at time period T-1,
+            // hence why we have nYears - 1.
             for (int ii = 0; ii < noControls; ii++) {
                 // Compute the single period financial payoff for each control
                 // for this period and the adjusted profit. If any adjusted
@@ -2188,15 +2199,13 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                 }
             }
 
-            condExp[nYears*noPaths + idx] = bestExp;
-            optCont[nYears*noPaths + idx] = bestCont;
+            condExp[(nYears-1)*noPaths + idx] = bestExp;
+            optCont[(nYears-1)*noPaths + idx] = bestCont;
 
             // INITIAL STATES //
-            // The states are the adjusted populations per unit traffic for
+            // The states are the adjusted populations under full flow for
             // each species and the current period unit profit. We use the
-            // aar of the highest flow control to compute this. AdjPops is only
-            // for the current year. We only compute the values here for
-            // completeness. They have no bearing on the results.
+            // aar of the highest flow control to compute this.
             for (int ii = 0; ii < noSpecies; ii++) {
 //                adjPops[ii*noPaths+idx] = totalPops[idx*noSpecies*(nYears+1) +
 //                        start*noSpecies + ii]*aars[idx*(nYears+1)*noSpecies*
@@ -2207,6 +2216,8 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                         noControls + start*noControls*noSpecies + ii*noControls
                         + (noControls - 1)];
             }
+
+//            printf("Test: %f %f %d\n",adjPops[idx],condExp[start*noPaths + idx],optCont[start*noPaths + idx]);
 
             // The prevailing unit profit
             unitProfits[start*noPaths + idx] = unitCost + unitFuel -
@@ -2436,8 +2447,17 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                         }
                     }
 
-                    payoffs[ii] = currPayoffs[ii] + coeffs[0]/(1+rrr*timeStep/
-                            100);
+                    // Due to the statistical nature of regression, we may end
+                    // up with positive values when we interpolate. Therefore,
+                    // we choose the maximum (least negative) value of the
+                    // regression and zero.
+                    double condExpIdx = coeffs[0]/(1+rrr*timeStep/100);
+
+                    if (condExpIdx > 0) {
+                        condExpIdx = 0.0;
+                    }
+
+                    payoffs[ii] = currPayoffs[ii] + condExpIdx;
 
                     free(lower);
                     free(upper);
@@ -2469,6 +2489,8 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
 
             condExp[start*noPaths + idx] = payoffs[bestCont];
             optCont[start*noPaths + idx] = bestCont;
+
+//            printf("Test: %f %f %d\n",adjPops[idx],condExp[start*noPaths + idx],optCont[start*noPaths + idx]);
 
             free(state);
         }
@@ -3494,10 +3516,10 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
         // CLEAR THE FACTOR OF 2 BELOW ONCE WE FIGURE OUT WHERE THE DOUBLING IS OCCURING ////////////////////////////////
         // Fixed cost per unit traffic
-        double unitCost = sim->getRoad()->getAttributes()->getUnitVarCosts()*2;
+        double unitCost = sim->getRoad()->getAttributes()->getUnitVarCosts();
         // Fuel consumption per vehicle class per unit traffic (L)
         Eigen::VectorXf fuelCosts = sim->getRoad()->getCosts()->
-                getUnitFuelCost().cast<float>()*2;
+                getUnitFuelCost().cast<float>();
         /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
         // Load per unit traffic
         float unitRevenue = (float)sim->getRoad()->getCosts()->
@@ -3904,21 +3926,21 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
         // Where to copy the results back to the host in floating point ready
         // to copy to the double precision outputs.
-        std::vector<Eigen::MatrixXf> adjPopsF(nYears+1);
+        std::vector<Eigen::MatrixXf> adjPopsF(nYears);
 
-        for (int ii = 0; ii <= nYears; ii++) {
+        for (int ii = 0; ii < nYears; ii++) {
             adjPopsF[ii].resize(noPaths,srp.size());
         }
 
         // 2. Unit profits map inputs at each time step
-        Eigen::MatrixXf unitProfitsF(noPaths,nYears+1);
+        Eigen::MatrixXf unitProfitsF(noPaths,nYears);
 
         float *d_unitProfits;
         CUDA_CALL(cudaMalloc((void**)&d_unitProfits,unitProfitsF.rows()*
                 unitProfitsF.cols()*sizeof(float)));
 
         // 3. Optimal profit-to-go outputs matrix (along each path)
-        Eigen::MatrixXf condExpF(noPaths,nYears+1);
+        Eigen::MatrixXf condExpF(noPaths,nYears);
 
         CUDA_CALL(cudaMalloc((void**)&d_condExp,condExp.rows()*condExp.cols()*
                 sizeof(float)));
@@ -3968,7 +3990,11 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
             case Optimiser::ALGO4:
             // Same as ALGO6 but without forward path recomputation
             {
-                backwardInduction<<<noBlocks,maxThreadsPerBlock1>>>(nYears,
+                // Backward induction actually starts at the beginning of the
+                // final year. This means the control runs from time t = 29 to
+                // t = T = 30 (which is when operations cease). I.e. there are
+                // no costs at the very end.
+                backwardInduction<<<noBlocks,maxThreadsPerBlock1>>>(nYears-1,
                         noPaths,nYears,srp.size(),noControls,noUncertainties,
                         stepSize,unitCost,unitRevenue,rrr,fuels.size(),
                         commodities.size(),dimRes,d_flowRates,d_fuelCosts,
@@ -3981,7 +4007,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 // Copy the adjusted populations to the output variable. This
                 // is only provided for completeness. The algorithm does not
                 // use the results as they pertain to the very last time step.
-                CUDA_CALL(cudaMemcpy(adjPopsF[nYears].data(),d_adjPops,srp.
+                CUDA_CALL(cudaMemcpy(adjPopsF[nYears-1].data(),d_adjPops,srp.
                         size()*noPaths*sizeof(float),cudaMemcpyDeviceToHost));
 
                 // Find the maximum and minimum x value along each dimension
@@ -3993,10 +4019,10 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 CUDA_CALL(cudaMalloc((void**)&d_xmins,noControls*noDims*sizeof(
                         float)));
 
-                // For each backward step not including the last period, we
-                // need to determine the adjusted population for each species
-                // and the unit payoffs.
-                for (int ii = nYears-1; ii > 0; ii--) {
+                // For every other backward step not including the first
+                // period, we need to determine the adjusted population for
+                // each species and the unit payoffs.
+                for (int ii = nYears-2; ii > 0; ii--) {
                     // Perform regression and save results
                     int noBlocks2 = (int)((int)pow(dimRes,noDims)*noControls %
                             maxThreadsPerBlock) ? (int)(pow(dimRes,noDims)*
@@ -4791,7 +4817,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 size()*sizeof(float),cudaMemcpyDeviceToHost));
         regressions = regressionsF.cast<double>();
 
-        for (int ii = 0; ii <= nYears; ii++) {
+        for (int ii = 0; ii < nYears; ii++) {
             adjPops[ii] = adjPopsF[ii].cast<double>();
         }
 
