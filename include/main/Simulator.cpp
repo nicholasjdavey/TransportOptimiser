@@ -372,21 +372,21 @@ void Simulator::simulateROVCR(bool policyMap, int device) {
     // 1. Adjusted population map inputs for each species at each time step
     // This represents the proportion of animals expected to be killed per unit
     // traffic.
-    std::vector<Eigen::MatrixXd> adjPops(nYears+1);
+    std::vector<Eigen::MatrixXd> adjPops(nYears);
 
-    for (int ii = 0; ii <= nYears; ii++) {
+    for (int ii = 0; ii < nYears; ii++) {
         adjPops[ii].resize(noPaths,srp.size());
     }
 
     // 2. Unit profits map inputs at each time step
     // Time step 0 will have junk data
-    Eigen::MatrixXd unitProfits(noPaths,nYears+1);
+    Eigen::MatrixXd unitProfits(noPaths,nYears);
 
     // 3. Optimal profit-to-go outputs matrix (along each path)
-    Eigen::MatrixXd condExp(noPaths,nYears+1);
+    Eigen::MatrixXd condExp(noPaths,nYears);
 
     // 4. Optimal control matrix (along each path)
-    Eigen::MatrixXi optCont(noPaths,nYears+1);
+    Eigen::MatrixXi optCont(noPaths,nYears);
 
     // 5. Regression data
     Eigen::VectorXd regressions(nYears*controls*(dimRes*(srp.size() + 1) +
@@ -557,10 +557,10 @@ void Simulator::simulateROVCR(bool policyMap, int device) {
             Eigen::MatrixXd stateLevels(noPaths,srp.size() + 1);
 
             for (int jj = 0; jj < srp.size(); jj++) {
-                stateLevels.col(jj) = adjPops[ii+1].col(jj);
+                stateLevels.col(jj) = adjPops[ii].col(jj);
             }
 
-            stateLevels.col(srp.size()) = unitProfits.col(ii+1);
+            stateLevels.col(srp.size()) = unitProfits.col(ii);
 
             policyMap->getPolicyMapYear()[ii]->setStateLevels(stateLevels);
             policyMap->getPolicyMapYear()[ii]->setProfits(condExp.col(ii));

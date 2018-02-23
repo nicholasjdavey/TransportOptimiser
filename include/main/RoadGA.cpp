@@ -622,13 +622,58 @@ void RoadGA::optimise(bool plot) {
     while ((status == 0) && (this->generation < this->generations)) {
         // Evaluate the current generation using the new surrogate
         this->evaluateGeneration();
-        this->output();
         this->assignBestRoad();
 
-        // Prepare for next generation
+        // Prepare surrogate for next generation
         if (this->type > Optimiser::SIMPLEPENALTY) {
             this->computeSurrogate();
-        }
+            // If we are tracking the error (i.e. min learn no > 0) we need to
+            // compute the discrepancy between the value for the best road
+            // using the surrogate and full models.
+            if (this->minLearnNo > 0) {
+                RoadPtr road = this->bestRoads[this->scenario->
+                        getCurrentScenario()][this->scenario->getRun()];
+
+                if (this->type == Optimiser::MTE) {
+                    Eigen::MatrixXd mteResult(3,this->species.size());
+
+                    Optimiser::ComputationStatus fullStatus = this->
+                            surrogateResultsMTE(road,mteResult);
+
+                    if (fullStatus == Optimiser::COMPUTATION_SUCCESS) {
+                        // Compute the error between the full model and the
+                        // surrogate
+                        road->evaluateRoad();
+                        Eigen::VectorXd endPops = road->getAttributes()->
+                                getEndPopMTE();
+
+                        for (int ii = 0; ii < this->species.size(); ii++) {
+                            this->surrErr(ii) = fabs((mteResult(1,ii) -
+                                    endPops(ii))/mteResult(1,ii));
+                        }
+                    }
+
+                } else if (this->type == Optimiser::CONTROLLED) {
+                    Eigen::MatrixXd rovResult(1,this->species.size()+3);
+
+                    Optimiser::ComputationStatus fullStatus = this->
+                            surrogateResultsROVCR(road,rovResult);
+
+                    if (fullStatus == Optimiser::COMPUTATION_SUCCESS) {
+                        // Compute the error between the full model and the
+                        // surrogate
+                        road->evaluateRoad();
+
+                        double value = road->getAttributes()->getVarProfitIC();
+
+                        this->surrErr(0) = fabs((rovResult(0,0) - value)/
+                                rovResult(0,0));
+                    }
+                }
+            }
+        }        
+
+        this->output();
 
         int pc = 2*floor((this->populationSizeGA * this->crossoverFrac)/2);
         int pm = 2*floor((this->populationSizeGA * this->mutationRate)/2);
@@ -1994,6 +2039,8 @@ void RoadGA::computeSurrogate() {
 
         // Now that we have the results, let's build the surrogate model!!!
         this->buildSurrogateModelROVCR();
+        // If the surrogate model has any strange numbers in it (NaN, Inf) or
+        // there are too many outliers, restart the GA and remove the outliers.
     }
 }
 
@@ -2906,19 +2953,19 @@ RoadGA::ComputationStatus RoadGA::surrogateResultsROVCR(RoadPtr road,
 
         rovResult(0,this->species.size()+2) = unitCost;
 
-        if (this->threader != nullptr) {
-            this->threader->lock();
-        }
-        this->writeOutSurrogateData(rovResult);
-        if (this->threader != nullptr) {
-            this->threader->unlock();
-        }
-
         // Be careful we aren't using junk data
         double threshold = this->getMaxROVBenefit();
         if (std::isfinite(threshold)) {
             if ((fabs(rovResult(0,0)) <= fabs(threshold)) &&
-                    (fabs(rovResult(0,1)) <= fabs(threshold))) {
+                    //(fabs(rovResult(0,1)) <= 0.1*fabs(threshold))) {
+                    (fabs(rovResult(0,1)) <= 50000000)) {
+                if (this->threader != nullptr) {
+                    this->threader->lock();
+                }
+                this->writeOutSurrogateData(rovResult);
+                if (this->threader != nullptr) {
+                    this->threader->unlock();
+                }
                 return RoadGA::COMPUTATION_SUCCESS;
             } else {
                 return RoadGA::COMPUTATION_FAILED;

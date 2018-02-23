@@ -4,7 +4,7 @@
 Name                                        : petrol
 Current Value                               : 1.05
 Mean Value                                  : 1.05
-Standard Deviation                          : 0.05
+Standard Deviation                          : 0.1
 Reversion                                   : 0.05
 Jump Probability                            : 0.05
 Poisson Parameter                           : 0.05

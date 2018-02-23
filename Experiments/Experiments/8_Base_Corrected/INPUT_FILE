@@ -1,0 +1,218 @@
+###################################################################################################
+############################### INPUT FILE FOR TRANSPORT OPTIMISER ################################
+###################################################################################################
+# INSTRUCTIONS
+# Only fill in elements after a colon (:) on lines that do not begin with "#"
+# Specific instructions are provided before some input parameters below
+# DO NOT ADD OR REMOVE ANY LINES!!!
+
+###################################################################################################
+## GENERAL OPTIMISATION PARAMETERS
+Mutation Rate                                   : 0.6
+Crossover Fraction                              : 0.375
+Max Generations                                 : 500
+Population Size                                 : 400
+Stopping Tolerance                              : 1e-6
+Confidence Interval                             : 0.95
+Confidence Level                                : 0.95
+Solution Scheme                                 : void
+Stall Generations                               : 5
+Cooling Rate                                    : 1.0
+Learning Period                                 : 0
+# GA Selection Routine
+# Stochastic Uniform                    = 0
+# Remainder                             = 1
+# Uniform                               = 2
+# Roulette                              = 3
+# Tournament                            = 4
+GA Selection Routine                            : 4
+# GA Scaling Routine
+# Rank                                  = 0
+# Proportional                          = 1
+# Top                                   = 2
+# Shift                                 = 3
+GA Scaling Routine                              : 0
+Top Scaling Proportion                          : 0.4
+Max Survival Rate                               : 0.65
+Tournament Size                                 : 5
+Use GPU                                         : TRUE
+CPU Threads (min = 1)                           : 6
+
+###################################################################################################
+## SURROGATE PARAMETERS
+Surrogate Dimension Resolution                  : 30
+Surrogate Threshold                             : 0.05
+Max Learning Samples per Generation             : 20
+Total Max Learning Samples                      : 7000
+Minimum Learning Samples per Generation         : 3
+# Interpolation Routine
+# Cubic Spline                          = 0
+# Multiple Local Linear Regression      = 1
+Interpolation Routine                           : 1
+
+###################################################################################################
+## DESIGN PARAMETERS
+Design Speed (m/s)                              : 27.8
+Start X Coordinate (m)                          : 0
+Start Y Coordinate (m)                          : 0
+End X Coordinate (m)                            : 4500
+End Y Coordinate (m)                            : 4500
+Max Grade (per cent)                            : 5
+Max Superelevation (per cent)                   : 8
+Road Width (m)                                  : 15
+Average Reaction Time (s)                       : 2.5
+Average Deceleration Rate (m^2/2)               : 3.4
+Intersection Points                             : 15
+Segment Length (m)                              : 20
+Cut Wall Angle (radians)                        : 0.78539816339744828
+Fill Wall Angle (radians)                       : 0.52359877559829882
+Fixed Bridge Cost                               : 0
+Bridge Cost per Unit Width                      : 0
+Bridge Cost per Unit Height                     : 0
+Fixed Tunnel Cost                               : 0
+Tunnel Cost per Unit Width                      : 0
+Tunnel Cost per Unit Depth                      : 0
+Pavement Cost ($/m^2)                           : 100
+Air Pollution Cost ($/(m*vehicle))              : 0.00003621
+Noise Pollution Cost ($/(m*vehicle))            : 0.00000355
+Water Pollution Cost ($/(m*vehicle))            : 0.000001562
+Oil Extraction Cost ($/(m*vehicle))             : 0.000024282
+Land Use Cost ($/(m*vehicle))                   : 0.00004331
+Chemical Pollution Cost ($/(m*vehicle))         : 0.000001704
+Spiral Transitions                              : FALSE
+
+###################################################################################################
+## TRAFFIC PARAMETERS
+Proportion of Daily Traffic During Peak         : 0.5
+Peak Time Directionality                        : 0.5
+Peak Hours in a Day                             : 6
+Traffic Growth Rate (p.a.)                      : 0
+
+###################################################################################################
+## ECONOMIC PARAMETERS
+Required Rate of Return (per cen per annum)     : 7
+Number of Years                                 : 30
+Step Size (Years)                               : 1
+
+###################################################################################################
+## EARTHWORK COSTS
+Depths Starts (m)                               : 0,1.5,3.0,4.5,6.0,7.5
+Corresponding per m^2 cost                      : 40.0,57.6,72.8,100.0,120.0,200.0
+Fill Cost per m^2                               : 24.65
+
+###################################################################################################
+## UNIT COSTS
+Cost per accident                               : 4852
+Air Pollution Cost ($/(m*vehicle))              : 0.00003621
+Noise Pollution Cost ($/(m*vehicle))            : 0.00000355
+Water Pollution Cost ($/(m*vehicle))            : 0.000001562
+Oil Extraction Cost ($/(m*vehicle))             : 0.000024282
+Land Use Cost ($/(m*vehicle))                   : 0.00004331
+Chemical Pollution Cost ($/(m*vehicle))         : 0.000001704
+
+###################################################################################################
+## OTHER INPUTS
+Habitat Grid Resolution                         : 10
+Minimum Viable X Value                          : 0
+Maximum Viable X Value                          : 1
+Minimum Viable Y Value                          : 0
+Maximum Viable Y Value                          : 1
+Number of X Points                              : 20
+Numner of Y Points                              : 20
+Number of Simulation Paths                      : 100000
+ROV Dimension Resolution                        : 40
+
+###################################################################################################
+## EXPERIMENTAL PARAMETERS
+Number of Runs per Experiment                   : 10
+# Optimisation methods
+#    no penalty     = 0
+#    simple penalty = 1
+#    mte            = 2
+#    controlled     = 3
+Optimisation Method                             : 3
+# ROV Method
+#    Regression Monte Carlo (Tsitsiklis and Van Roy)                                        = 0
+#    Regression Monte Carlo (Longstaff and Schwartz)                                        = 1
+#    Parametric Control (Guyon and Henry-Labordere)                                         = 2
+#    Regression Monte Carlo, State & Control (Kharroubi et al.)                             = 3
+#    Regression Monte Carlo, State, Control & Recomputation                                 = 4
+#    Regression Monte Carlo, State, Control, Recomputation & Switching (Langrene et al.)    = 5
+#    Regression Monte Carlo with targeted end population (Zhang et al.)                     = 6
+ROV Method                                      : 3
+
+###################################################################################################
+## VARIABLE PARAMETERS
+# The combinations of the below are used to create the experimental scenarios
+Animal Bridges to Build                         : 0
+Habitat Preference SD Multipliers               : 0
+Movement Propensity SD Multipliers              : 0
+Ranging Coefficient SD Multipliers              : 0
+Population Growth Rate Mean Multipliers         : 1
+Population Growth Rate SD Multipliers           : 1
+Commodity Price Mean Multipliers                : 1
+Commodity Price SD Multipliers                  : 1
+Ore Composition SD Multipliers                  : 1
+Minimum Population Levels (proportion of min)   : 0.9
+Comparison Road Variable Cost Multipliers       : 0.5
+
+###################################################################################################
+## TRAFFIC PROGRAMS
+# Add traffic program flow rates after the first ":" and the corresponding switching costs after
+# the second ":". Separate flow rates (veh/hr) and switching costs by ",". The number of switching
+# costs should be 2^N where N is the number of flow rates. Flows MUST be in ASCENDING order.
+Programs                                        : 1
+Program 1   : 0,200,400 : 0,0,0,0,0,0,0,0 : FALSE
+
+###################################################################################################
+## INPUT FILES ####################################################################################
+# Ensure that all input files paths are relative to the root directory of the program.
+
+###################################################################################################
+## REGION DATA
+# Ensure that the files below are all of the same dimension. All points must correspond to each
+# other. This is relative to the root directory for the program.
+X Values Matrix                                 : Experiments/Input_Data/Regions/Region_3/xcoordsMatrix.csv
+Y Values Matrix                                 : Experiments/Input_Data/Regions/Region_3/ycoordsMatrix.csv
+Z Values Matrix                                 : Experiments/Input_Data/Regions/Region_3/zcoordsMatrix.csv
+Vegetation Data Matrix                          : Experiments/Input_Data/Regions/Region_3/habitat.csv
+Acquisition Costs Matrix                        : Experiments/Input_Data/Regions/Region_3/acquisition.csv
+Soil Stabilisation Costs Matrix                 : Experiments/Input_Data/Regions/Region_3/stabilisation.csv
+
+###################################################################################################
+## COMMODITY DATA (Includes Fuels)
+# Commodities transported and fuels used. Each commodity must be provided an index for later use
+# Add new commodity datafiles (in accordance with the template file) on new lines below preceded by
+# ":"
+Number of Fuels                                 : 2
+Number of Transported Commodities               : 0
+Commodity 1                                     : Experiments/Input_Data/Commodities/diesel
+Commodity 2                                     : Experiments/Input_Data/Commodities/petrol
+
+###################################################################################################
+## VEHICLE DATA
+# Add new vehicle datafiles (in accordance with the template) on new lines below preceded by ":"
+Number of Vehicles                              : 3
+Vehicle 1                                       : Experiments/Input_Data/Vehicles/small
+Vehicle 2                                       : Experiments/Input_Data/Vehicles/medium
+Vehicle 3                                       : Experiments/Input_Data/Vehicles/large
+
+###################################################################################################
+## SPECIES DATA
+# Add new species datafiles (in accordance with the template) on new lines below preceded by ":"
+Number of Species                               : 1
+Species 1                                       : Experiments/Input_Data/Species/Species_3/Species_3
+
+###################################################################################################
+## EXISTING ROAD DATA #############################################################################
+# Add information here for the fuel usage per journey for the existing road (if it exists). There
+# needs to be as many data points as there are fuels in the "VEHICLE DATA" section above.
+# N.B. This section only applies to the Optimisation Method CONTROLLED.
+Road Exists                                     : TRUE
+Travel Time (hours)                             : 0.5
+Length (m)                                      : 15000
+Fuel Consumption Per Journey                    : 2,3.3,6.7
+Accident Cost per Unit Traffic                  : 1000
+
+# N.B. If this last section is TRUE, ensure that the commodity is either blank or has zero mean and
+# standard deviation.

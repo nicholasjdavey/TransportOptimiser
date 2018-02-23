@@ -276,6 +276,21 @@ namespace SimulateGPU {
             int* elemsPerCol, int* rowIdx, int &totalElements);
 
     /**
+     * Removes zero and positive values from a multiple linear regression
+     * before creating a payoff function.
+     *
+     * @param refXIn as float*
+     * @param refYIn as float*
+     * @param refXOut as float*
+     * @param refYOut as float*
+     * @param originalPoints as int
+     * @param finalPoints as int&
+     * @param dim as int
+     */
+    void keepValidPoints(int dims, int originalPoints, float* refXIn, float*
+            refYIn, float* refXOut, float* refYOut, int& finalPoints);
+
+    /**
      * CPU-based multiple linear regression (global)
      *
      * @param noPoints as int

@@ -1126,12 +1126,28 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
     // Global thread index (path number)
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
 
+//    printf("IDX = %d\n",blockIdx.x);
+
+//    if (idx == (noPaths-1)) {
+//        printf("got here -3\n");
+//    }
+//    if (idx == 0) {
+//        printf("got here -3a\n");
+//    }
+
     // We do not need to recompute the exogenous uncertainties (everything
     // else other than animal populations)
     if (idx < noPaths) {
         // Shared memory declaration for patch populations used in path
         // recomputations and optimal controls/conditional expectations
         extern __shared__ float s[];
+
+//        if (idx == (noPaths-1)) {
+//            printf("got here -2\n");
+//        }
+//        if (idx == 0) {
+//            printf("got here -2a\n");
+//        }
 
         float* payoffs, *currPayoffs;
         payoffs = (float*)malloc(noControls*sizeof(float));
@@ -1157,7 +1173,11 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                     start*noUncertainties + noFuels + ii];
         }
 
-        if (start == nYears) {
+//        if (idx == (noPaths-1)) {
+//            printf("got here -1\n");
+//        }
+
+        if (start == (nYears-1)) {
             // At the last period we run the road if the adjusted population
             // for a particular control (pop-pop*aar_jj) is greater than the
             // minimum permissible population. This becomes the optimal
@@ -1216,7 +1236,7 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
             }
 
             conditionalExp = bestExp;
-            optCont[nYears*noPaths + idx] = bestCont;
+            optCont[(nYears-1)*noPaths + idx] = bestCont;
 
             // INITIAL STATES //
             // The states are the adjusted populations per unit traffic for
@@ -1264,6 +1284,11 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
 
             // We keep the adjusted population under each control for
             // validation purposes, however.
+
+//            if (idx == (noPaths-1)) {
+//                printf("got here 0\n");
+//            }
+
             float *state;
             state = (float*)malloc((noSpecies*noControls+1)*sizeof(float));
 
@@ -1277,6 +1302,22 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                             jj*noControls + ii];
                 }
             }
+
+            // Save the adjusted populations for the control chosen
+            for (int ii = 0; ii < noSpecies; ii++) {
+//                adjPops[ii*noPaths+idx] = totalPops[idx*noSpecies*(nYears+1) +
+//                        start*noSpecies + ii]*aars[idx*(nYears+1)*noSpecies*
+//                        noControls + start*noControls*noSpecies + ii*noControls
+//                        + controls[optCont[nYears*noPaths + idx]]];
+                adjPops[ii*noPaths+idx] = totalPops[idx*noSpecies*(nYears+1) +
+                        start*noSpecies + ii]*aars[idx*(nYears+1)*noSpecies*
+                        noControls + start*noControls*noSpecies + ii*noControls
+                        + (noControls - 1)];
+            }
+
+//            if (idx == (noPaths-1)) {
+//                printf("got here 1\n");
+//            }
 
             // 2. Unit profit is the same for each control
             unitFuel = 0.0;
@@ -1297,6 +1338,10 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                     orePrice;
             unitProfits[start*noPaths + idx] = unitCost + unitFuel -
                     unitRevenue*orePrice;
+
+//            if (idx == (noPaths-1)) {
+//                printf("got here 2\n");
+//            }
 
 //            if (idx == noPaths-1) {
 //                printf("Test: %f %f %f %f\n",state[0],state[1],state[2],state[3]);
@@ -1320,6 +1365,10 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                             break;
                         }
                     }
+
+//                    if (idx == (noPaths-1)) {
+//                        printf("got here 3\n");
+//                    }
 
                     // Compute the payoff for the control if valid using the
                     // regressions. We keep track of the overall temporary cost
@@ -1361,10 +1410,14 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
 
                             if (lowerInd[jj] < 0) {
                                 lowerInd[jj] = 0;
-                            } else if (lowerInd[jj] >= dimRes) {
+                            } else if (lowerInd[jj] >= (dimRes-1)) {
                                 lowerInd[jj] = dimRes-2;
                             }
                         }
+
+//                        if (idx == (noPaths-1)) {
+//                            printf("got here 4\n");
+//                        }
 
                         // Index for unit profit state variable
                         lower[noSpecies] = regression[start*noControls*(dimRes
@@ -1382,7 +1435,7 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
 
                         if (lowerInd[noSpecies] < 0) {
                             lowerInd[noSpecies] = 0;
-                        } else if (lowerInd[noSpecies] >= dimRes) {
+                        } else if (lowerInd[noSpecies] >= (dimRes-1)) {
                             lowerInd[noSpecies] = dimRes-2;
                         }
 
@@ -1411,6 +1464,10 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                             xd = (state[(noControls - 1)*noSpecies] - x0)/
                                     (x1-x0);
                         }
+
+//                        if (idx == (noPaths-1)) {
+//                            printf("got here 5\n");
+//                        }
 
                         // First, assign the yvalues to the coefficients matrix
                         for (int jj = 0; jj < (int)pow(2,noSpecies); jj++) {
@@ -1457,6 +1514,10 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                                 }
                             }
 
+//                            if (idx == (noPaths-1)) {
+//                                printf("got here 6\n");
+//                            }
+
                             // Now add the lowest dimension's lower index
                             idxL += lowerInd[noSpecies];
 
@@ -1494,8 +1555,21 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                             }
                         }
 
-                        payoffs[ii] = currPayoffs[ii] + coeffs[0]/(1+rrr/(100*
-                                timeStep));
+//                        if (idx == (noPaths-1)) {
+//                            printf("got here 7\n");
+//                        }
+
+                        // Due to the statistical nature of regression, we may end
+                        // up with positive values when we interpolate. Therefore,
+                        // we choose the maximum (least negative) value of the
+                        // regression and zero.
+                        double condExpIdx = coeffs[0]/(1+rrr*timeStep/100);
+
+                        if (condExpIdx > 0) {
+                            condExpIdx = 0.0;
+                        }
+
+                        payoffs[ii] = currPayoffs[ii] + condExpIdx;
 
                         free(lower);
                         free(upper);
@@ -1524,7 +1598,11 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                     }
                 }
 
-//                condExp[start*noPaths + idx] = bestExp;
+//                if (idx == (noPaths-1)) {
+//                    printf("got here 8\n");
+//                }
+
+                condExp[start*noPaths + idx] = bestExp;
                 optCont[start*noPaths + idx] = bestCont;
 
             } else {
@@ -1555,8 +1633,16 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                 }
             }
 
+//            if (idx == (noPaths-1)) {
+//                printf("got here 9\n");
+//            }
+
             for (int ii = start+1; ii <= nYears; ii++) {
                 bestCont = optCont[(ii-1)*noPaths + idx];
+
+//                if (idx == (noPaths-1)) {
+//                    printf("got here 10\n");
+//                }
 
                 // We must keep track of the population(s) over time as well as
                 // the optimal choice taken. This means computing the current
@@ -1606,6 +1692,10 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                                 ll + noSpecies*noPatches] = population;
                     }
 
+//                    if (idx == (noPaths-1)) {
+//                        printf("got here 11\n");
+//                    }
+
                     // Update the actual populations. We only care about the
                     // end result, therefore we do not alter the global
                     // population vectors; we update the shared memory
@@ -1629,6 +1719,10 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                                 noSpecies*noPatches + noSpecies*noPatches + jj*
                                 noPatches + ll])/caps[jj*noPatches + ll]/100.0);
                     }
+
+//                    if (idx == (noPaths-1)) {
+//                        printf("got here 12\n");
+//                    }
                 }
 
                 __syncthreads();
@@ -1689,6 +1783,10 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                             state[kk*noSpecies + jj] = totalPop;
                         }
                     }
+
+//                    if (idx == (noPaths-1)) {
+//                        printf("got here 13\n");
+//                    }
                 }
 
 //                for (int jj = 0; jj <noSpecies; jj++) {
@@ -1717,6 +1815,10 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                 state[noSpecies*noControls] = unitCost + unitFuel - unitRevenue
                         *orePrice;
 
+//                if (idx == (noPaths-1)) {
+//                    printf("got here 14\n");
+//                }
+
                 // Determine the current period payoffs to select the optimal
                 // control for this period.
                 for (int jj = 0; jj < noControls; jj++) {
@@ -1736,6 +1838,10 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                             break;
                         }
                     }
+
+//                    if (idx == (noPaths-1)) {
+//                        printf("got here 15\n");
+//                    }
 
                     // Compute the payoff for the control if valid using the
                     // regressions. We keep track of the overall temporary cost
@@ -1789,7 +1895,17 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                                 lowerInd[kk] = (int)(dimRes-1)*(state[jj*
                                         noSpecies + kk] - lower[kk])/(upper[kk]
                                         - lower[kk]);
+
+                                if (lowerInd[kk] < 0) {
+                                    lowerInd[kk] = 0;
+                                } else if (lowerInd[kk] >= (dimRes-1)) {
+                                    lowerInd[kk] = dimRes-2;
+                                }
                             }
+
+//                            if (idx == (noPaths-1)) {
+//                                printf("got here 16\n");
+//                            }
 
                             // Index for unit profit state variable
                             lower[noSpecies] = regression[ii*noControls*(dimRes
@@ -1809,9 +1925,13 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
 
                             if (lowerInd[noSpecies] < 0) {
                                 lowerInd[noSpecies] = 0;
-                            } else if (lowerInd[noSpecies] >= dimRes) {
+                            } else if (lowerInd[noSpecies] >= (dimRes-1)) {
                                 lowerInd[noSpecies] = dimRes-2;
                             }
+
+//                            if (idx == (noPaths-1)) {
+//                                printf("got here 17\n");
+//                            }
 
                             // Now that we have all the index requirements,
                             // let's interpolate.
@@ -1891,6 +2011,10 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
     //                                    regression[idxU]*xd;
                             }
 
+//                            if (idx == (noPaths-1)) {
+//                                printf("got here 18\n");
+//                            }
+
                             // Now we work our way down the dimensions using our
                             // computed coefficients to get the interpolated value.
                             for (int kk = 1; kk <= noSpecies; kk++) {
@@ -1918,7 +2042,21 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                                 }
                             }
 
-                            payoffs[jj] = currPayoffs[jj] + coeffs[0];
+//                            if (idx == (noPaths-1)) {
+//                                printf("got here 19\n");
+//                            }
+
+                            // Due to the statistical nature of regression, we may end
+                            // up with positive values when we interpolate. Therefore,
+                            // we choose the maximum (least negative) value of the
+                            // regression and zero.
+                            double condExpIdx = coeffs[0]/(1+rrr*timeStep/100);
+
+                            if (condExpIdx > 0) {
+                                condExpIdx = 0.0;
+                            }
+
+                            payoffs[ii] = currPayoffs[ii] + condExpIdx;
 
                             free(lower);
                             free(upper);
@@ -1929,6 +2067,10 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                         currPayoffs[jj] = NAN;
                         payoffs[jj] = NAN;
                     }
+
+//                    if (idx == (noPaths-1)) {
+//                        printf("got here 20\n");
+//                    }
                 }
 
                 // Initialise the conditional expectations for this path at this
@@ -1936,7 +2078,7 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                 // no traffic flow will have a finite payoff as it is always a
                 // valid option. We select the control with the lowest overall
                 // payoff.
-                float currMax = currPayoffs[0];
+                float currMax = payoffs[0];
                 bestCont = 0;
 
                 for (int jj = 1; jj < noControls; jj++) {
@@ -1951,7 +2093,11 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
                 // Now add the discounted cash flow for the current period for
                 // the control with the optimal payoff to the retained values
                 // for the optimal path value at this time step.
-                conditionalExp += currMax/(1+rrr/(100*timeStep));
+                conditionalExp += currPayoffs[bestCont]/(1+rrr/(100*timeStep));
+
+//                if (idx == (noPaths-1)) {
+//                    printf("got here 21\n");
+//                }
             }
 
             free(state);
@@ -1959,7 +2105,11 @@ __global__ void optimalForwardPaths(int start, int noPaths, int nYears, int
         // We don't need to keep the optimal control at this stage but can
         // easily store it later if we wish.
 
-        condExp[start*noPaths + idx] = conditionalExp;
+//        condExp[start*noPaths + idx] = conditionalExp;
+
+//        if (idx == (noPaths-1)) {
+//            printf("got here 22\n");
+//        }
 
         // Free memory
         free(payoffs);
@@ -2343,7 +2493,7 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
 
                         if (lowerInd[jj] < 0) {
                             lowerInd[jj] = 0;
-                        } else if (lowerInd[jj] >= dimRes) {
+                        } else if (lowerInd[jj] >= (dimRes-1)) {
                             lowerInd[jj] = dimRes-2;
                         }
                     }
@@ -2364,7 +2514,7 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
 
                     if (lowerInd[noSpecies] < 0) {
                         lowerInd[noSpecies] = 0;
-                    } else if (lowerInd[noSpecies] >= dimRes) {
+                    } else if (lowerInd[noSpecies] >= (dimRes-1)) {
                         lowerInd[noSpecies] = dimRes-2;
                     }
 
@@ -2473,21 +2623,33 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
             // stage using the optimal control. Again, the first control of
             // no traffic flow will have a finite payoff as it is always a
             // valid option. We select the control with the lowest overall
-            // payoff.
+            // payoff (i.e. highest profit).
 
-            float bestExp = currPayoffs[0];
+//            float bestExp = currPayoffs[0];
+//            int bestCont = 0;
+
+//            for (int ii = 1; ii < noControls; ii++) {
+//                if (isfinite(payoffs[ii])) {
+//                    if (payoffs[ii] < bestExp) {
+//                        bestExp = currPayoffs[ii];
+//                        bestCont = ii;
+//                    }
+//                }
+//            }
+
+            float bestExp = payoffs[0];
             int bestCont = 0;
 
             for (int ii = 1; ii < noControls; ii++) {
                 if (isfinite(payoffs[ii])) {
                     if (payoffs[ii] < bestExp) {
-                        bestExp = currPayoffs[ii];
+                        bestExp = payoffs[ii];
                         bestCont = ii;
                     }
                 }
             }
 
-            condExp[start*noPaths + idx] = payoffs[bestCont];
+            condExp[start*noPaths + idx] = bestExp;
             optCont[start*noPaths + idx] = bestCont;
 
 //            printf("Test: %f %f %d\n",adjPops[idx],condExp[start*noPaths + idx],optCont[start*noPaths + idx]);
@@ -2525,6 +2687,62 @@ __global__ void destroyHandles(cublasHandle_t* handles, int noThreads) {
         cublasStatus_t status = cublasDestroy_v2(handles[idx]);
     }
 }
+
+// If evaluation of the linear regression model results in a positive
+// value for the payoff function at a particular point, a zero is
+// recorded instead (i.e. the control is not picked).
+__global__ void buildGlobalLinReg(int noPoints, int noDims, int dimRes, int
+        nYears, int noControls, int year, int control, float* regCoeffs,
+        float* xmins, float* xmaxes, float* regression) {
+
+    // Global thread index
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+    if (idx < noPoints) {
+        // First, deconstruct the index into the index along each dimension
+        int *dimIdx;
+        dimIdx = (int*)malloc(noDims*sizeof(int));
+
+        int rem = idx;
+
+        for (int ii = 0; ii < noDims; ii++) {
+            int div = (int)(rem/pow(dimRes,noDims-ii-1));
+            dimIdx[ii] = div;
+            rem = rem - div*pow(dimRes,noDims-ii-1);
+        }
+
+        // Get the query point coordinates
+        float *xQ;
+        xQ = (float*)malloc(noDims*sizeof(float));
+
+        for (int ii = 0; ii < noDims; ii++) {
+            xQ[ii] = ((float)dimIdx[ii])*(xmaxes[control*noDims + ii] -
+                    xmins[control*noDims + ii])/(float)dimRes +
+                    xmins[control*noDims + ii];
+        }
+
+        // Use the regression coefficients to compute the value at this query
+        // point
+        float computed = regCoeffs[0];
+
+        for (int ii = 0; ii < noDims; ii++) {
+            computed += xQ[ii]*regCoeffs[ii+1];
+        }
+
+        if (computed >= 0) {
+            computed = 0;
+        }
+
+        regression[year*noControls*(dimRes*noDims + (int)pow(dimRes,noDims)*2)
+                + control*(dimRes*noDims + (int)pow(dimRes,noDims)*2) + dimRes*
+                noDims + idx] = computed;
+
+        // Free memory
+        free(xQ);
+        free(dimIdx);
+    }
+}
+
 
 // Multiple local linear regression. Makes use of LU decomposition for
 // solving the linear equations. Does not use cuBlas.
@@ -3295,8 +3513,8 @@ void SimulateGPU::simulateMTECUDA(SimulatorPtr sim,
             speciesParams[3] = srp[ii]->getSpecies()->getThreshold()*varParams
                     ->getPopulationLevels()(scenario->getPopLevel());
             speciesParams[4] = srp[ii]->getSpecies()->getGrowthRate()->
-                    getMRStrength()*varParams->getGrowthRateSDMultipliers()(
-                    scenario->getPopGRSD());
+                    getMRStrength()/**varParams->getGrowthRateSDMultipliers()(
+                    scenario->getPopGRSD())*/;
             speciesParams[5] = srp[ii]->getSpecies()->getGrowthRate()->
                     getPoissonJump()*varParams->getGrowthRateSDMultipliers()(
                     scenario->getPopGRSD());
@@ -3476,7 +3694,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     ///////////////////////////////////////////////////////////////////////////
     time_t begin;
     time_t end;
-    double regressionsTime = 0;
+//    double regressionsTime = 0;
     double pathsTime = 0;
     ///////////////////////////////////////////////////////////////////////////
 
@@ -3489,7 +3707,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
         // Scaling for relative importance of species population to unit profit
         // used in regressions.
-        float scaling = 1.0;
+        float scaling = 4;
 
         // Get general properties
         OptimiserPtr optimiser = sim->getRoad()->getOptimiser();
@@ -3504,7 +3722,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
         /////////////////////////////////////////
         // Plot the surrogate
-//        GnuplotPtr plotPtr(new Gnuplot);
+        GnuplotPtr plotPtr(new Gnuplot);
         /////////////////////////////////////////
 
         // Get important values for computation
@@ -3595,8 +3813,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                     getThreshold()*varParams->getPopulationLevels()(scenario->
                     getPopLevel());
             speciesParams[counter1+4] = (float)srp[ii]->getSpecies()->
-                    getGrowthRate()->getMRStrength()*varParams->
-                    getGrowthRateSDMultipliers()(scenario->getPopGRSD());
+                    getGrowthRate()->getMRStrength()/**varParams->
+                    getGrowthRateSDMultipliers()(scenario->getPopGRSD())*/;
             speciesParams[counter1+5] = (float)srp[ii]->getSpecies()->
                     getGrowthRate()->getPoissonJump()*varParams->
                     getGrowthRateSDMultipliers()(scenario->getPopGRSD());
@@ -3615,8 +3833,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                     getCommodityMultipliers()(scenario->getCommodity());
             uncertParams[6*ii+2] = (float)fuels[ii]->getNoiseSD()*varParams->
                     getCommoditySDMultipliers()(scenario->getCommoditySD());
-            uncertParams[6*ii+3] = (float)fuels[ii]->getMRStrength()*varParams
-                    ->getCommoditySDMultipliers()(scenario->getCommoditySD());
+            uncertParams[6*ii+3] = (float)fuels[ii]->getMRStrength()/**varParams
+                    ->getCommoditySDMultipliers()(scenario->getCommoditySD())*/;
             uncertParams[6*ii+4] = (float)fuels[ii]->getPoissonJump()*varParams
                     ->getCommoditySDMultipliers()(scenario->getCommoditySD());
             uncertParams[6*ii+5] = (float)fuels[ii]->getJumpProb()*varParams->
@@ -4085,144 +4303,227 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                             sizeof(int),cudaMemcpyDeviceToHost));
 
                     for (int jj = 0; jj < noControls; jj++) {
-                        // Let k be the natural logarithm of the number of data
-                        // points
-                        int k = 3*(log(dataPoints[jj]) + 1);
+                        bool localReg = false;
 
-                        // We first need to perform a k nearest neighbour
-                        // search
-                        Eigen::MatrixXf ref(dataPoints[jj],noDims);
-                        Eigen::MatrixXf query((int)pow(dimRes,noDims),noDims);
-                        Eigen::MatrixXf dist((int)pow(dimRes,noDims),k);
-                        Eigen::MatrixXi ind((int)pow(dimRes,noDims),k);
-
-                        float *d_queryPts, *d_dist;
-                        int *d_ind;
-                        CUDA_CALL(cudaMalloc((void**)&d_queryPts,pow(dimRes,
-                                noDims)*noDims*sizeof(float)));
-                        CUDA_CALL(cudaMalloc((void**)&d_dist,pow(dimRes,noDims)
-                                *k*sizeof(float)));
-                        CUDA_CALL(cudaMalloc((void**)&d_ind,pow(dimRes,noDims)
-                                *k*sizeof(int)));
-
-                        createQueryPoints<<<noBlocks2,maxThreadsPerBlock2>>>(
-                                (int)pow(dimRes,noDims),noDims,dimRes,jj,
-                                noControls,ii,d_xmins,d_xmaxes,d_regression,
-                                d_queryPts);
-                        CUDA_CALL(cudaPeekAtLastError());
-                        CUDA_CALL(cudaDeviceSynchronize());
-
-                        CUDA_CALL(cudaMemcpy(query.data(),d_queryPts,pow(
-                                dimRes,noDims)*noDims*sizeof(float),
-                                cudaMemcpyDeviceToHost));
-                        CUDA_CALL(cudaFree(d_queryPts));
-
-                        // Transfer sample data points to the host
-                        for (int kk = 0; kk < noDims; kk++) {
-                            CUDA_CALL(cudaMemcpy(ref.data() + kk*dataPoints[
-                                    jj],d_xvals + jj*noPaths*noDims + kk*
-                                    noPaths,dataPoints[jj]*sizeof(float),
-                                    cudaMemcpyDeviceToHost));
-                        }
-
-                        // Send the reference point data to a temporary array
-                        // for use in the multiple local linear regression.
-                        float* d_refX;
-                        CUDA_CALL(cudaMalloc((void**)&d_refX,dataPoints[jj]*
-                                noDims*sizeof(float)));
-                        CUDA_CALL(cudaMemcpy(d_refX,ref.data(),dataPoints[jj]*
-                                noDims*sizeof(float),cudaMemcpyHostToDevice));
-
-                        // We need to normalise in each dimension before
-                        // performing the regression. (We also convert the unit
-                        // profit component to a log scale. NOT IMPLEMENTED
-                        // YET). As the profit component is not as important as
-                        // the population component for making immediate
-                        // decisions, we give it a smaller scale. We
-                        // arbitrarily choose a factor of 4 for now.
                         Eigen::VectorXf xmins(noDims);
                         Eigen::VectorXf xmaxes(noDims);
                         CUDA_CALL(cudaMemcpy(xmins.data(),d_xmins,noDims*
                                 sizeof(float),cudaMemcpyDeviceToHost));
                         CUDA_CALL(cudaMemcpy(xmaxes.data(),d_xmaxes,noDims*
                                 sizeof(float),cudaMemcpyDeviceToHost));
-                        // Species components
-                        for(int kk = 0; kk < (noDims-1); kk++) {
-                            ref.block(0,kk,dataPoints[jj],1) = (ref.block(0,kk,
-                                    dataPoints[jj],1).array() - xmins(kk))/(
-                                    xmaxes(kk) - xmins(kk));
-                            query.block(0,kk,pow(dimRes,noDims),1) = (query.
-                                    block(0,kk,pow(dimRes,noDims),1).array() -
-                                    xmins(kk))/(xmaxes(kk) - xmins(kk));
+
+                        // Transfer sample data points to the host
+                        Eigen::MatrixXf refX(dataPoints[jj],noDims);
+                        Eigen::MatrixXf refY(dataPoints[jj],1);
+
+                        // Transfer sample data points to the host
+                        // X values
+                        for (int kk = 0; kk < noDims; kk++) {
+                            CUDA_CALL(cudaMemcpy(refX.data() + kk*dataPoints[
+                                    jj],d_xvals + jj*noPaths*noDims + kk*
+                                    noPaths,dataPoints[jj]*sizeof(float),
+                                    cudaMemcpyDeviceToHost));
                         }
-                        // Profit component
-                        ref.block(0,(noDims-1),dataPoints[jj],1) = (ref.block(
-                                0,(noDims-1),dataPoints[jj],1).array() - xmins(
-                                (noDims-1)))/(scaling*(xmaxes((noDims-1)) -
-                                xmins((noDims -1))));
-                        query.block(0,(noDims-1),pow(dimRes,noDims),1) = (query
-                                .block(0,(noDims-1),pow(dimRes,noDims),1).
-                                array() - xmins((noDims-1)))/(scaling*(xmaxes((
-                                noDims-1)) - xmins((noDims-1))));
 
-                        // Compute the knn searches
-                        knn_cuda_with_indexes::knn(ref.data(),dataPoints[jj],
-                                query.data(),pow(dimRes,noDims),noDims,k,dist
-                                .data(),ind.data());
-                        CUDA_CALL(cudaPeekAtLastError());
-                        CUDA_CALL(cudaDeviceSynchronize());
+                        // Y Values
+                        CUDA_CALL(cudaMemcpy(refY.data(),d_yvals + jj*noPaths,
+                                dataPoints[jj]*sizeof(float),cudaMemcpyDeviceToHost));
 
-                        CUDA_CALL(cudaMemcpy(d_dist,dist.data(),pow(dimRes,
-                                noDims)*k*sizeof(float),
-                                cudaMemcpyHostToDevice));
+                        if (localReg) {
+                            ///////////////////////////////////////////////////////
+                            // MULTI-LOC LIN REG APPROACH /////////////////////////
+                            // Let k be the natural logarithm of the number of data
+                            // points
+                            int k = 30*(log(dataPoints[jj]) + 1);
 
-                        CUDA_CALL(cudaMemcpy(d_ind,ind.data(),pow(dimRes,
-                                noDims)*k*sizeof(float),
-                                cudaMemcpyHostToDevice));
+                            // We first need to perform a k nearest neighbour
+                            // search
+                            Eigen::MatrixXf query((int)pow(dimRes,noDims),noDims);
+                            Eigen::MatrixXf dist((int)pow(dimRes,noDims),k);
+                            Eigen::MatrixXi ind((int)pow(dimRes,noDims),k);
 
-                        // Due to normalisation, we need to make the minimum
-                        // and maximum values for each dimension 0 and 1,
-                        // respectively.
-                        float *d_xminsN, *d_xmaxesN;
-                        Eigen::VectorXf xminsN = Eigen::VectorXf::Zero(noDims);
-                        Eigen::VectorXf xmaxesN = Eigen::VectorXf::Constant(
-                                noDims,1);
-                        CUDA_CALL(cudaMalloc((void**)&d_xminsN,noDims*sizeof(
-                                float)));
-                        CUDA_CALL(cudaMalloc((void**)&d_xmaxesN,noDims*sizeof(
-                                float)));
-                        CUDA_CALL(cudaMemcpy(d_xminsN,xminsN.data(),noDims*
-                                sizeof(float),cudaMemcpyHostToDevice));
-                        CUDA_CALL(cudaMemcpy(d_xmaxesN,xmaxesN.data(),noDims*
-                                sizeof(float),cudaMemcpyHostToDevice));
+                            float *d_queryPts, *d_dist;
+                            int *d_ind;
+                            CUDA_CALL(cudaMalloc((void**)&d_queryPts,pow(dimRes,
+                                    noDims)*noDims*sizeof(float)));
+                            CUDA_CALL(cudaMalloc((void**)&d_dist,pow(dimRes,noDims)
+                                    *k*sizeof(float)));
+                            CUDA_CALL(cudaMalloc((void**)&d_ind,pow(dimRes,noDims)
+                                    *k*sizeof(int)));
 
-                        // Perform the regression for this control at this time
-                        // at each of the query points.
-                        multiLocLinReg<<<noBlocks2,maxThreadsPerBlock2>>>((int)
-                                pow(dimRes,noDims),noDims,dimRes,nYears,
-                                noControls,ii,jj,k,d_dataPoints,d_refX,d_yvals+
-                                jj*noPaths,d_regression,d_xminsN,d_xmaxesN,
-                                d_dist,d_ind);
-                        CUDA_CALL(cudaPeekAtLastError());
-                        CUDA_CALL(cudaDeviceSynchronize());
+                            createQueryPoints<<<noBlocks2,maxThreadsPerBlock2>>>(
+                                    (int)pow(dimRes,noDims),noDims,dimRes,jj,
+                                    noControls,ii,d_xmins,d_xmaxes,d_regression,
+                                    d_queryPts);
+                            CUDA_CALL(cudaPeekAtLastError());
+                            CUDA_CALL(cudaDeviceSynchronize());
 
-                        CUDA_CALL(cudaFree(d_dist));
-                        CUDA_CALL(cudaFree(d_ind));
-                        CUDA_CALL(cudaFree(d_refX));
-                        CUDA_CALL(cudaFree(d_xminsN));
-                        CUDA_CALL(cudaFree(d_xmaxesN));
+                            CUDA_CALL(cudaMemcpy(query.data(),d_queryPts,pow(
+                                    dimRes,noDims)*noDims*sizeof(float),
+                                    cudaMemcpyDeviceToHost));
+                            CUDA_CALL(cudaFree(d_queryPts));
 
-//                        // Test plots /////////////////////////////////////////////
+                            // Send the reference point data to a temporary array
+                            // for use in the multiple local linear regression.
+                            float* d_refX;
+                            CUDA_CALL(cudaMalloc((void**)&d_refX,dataPoints[jj]*
+                                    noDims*sizeof(float)));
+                            CUDA_CALL(cudaMemcpy(d_refX,refX.data(),dataPoints[jj]*
+                                    noDims*sizeof(float),cudaMemcpyHostToDevice));
+
+                            // We need to normalise in each dimension before
+                            // performing the regression. (We also convert the unit
+                            // profit component to a log scale. NOT IMPLEMENTED
+                            // YET). As the profit component is not as important as
+                            // the population component for making immediate
+                            // decisions, we give it a smaller scale. We
+                            // arbitrarily choose a factor of 4 for now.
+
+                            // Species components
+                            for(int kk = 0; kk < (noDims-1); kk++) {
+                                refX.block(0,kk,dataPoints[jj],1) = (refX.block(0,kk,
+                                        dataPoints[jj],1).array() - xmins(kk))/(
+                                        xmaxes(kk) - xmins(kk));
+                                query.block(0,kk,pow(dimRes,noDims),1) = (query.
+                                        block(0,kk,pow(dimRes,noDims),1).array() -
+                                        xmins(kk))/(xmaxes(kk) - xmins(kk));
+                            }
+                            // Profit component
+                            refX.block(0,(noDims-1),dataPoints[jj],1) = (refX.block(
+                                    0,(noDims-1),dataPoints[jj],1).array() - xmins(
+                                    (noDims-1)))/(scaling*(xmaxes((noDims-1)) -
+                                    xmins((noDims -1))));
+                            query.block(0,(noDims-1),pow(dimRes,noDims),1) = (query
+                                    .block(0,(noDims-1),pow(dimRes,noDims),1).
+                                    array() - xmins((noDims-1)))/(scaling*(xmaxes((
+                                    noDims-1)) - xmins((noDims-1))));
+
+                            // Compute the knn searches
+                            knn_cuda_with_indexes::knn(refX.data(),dataPoints[jj],
+                                    query.data(),pow(dimRes,noDims),noDims,k,dist
+                                    .data(),ind.data());
+                            CUDA_CALL(cudaPeekAtLastError());
+                            CUDA_CALL(cudaDeviceSynchronize());
+
+                            CUDA_CALL(cudaMemcpy(d_dist,dist.data(),pow(dimRes,
+                                    noDims)*k*sizeof(float),
+                                    cudaMemcpyHostToDevice));
+
+                            CUDA_CALL(cudaMemcpy(d_ind,ind.data(),pow(dimRes,
+                                    noDims)*k*sizeof(float),
+                                    cudaMemcpyHostToDevice));
+
+                            // Due to normalisation, we need to make the minimum
+                            // and maximum values for each dimension 0 and 1,
+                            // respectively.
+                            float *d_xminsN, *d_xmaxesN;
+                            Eigen::VectorXf xminsN = Eigen::VectorXf::Zero(noDims);
+                            Eigen::VectorXf xmaxesN = Eigen::VectorXf::Constant(
+                                    noDims,1);
+                            CUDA_CALL(cudaMalloc((void**)&d_xminsN,noDims*sizeof(
+                                    float)));
+                            CUDA_CALL(cudaMalloc((void**)&d_xmaxesN,noDims*sizeof(
+                                    float)));
+                            CUDA_CALL(cudaMemcpy(d_xminsN,xminsN.data(),noDims*
+                                    sizeof(float),cudaMemcpyHostToDevice));
+                            CUDA_CALL(cudaMemcpy(d_xmaxesN,xmaxesN.data(),noDims*
+                                    sizeof(float),cudaMemcpyHostToDevice));
+
+                            // Perform the regression for this control at this time
+                            // at each of the query points.
+                            multiLocLinReg<<<noBlocks2,maxThreadsPerBlock2>>>((int)
+                                    pow(dimRes,noDims),noDims,dimRes,nYears,
+                                    noControls,ii,jj,k,d_dataPoints,d_refX,d_yvals+
+                                    jj*noPaths,d_regression,d_xminsN,d_xmaxesN,
+                                    d_dist,d_ind);
+                            CUDA_CALL(cudaPeekAtLastError());
+                            CUDA_CALL(cudaDeviceSynchronize());
+
+                            CUDA_CALL(cudaFree(d_dist));
+                            CUDA_CALL(cudaFree(d_ind));
+                            CUDA_CALL(cudaFree(d_refX));
+                            CUDA_CALL(cudaFree(d_xminsN));
+                            CUDA_CALL(cudaFree(d_xmaxesN));
+                        } else {
+                            // GLOBAL LINEAR REGRESSION APPROACH //////////////////
+                            // We first need to create a map of query points for
+                            // the regressions
+                            Eigen::MatrixXf query((int)pow(dimRes,noDims),noDims);
+
+                            float *d_queryPts;
+                            CUDA_CALL(cudaMalloc((void**)&d_queryPts,pow(dimRes,
+                                    noDims)*noDims*sizeof(float)));
+
+                            createQueryPoints<<<noBlocks2,maxThreadsPerBlock2>>>(
+                                    (int)pow(dimRes,noDims),noDims,dimRes,jj,
+                                    noControls,ii,d_xmins,d_xmaxes,d_regression,
+                                    d_queryPts);
+                            CUDA_CALL(cudaPeekAtLastError());
+                            CUDA_CALL(cudaDeviceSynchronize());
+
+                            CUDA_CALL(cudaMemcpy(query.data(),d_queryPts,pow(
+                                    dimRes,noDims)*noDims*sizeof(float),
+                                    cudaMemcpyDeviceToHost));
+                            CUDA_CALL(cudaFree(d_queryPts));
+
+                            // Perform the global regression. This kernel is run on
+                            // the GPU to simply avoid memory transfers. It does
+                            // not make use of parallel computation.
+                            Eigen::MatrixXf regCoeffs(noDims+1,1);
+
+                            // We only want to consider points that are on the sloping
+                            // hyperplane with a non-zero payoff. Therefore, we remove
+                            // data points from our analysis where the points do not
+                            // appear to be on such a hyperplane.
+                            Eigen::MatrixXf refXValid(dataPoints[jj],noDims);
+                            Eigen::MatrixXf refYValid(dataPoints[jj],1);
+                            int finalPoints = 0;
+
+                            SimulateGPU::keepValidPoints(noDims,dataPoints[jj],
+                                    refX.data(),refY.data(),refXValid.data(),
+                                    refYValid.data(),finalPoints);
+
+//                            std::cout << finalPoints << std::endl;
+
+                            SimulateGPU::multiLinReg(finalPoints,noDims,
+                                    refXValid.data(),refYValid.data(),regCoeffs.data());
+
+//                            std::cout << regCoeffs(0) << std::endl;
+//                            std::cout << regCoeffs(1) << std::endl;
+//                            std::cout << regCoeffs(2) << std::endl;
+
+                            float *d_regCoeffs;
+                            CUDA_CALL(cudaMalloc((void**)&d_regCoeffs,(noDims+1)*
+                                    sizeof(float)));
+                            CUDA_CALL(cudaMemcpy(d_regCoeffs,regCoeffs.data(),
+                                    (noDims+1)*sizeof(float),cudaMemcpyHostToDevice));
+
+                            buildGlobalLinReg<<<noBlocks2,maxThreadsPerBlock2>>>(
+                                    (int)pow(dimRes,noDims),noDims,dimRes,nYears,noControls,
+                                    ii,jj,d_regCoeffs,d_xmins,d_xmaxes,d_regression);
+                            CUDA_CALL(cudaPeekAtLastError());
+                            CUDA_CALL(cudaDeviceSynchronize());
+
+                            CUDA_CALL(cudaFree(d_regCoeffs));
+                        }
+
+//                        ///////////////////////////////////////////////////////
+//                        // Test plots /////////////////////////////////////////
 //                        // Prepare raw data
-//                        for(int kk = 0; kk < (noDims-1); kk++) {
-//                            ref.block(0,kk,dataPoints[jj],1) = (ref.block(0,kk,
-//                                    dataPoints[jj],1)*(xmaxes(kk) - xmins(kk)))
-//                                    .array() + xmins(kk);
-//                        }
 
-//                        ref.block(0,noDims-1,dataPoints[jj],1) = (ref.block(0,
-//                                noDims-1,dataPoints[jj],1)*(scaling*(xmaxes(noDims
-//                                -1) - xmins(noDims-1)))).array() + xmins(noDims-1);
+//                        if (localReg) {
+//                            // Local regression scaled the data previously. We
+//                            // need to undo this
+//                            for(int kk = 0; kk < (noDims-1); kk++) {
+//                                refX.block(0,kk,dataPoints[jj],1) = (refX.block(0,kk,
+//                                        dataPoints[jj],1)*(xmaxes(kk) - xmins(kk)))
+//                                        .array() + xmins(kk);
+//                            }
+
+//                            refX.block(0,noDims-1,dataPoints[jj],1) = (refX.block(0,
+//                                    noDims-1,dataPoints[jj],1)*(scaling*(xmaxes(noDims
+//                                    -1) - xmins(noDims-1)))).array() + xmins(noDims-1);
+//                        }
 
 //    //                    ref.block(0,1,dataPoints[jj],1) = (-1*((ref.block(0,1,
 //    //                            dataPoints[jj],1)*(xmaxes(1) - xmins(1)))
@@ -4239,8 +4540,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
 //                        for (int kk = 0; kk < dataPoints[jj]; kk++) {
 //                            raw[kk].resize(noDims+1);
-//                            raw[kk][0] = ref.data()[kk];
-//                            raw[kk][1] = ref.data()[dataPoints[jj] + kk];
+//                            raw[kk][0] = refX.data()[kk];
+//                            raw[kk][1] = refX.data()[dataPoints[jj] + kk];
 //                            raw[kk][2] = yVals(kk);
 //                        }
 
@@ -4298,7 +4599,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 //                        (*plotPtr).send1d(raw);
 //                        (*plotPtr).flush();
 
-                        ///////////////////////////////////////////////////////
+//                        ///////////////////////////////////////////////////////
                     }
 
                     free(dataPoints);
@@ -4373,10 +4674,10 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
     //            time_t begin = clock();
 
                 ///////////////////////////////////////////////////////////////////////////
-                begin = clock();
+//                begin = clock();
                 ///////////////////////////////////////////////////////////////////////////
                 optimalForwardPaths<<<noBlocks,maxThreadsPerBlock1,maxElems*
-                        maxThreadsPerBlock1*sizeof(float)>>>(nYears,noPaths,
+                        maxThreadsPerBlock1*sizeof(float)>>>(nYears-1,noPaths,
                         nYears,srp.size(),patches,noControls,noUncertainties,
                         stepSize,unitCost,unitRevenue,rrr,fuels.size(),
                         commodities.size(),dimRes,d_flowRates,d_fuelCosts,
@@ -4389,8 +4690,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 CUDA_CALL(cudaDeviceSynchronize());
 
                 ///////////////////////////////////////////////////////////////////////////
-                end = clock();
-                pathsTime += double(end - begin)/CLOCKS_PER_SEC;
+//                end = clock();
+//                pathsTime += double(end - begin)/CLOCKS_PER_SEC;
                 ///////////////////////////////////////////////////////////////////////////
 
 
@@ -4406,7 +4707,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 // Copy the adjusted populations to the output variable. This
                 // is only provided for completeness. The algorithm does not
                 // use the results as they pertain to the very last time step.
-                CUDA_CALL(cudaMemcpy(adjPopsF[nYears].data(),d_adjPops,srp.
+                CUDA_CALL(cudaMemcpy(adjPopsF[nYears-1].data(),d_adjPops,srp.
                         size()*noPaths*sizeof(float),cudaMemcpyDeviceToHost));
 
                 // Find the maximum and minimum x value along each dimension
@@ -4421,7 +4722,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 // For each backward step not including the last period, we
                 // need to determine the adjusted population for each species
                 // and the unit payoffs.
-                for (int ii = nYears-1; ii > 0; ii--) {
+                for (int ii = nYears-2; ii > 0; ii--) {
                     // Perform regression and save results
                     int noBlocks2 = (int)((int)pow(dimRes,noDims)*noControls %
                             maxThreadsPerBlock) ? (int)(pow(dimRes,noDims)*
@@ -4484,6 +4785,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                             sizeof(int),cudaMemcpyDeviceToHost));
 
                     for (int jj = 0; jj < noControls; jj++) {
+                        ///////////////////////////////////////////////////////
+                        // MULTI-LOC LIN REG //////////////////////////////////
                         // Let k be the natural logarithm of the number of data
                         // points
                         int k = 3*(log(dataPoints[jj]) + 1);
@@ -4598,7 +4901,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                         // Perform the regression for this control at this time
                         // at each of the query points.
                         ///////////////////////////////////////////////////////////////////////////
-                        begin = clock();
+//                        begin = clock();
                         ///////////////////////////////////////////////////////////////////////////
                         multiLocLinReg<<<noBlocks2,maxThreadsPerBlock2>>>((int)
                                 pow(dimRes,noDims),noDims,dimRes,nYears,
@@ -4608,8 +4911,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                         CUDA_CALL(cudaPeekAtLastError());
                         CUDA_CALL(cudaDeviceSynchronize());
                         ///////////////////////////////////////////////////////////////////////////
-                        end = clock();
-                        regressionsTime += double(end - begin)/CLOCKS_PER_SEC;
+//                        end = clock();
+//                        regressionsTime += double(end - begin)/CLOCKS_PER_SEC;
                         ///////////////////////////////////////////////////////////////////////////
 
                         CUDA_CALL(cudaFree(d_dist));
@@ -4617,6 +4920,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                         CUDA_CALL(cudaFree(d_refX));
                         CUDA_CALL(cudaFree(d_xminsN));
                         CUDA_CALL(cudaFree(d_xmaxesN));
+
+                        // GLOBAL LIN REG /////////////////////////////////////
 
 //                        // Test plots /////////////////////////////////////////////
 //                        // Prepare raw data
@@ -4715,8 +5020,9 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
                     // Recompute forward paths
                     ///////////////////////////////////////////////////////////////////////////
-                    begin = clock();
+//                    begin = clock();
                     ///////////////////////////////////////////////////////////////////////////
+                    std::cout << ii << std::endl;
                     optimalForwardPaths<<<noBlocks,maxThreadsPerBlock1,maxElems
                             *maxThreadsPerBlock1*sizeof(float)>>>(ii,noPaths,
                             nYears,srp.size(),patches,noControls,
@@ -4730,8 +5036,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                     CUDA_CALL(cudaPeekAtLastError());
                     CUDA_CALL(cudaDeviceSynchronize());
                     ///////////////////////////////////////////////////////////////////////////
-                    end = clock();
-                    pathsTime += double(end - begin)/CLOCKS_PER_SEC;
+//                    end = clock();
+//                    pathsTime += double(end - begin)/CLOCKS_PER_SEC;
                     ///////////////////////////////////////////////////////////////////////////
 
                     // Copy the adjusted populations for this time step to the
@@ -5047,17 +5353,17 @@ void SimulateGPU::buildSurrogateROVCUDA(RoadGAPtr op, int device) {
         if (samples < 50) {
             k = 5;
         } else if (samples < 100) {
-            k = 7;
+            k = (int)(5+5*ceil((samples-50)/50));
         } else if (samples < 500) {
-            k = (int)ceil(0.02*(samples-100)+5);
+            k = (int)ceil(10+15*ceil((samples-100)/400));
         } else {
-            k = (int)ceil(log(samples)+8);
+            k = (int)(25+ceil((samples-500)*0.02));
         }
 
         k = min(samples,k);
 
         // Adjust for the number of dimensions
-        k = k*pow(2,noDims-1);
+        //k = k*pow(2,noDims-1);
 
         // Convert to floating point
         Eigen::VectorXf surrogateF(dimRes*noDims+pow(dimRes,noDims));
@@ -5330,6 +5636,26 @@ void SimulateGPU::dense2Sparse(float* denseIn, int rows, int cols,
     totalElements = it_1;
 }
 
+// Global linear regression pre-processing
+void SimulateGPU::keepValidPoints(int dims, int originalPoints, float* refXIn,
+        float* refYIn, float* refXOut, float* refYOut, int& outPoints) {
+
+    outPoints = 0;
+
+    // We only keep points that have negative y values
+    for (int ii = 0; ii < originalPoints; ii++) {
+        if (refYIn[ii] < -10.0) {
+            for (int jj = 0; jj < dims; jj++) {
+                refXOut[outPoints*dims + jj] = refXIn[ii + jj*originalPoints];
+//                std::cout << refXOut[outPoints*dims + jj] << "          ";
+            }
+            refYOut[outPoints] = refYIn[ii];
+//            std::cout << refYOut[outPoints] << std::endl;
+            outPoints++;
+        }
+    }
+}
+
 // Multiple global linear regression
 void SimulateGPU::multiLinReg(int noPoints, int noDims, float *xvals, float
         *yvals, float *X) {
@@ -5338,38 +5664,40 @@ void SimulateGPU::multiLinReg(int noPoints, int noDims, float *xvals, float
     A = (float*)malloc(pow(noDims+1,2)*sizeof(float));
     B = (float*)malloc((noDims+1)*sizeof(float));
 
-    for (int ii = 0; ii <= noDims; ii++) {
-        // Initialise values to zero
-        B[ii] = 0.0;
+    if (noPoints > (noDims+1)) {
+        for (int ii = 0; ii <= noDims; ii++) {
+            // Initialise values to zero
+            B[ii] = 0.0;
 
-        for (int jj = 0; jj < noPoints; jj++) {
-            if (ii == 0) {
-                B[ii] += yvals[jj];
-            } else {
-                B[ii] += yvals[jj]*xvals[jj*noDims+ii-1];
-            }
-        }
-
-        for (int jj = 0; jj <= noDims; jj++) {
-            A[jj*(noDims+1)+ii] = 0.0;
-
-            for (int kk = 0; kk < noPoints; kk++) {
-
-                if ((ii == 0) && (jj == 0)) {
-                    A[jj*(noDims+1)+ii] += 1.0;
-                } else if (ii == 0) {
-                    A[jj*(noDims+1)+ii] += (xvals[kk*noDims+ii-1]);
-                } else if (jj == 0) {
-                    A[jj*(noDims+1)+ii] += (xvals[kk*noDims+jj-1]);
+            for (int jj = 0; jj < noPoints; jj++) {
+                if (ii == 0) {
+                    B[ii] += yvals[jj];
                 } else {
-                    A[jj*(noDims+1)+ii] += (xvals[kk*noDims+ii-1])*
-                            (xvals[kk*noDims+jj-1]);
+                    B[ii] += yvals[jj]*xvals[jj*noDims+ii-1];
+                }
+            }
+
+            for (int jj = 0; jj <= noDims; jj++) {
+                A[jj*(noDims+1)+ii] = 0.0;
+
+                for (int kk = 0; kk < noPoints; kk++) {
+
+                    if ((ii == 0) && (jj == 0)) {
+                        A[jj*(noDims+1)+ii] += 1.0;
+                    } else if (ii == 0) {
+                        A[jj*(noDims+1)+ii] += (xvals[kk*noDims+jj-1]);
+                    } else if (jj == 0) {
+                        A[jj*(noDims+1)+ii] += (xvals[kk*noDims+ii-1]);
+                    } else {
+                        A[jj*(noDims+1)+ii] += (xvals[kk*noDims+ii-1])*
+                                (xvals[kk*noDims+jj-1]);
+                    }
                 }
             }
         }
-    }
 
-    SimulateGPU::solveLinearSystem(noDims+1,A,B,X);
+        SimulateGPU::solveLinearSystem(noDims+1,A,B,X);
+    }
 
     free(A);
     free(B);

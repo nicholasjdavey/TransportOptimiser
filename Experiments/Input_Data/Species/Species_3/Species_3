@@ -34,7 +34,7 @@ Initial Region Population                   : 2000
 Current                                     : 0.014
 Mean                                        : 0.014
 Standard Deviation                          : 0.005
-Reversion                                   : 0.1
+Reversion                                   : 0.02
 Jump Probability                            : 0.1
 Jump Poisson Parameter                      : 0.1
 
