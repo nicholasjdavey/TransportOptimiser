@@ -96,6 +96,19 @@ inline void gpuAssert(curandStatus_t code, const char *file, int line, bool
 
 // ASSISTANT KERNELS //////////////////////////////////////////////////////////
 
+// Compute the factorial of a number
+__device__ float factorialGPU(const int n) {
+    float result = 1;
+
+    if (n > 0) {
+        for (int ii = 1; ii <= n;ii++) {
+            result = result*ii;
+        }
+    }
+
+    return (float)result;
+}
+
 // The generator is used for creating pseudo-random numbers for a given array
 // of states (std_normal distribution)
 __device__ float generateNormal(curandState* globalState, const unsigned int
@@ -174,6 +187,35 @@ __device__ void solveLinearSystem(int dims, float *A, float *B, float *C) {
             C[jj] -= C[ii]*A[ii*dims+jj];
         }
     }
+}
+
+__device__ float interpolateQuad(int noDims, int year, int control, float*
+        xQ, float* regCoeffs) {
+    // Constant
+    float computed = regCoeffs[0];
+
+    // Linear Terms
+    for (int ii = 0; ii < noDims; ii++) {
+        computed += xQ[ii]*regCoeffs[ii+1];
+    }
+
+    // Quadratic and Interacting Terms
+    int counter = 0;
+    for (int ii = 0; ii < noDims; ii++) {
+        for (int jj = ii; jj < noDims; jj++) {
+            computed += xQ[ii]*xQ[jj]*regCoeffs[counter+1+noDims];
+            counter++;
+        }
+    }
+
+    // We know that a payoff cannot be greater than zero, so we adjust all
+    // conditional payoffs greater than zero to be zero.
+
+    if (computed >= 0.0) {
+        computed = 0.0;
+    }
+
+    return computed;
 }
 
 // Initialise the states for curand on each kernel
@@ -776,7 +818,7 @@ __global__ void forwardPathKernel(int noPaths, int nYears, int noSpecies,
 
         // Carry over the initial value for all uncertainties
         for (int ii = 0; ii < noUncertainties; ii++) {
-            uResults[idx*noUncertainties*nYears + ii] = uncertParams[ii*6];
+            uResults[idx*noUncertainties*(nYears+1) + ii] = uncertParams[ii*6];
         }
 
         float* grMean;
@@ -854,7 +896,8 @@ __global__ void forwardPathKernel(int noPaths, int nYears, int noSpecies,
                         totalPop += population;
 
                         // We only update the actual populations if we are in
-                        // the control that was selected.
+                        // the control that was selected. Save the total
+                        // population for the start of the next time period.
                         if (kk == control && ii < nYears) {
                             // Population growth based on a mean-reverting process
                             rgr[idx*noSpecies*noPatches*nYears + ii*noSpecies*
@@ -877,7 +920,7 @@ __global__ void forwardPathKernel(int noPaths, int nYears, int noSpecies,
                                     noPatches + jj*noPatches + ll];
                         }
                     }
-                    // Save AAR for this control
+                    // Save AAR for this control at this time
                     aars[idx*(nYears+1)*noControls*noSpecies + ii*noControls*
                             noSpecies + jj*noControls + kk] = totalPop/
                             initialPopulation;
@@ -891,7 +934,7 @@ __global__ void forwardPathKernel(int noPaths, int nYears, int noSpecies,
                         ii*noUncertainties + jj] < uncertParams[jj*6 + 5]) ?
                         1.0f : 0.0f;
 
-                float curr = uResults[idx*noUncertainties*nYears +
+                float curr = uResults[idx*noUncertainties*(nYears+1) +
                         ii*noUncertainties + jj];
                 float meanP = uncertParams[jj*6 + 1];
                 float reversion = uncertParams[jj*6 + 3];
@@ -902,7 +945,8 @@ __global__ void forwardPathKernel(int noPaths, int nYears, int noSpecies,
                         ii*noUncertainties + jj]*pow(uncertParams[jj*6 + 4],2)
                         - pow(uncertParams[jj*6 + 4],2)/2;
 
-                uResults[idx*noUncertainties*nYears+(ii+1)*noUncertainties+jj]
+                // Save the value of the uncertainty for the next time period
+                uResults[idx*noUncertainties*(nYears+1)+(ii+1)*noUncertainties+jj]
                         = curr + reversion*(meanP - curr)*timeStep +
                         curr*brownian + (exp(jumpSize) - 1)*curr*jump;
             }
@@ -945,13 +989,13 @@ __global__ void computePathStates(int noPaths, int noDims, int nYears, int
 
         // Compute the unit fuel cost component
         for (int ii = 0; ii < noFuels; ii++) {
-            unitFuel += fuelCosts[ii]*uResults[idx*nYears*noUncertainties +
+            unitFuel += fuelCosts[ii]*uResults[idx*(nYears+1)*noUncertainties +
                     (year)*noUncertainties + fuelIdx[ii]];
         }
         // Compute the unit revenue from ore
         for (int ii = 0; ii < noCommodities; ii++) {
             orePrice += uComposition[idx*nYears*noCommodities + (year)*
-                    noCommodities + ii]*uResults[idx*nYears*noUncertainties +
+                    noCommodities + ii]*uResults[idx*(nYears+1)*noUncertainties +
                     (year)*noUncertainties + noFuels + ii];
         }
 
@@ -964,7 +1008,7 @@ __global__ void computePathStates(int noPaths, int noDims, int nYears, int
 }
 
 // Allocates X (predictors) and corresponding response variables for multiple
-// local linear regression.
+// local linear regression for each control.
 __global__ void allocateXYRegressionData(int noPaths, int noControls, int
         noDims, int nYears, float* speciesParams, int year, int* controls,
         float* xin, float *condExp, int *dataPoints, float *xvals, float
@@ -974,47 +1018,53 @@ __global__ void allocateXYRegressionData(int noPaths, int noControls, int
         dataPoints[ii] = 0;
     }
 
-    // For each path
+//    // For each path
     for (int ii = 0; ii < noPaths; ii++) {
         if (controls[ii] >= noControls) {
             printf("Invalid control %d\n",controls[ii]);
         }
 
-        yvals[noPaths*controls[ii] + dataPoints[controls[ii]]] = condExp[(
-                year + 1)*noPaths + ii];
+        // NOT CHECKING VALIDITY
+//        yvals[noPaths*controls[ii] + dataPoints[controls[ii]]] = condExp[(
+//                year + 1)*noPaths + ii];
 
-        // Save the input dimension values to the corresponding data group
-        for (int jj = 0; jj < noDims; jj++) {
-            xvals[controls[ii]*noPaths*noDims + jj*noPaths + dataPoints[
-                    controls[ii]]] = xin[ii*noDims + jj];
+//        // Save the input dimension values to the corresponding data group
+//        for (int jj = 0; jj < noDims; jj++) {
+//            xvals[controls[ii]*noPaths*noDims + jj*noPaths + dataPoints[
+//                    controls[ii]]] = xin[ii*noDims + jj];
+//        }
+
+////        printf("%6d | %3d: %6.0f %15.0f %15.0f\n",ii,controls[ii],xin[ii*noDims],
+////                xin[ii*noDims + 1],yvals[noPaths*controls[ii] + dataPoints[controls[ii]]]);
+
+//        // Increment the number of data points for this control
+//        dataPoints[controls[ii]] += 1;
+
+        // CHECKING
+        // First check that the path is in-the-money. If it isn't we do not use
+        // it
+        bool valid = true;
+        for (int jj = 0; jj < (noDims-1); jj++) {
+            if (xin[ii*noDims + jj] < speciesParams[8*jj + 3]) {
+                valid = false;
+                break;
+            }
         }
 
-//        printf("%6d | %3d: %6.0f %15.0f %15.0f\n",ii,controls[ii],xin[ii*noDims],
-//                xin[ii*noDims + 1],yvals[noPaths*controls[ii] + dataPoints[controls[ii]]]);
+        if (valid || controls[ii] == 0) {
+            // Save the conditional expectation
+            yvals[noPaths*controls[ii] + dataPoints[controls[ii]]] = condExp[(
+                    year + 1)*noPaths + ii];
 
-        // Increment the number of data points for this control
-        dataPoints[controls[ii]] += 1;
+            // Save the input dimension values to the corresponding data group
+            for (int jj = 0; jj < noDims; jj++) {
+                xvals[controls[ii]*noPaths*noDims + jj*noPaths + dataPoints[
+                        controls[ii]]] = xin[ii*noDims + jj];
+            }
 
-//        // First check that the path is in-the-money. If it isn't we do not use
-//        // it
-//        bool valid = true;
-//        for (int jj = 0; jj < (noDims-1); jj++) {
-//            if (xin[ii*noDims + jj] < speciesParams[8*jj + 3]) {
-//                valid = false;
-//                break;
-//            }
-//        }
-
-//        if (valid || controls[ii] == 0) {
-//            // Save the input dimension values to the corresponding data group
-//            for (int jj = 0; jj < noDims; jj++) {
-//                xvals[controls[ii]*noPaths*noDims + jj*noPaths + dataPoints[
-//                        controls[ii]]] = xin[ii*noDims + jj];
-//            }
-
-//            // Increment the number of data points for this control
-//            dataPoints[controls[ii]] += 1;
-//        }
+            // Increment the number of data points for this control
+            dataPoints[controls[ii]] += 1;
+        }
     }
 }
 
@@ -1028,46 +1078,72 @@ __global__ void computeStateMinMax(int noControls, int noDims, int noPaths,
         xmin = (float*)malloc(noDims*sizeof(float));
         xmax = (float*)malloc(noDims*sizeof(float));
 
-        for (int jj = 0; jj < noDims; jj++) {
-            xmin[jj] = xvals[ii*noDims*noPaths + jj*noPaths];
-            xmax[jj] = xmin[jj];
-        }
+        if (ii == 0 || dataPoints[ii] > (noDims+1)) {
+            for (int jj = 0; jj < noDims; jj++) {
+                xmin[jj] = xvals[ii*noDims*noPaths + jj*noPaths];
+                xmax[jj] = xmin[jj];
+            }
 
-        for (int jj = 0; jj < noDims; jj++) {
-            for (int kk = 0; kk < dataPoints[ii]; kk++) {
-                float xtemp = xvals[ii*noDims*noPaths + jj*noPaths + kk];
-                if (xmin[jj] > xtemp) {
-                    xmin[jj] = xtemp;
-                } else if (xmax[jj] < xtemp) {
-                    xmax[jj] = xtemp;
+            for (int jj = 0; jj < noDims; jj++) {
+                for (int kk = 0; kk < dataPoints[ii]; kk++) {
+                    float xtemp = xvals[ii*noDims*noPaths + jj*noPaths + kk];
+                    if (xmin[jj] > xtemp) {
+                        xmin[jj] = xtemp;
+                    } else if (xmax[jj] < xtemp) {
+                        xmax[jj] = xtemp;
+                    }
                 }
             }
-        }
 
-//        for (int jj = 0; jj < noDims; jj++) {
-//            xmin[jj] = xvals[ii*noDims*noPaths + jj];
-//            xmax[jj] = xmin[jj];
-//        }
+    //        for (int jj = 0; jj < noDims; jj++) {
+    //            xmin[jj] = xvals[ii*noDims*noPaths + jj];
+    //            xmax[jj] = xmin[jj];
+    //        }
 
-//        for (int jj = 0; jj < dataPoints[ii]; jj++) {
-//            for (int kk = 0; kk < noDims; kk ++) {
-//                float xtemp = xvals[ii*noDims*noPaths + jj*noDims + kk];
-//                if (xmin[kk] > xtemp) {
-//                    xmin[kk] = xtemp;
-//                } else if (xmax[kk] < xtemp) {
-//                    xmax[kk] = xtemp;
-//                }
-//            }
-//        }
+    //        for (int jj = 0; jj < dataPoints[ii]; jj++) {
+    //            for (int kk = 0; kk < noDims; kk ++) {
+    //                float xtemp = xvals[ii*noDims*noPaths + jj*noDims + kk];
+    //                if (xmin[kk] > xtemp) {
+    //                    xmin[kk] = xtemp;
+    //                } else if (xmax[kk] < xtemp) {
+    //                    xmax[kk] = xtemp;
+    //                }
+    //            }
+    //        }
 
-        for (int jj = 0; jj < noDims; jj++) {
-            xmins[ii*noDims + jj] = xmin[jj];
-            xmaxes[ii*noDims + jj] = xmax[jj];
-//            printf("Control %d: Xmin = %f Xmax = %f\n",ii,xmin[jj],xmax[jj]);
+            for (int jj = 0; jj < noDims; jj++) {
+                xmins[ii*noDims + jj] = xmin[jj];
+                xmaxes[ii*noDims + jj] = xmax[jj];
+    //            printf("Control %d: Xmin = %f Xmax = %f\n",ii,xmin[jj],xmax[jj]);
+            }
+        } else {
+            for (int jj = 0; jj < noDims; jj++) {
+                xmins[ii*noDims + jj] = xmins[jj];
+                xmaxes[ii*noDims + jj] = xmaxes[jj];
+            }
         }
 
         free(xmin);
         free(xmax);
+    }
+
+    for (int ii = 0; ii < noDims; ii++) {
+        xmins[noControls*noDims + ii] = xmins[ii];
+        xmaxes[noControls*noDims + ii] = xmaxes[ii];
+    }
+
+    for (int ii = 1; ii < noControls; ii++) {
+        for (int jj = 0; jj < noDims; jj++) {
+            float xtemp = xmins[ii*noDims + jj];
+            if (xmins[noControls*noDims + jj] > xtemp) {
+                xmins[noControls*noDims + jj] = xtemp;
+            }
+
+            xtemp = xmaxes[ii*noDims + jj];
+            if (xmaxes[noControls*noDims + jj] < xtemp) {
+                xmaxes[noControls*noDims + jj] = xtemp;
+            }
+        }
     }
 }
 
@@ -1094,11 +1170,18 @@ __global__ void createQueryPoints(int noPoints, int noDims, int dimRes, int
             rem = rem - div*pow(dimRes,noDims-ii-1);
         }
 
+        // We use the highest and lowest x values for each dimension
+        // among ALL the controls, not just for this control
+
         // Get the query point coordinates
         for (int ii = 0; ii < noDims; ii++) {
+//            queryPts[idx + ii*noPoints] = ((float)dimIdx[ii])*(xmaxes[
+//                    control*noDims + ii] - xmins[control*noDims + ii])/(
+//                    float)(dimRes-1) + xmins[control*noDims + ii];
             queryPts[idx + ii*noPoints] = ((float)dimIdx[ii])*(xmaxes[
-                    control*noDims + ii] - xmins[control*noDims + ii])/(
-                    float)(dimRes-1) + xmins[control*noDims + ii];
+                    noControls*noDims + ii] - xmins[noControls*noDims +
+                    ii])/(float)(dimRes-1) + xmins[noControls*noDims +
+                    ii];
 
             // Save the X value for the query point
             regression[year*noControls*(dimRes*noDims + (int)pow(dimRes,
@@ -2253,7 +2336,7 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
         int dimRes, float* Q, float* fuelCosts, float* totalPops, float*
         speciesParams, int* controls, float* aars, float* regression, float*
         uComposition, float* uResults, int* fuelIdx, float* condExp, int*
-        optCont, float* adjPops, float *unitProfits) {
+        optCont, float* adjPops, float *unitProfits, float* regCoeffs) {
 
     // Global thread index (path number)
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
@@ -2272,7 +2355,7 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
 
         // Compute the unit fuel cost component
         for (int ii = 0; ii < noFuels; ii++) {
-            unitFuel += fuelCosts[ii]*uResults[idx*nYears*noUncertainties +
+            unitFuel += fuelCosts[ii]*uResults[idx*(nYears+1)*noUncertainties +
                     start*noUncertainties + fuelIdx[ii]];
         }
         // Compute the unit revenue from ore
@@ -2324,8 +2407,11 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                     // given the prevailing stochastic factors (undiscounted).
                     payoffs[ii] = Q[ii]*(unitCost + unitFuel - unitRevenue*
                             orePrice);
+                    if (payoffs[ii] > 0.0) {
+                        payoffs[ii] = 0.0;
+                    }
                 } else {
-                    payoffs[ii] = NAN;
+                    payoffs[ii] = 0.0;
                 }
             }
 
@@ -2340,8 +2426,11 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
             float bestExp = payoffs[0];
             int bestCont = 0;
 
-            for (int ii = 1; ii < noControls; ii++) {
-                if (isfinite(payoffs[ii])) {
+            for (int ii = 1; ii < noControls; ii++) {                
+                // TO DELETE AFTER TESTING
+                regCoeffs[ii*noPaths + idx] = payoffs[ii];
+
+                if (/*isfinite(payoffs[ii])*/valid[ii]) {
                     if (payoffs[ii] < bestExp) {
                         bestExp = payoffs[ii];
                         bestCont = ii;
@@ -2378,12 +2467,13 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
             // Furthermore, speed is an issue, so we need a faster approach
             // than a more accurate one such as cubic spline interpolation.
 
-            // Find the current state through multilinear interpolation. The
-            // state consists of the current period unit profit and the
-            // adjusted population for each species under the chosen control.
-            // As it is endogenous, the adjusted populations components of the
-            // state are different for each control and must be dealt with
-            // accordingly.
+            // Find the current state's payoff for each control through multi-
+            // linear interpolation. The state consists of the current period
+            // unit profit and the adjusted population for each species under
+            // the maximum flow control (we do not use the random control's
+            // flow). As it is endogenous, the adjusted populations components
+            // of the state are different for each control and affect the
+            // future paths. This is dealt with accordingly.
 
             // The state is the current period unit profit as well as a measure
             // of the potential damage of the current distribution of animals.
@@ -2391,7 +2481,7 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
             // control.
 
             // We also retain the adjusted population under the other controls
-            // to determine if they are valid.
+            // only to determine if they are valid.
             float *state;
             state = (float*)malloc((noSpecies*noControls+1)*sizeof(float));
 
@@ -2406,7 +2496,8 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                 }
             }
 
-            // Save the adjusted populations for the control chosen
+            // Save the adjusted populations for the highest flow. This is used
+            // for the regressions.
             for (int ii = 0; ii < noSpecies; ii++) {
 //                adjPops[ii*noPaths+idx] = totalPops[idx*noSpecies*(nYears+1) +
 //                        start*noSpecies + ii]*aars[idx*(nYears+1)*noSpecies*
@@ -2440,7 +2531,7 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                     unitRevenue*orePrice;
 
             // Determine the current period payoffs to select the optimal
-            // control for this period.
+            // control for this period. We use the state
             for (int ii = 0; ii < noControls; ii++) {
                 // Compute the single period financial payoff for each control
                 // for this period and the adjusted profit. If the adjusted
@@ -2466,6 +2557,7 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                     // given the prevailing stochastic factors (undiscounted).
                     currPayoffs[ii] = Q[ii]*state[noSpecies*noControls];
 
+                    // MULTIPLE LINEAR INTERPOLATION
                     // First find the global upper and lower bounds in each
                     // dimension as well as the index of the lower bound of the
                     // regressed value in each dimension.
@@ -2477,7 +2569,9 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                             sizeof(float));
                     lowerInd = (int*)malloc((noSpecies+1)*sizeof(float));
 
-                    // Indices for species state variables
+                    // Indices for species state variables (Remember, the state
+                    // the represents each species is actually the initial
+                    // population under the maximum flow rate)
                     for (int jj = 0; jj < noSpecies; jj++) {
                         lower[jj] = regression[start*noControls*(dimRes*(
                                 noSpecies+1) + (int)pow(dimRes,noSpecies+1)*2)
@@ -2488,8 +2582,11 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                                 + ii*(dimRes*(noSpecies+1) + (int)pow(dimRes,
                                 (noSpecies+1))*2) + (jj+1)*dimRes - 1];
 
-                        lowerInd[jj] = (int)(dimRes-1)*(state[ii*noSpecies +
-                                jj] - lower[jj])/(upper[jj] - lower[jj]);
+//                        lowerInd[jj] = (int)(dimRes-1)*(state[ii*noSpecies +
+//                                jj] - lower[jj])/(upper[jj] - lower[jj]);
+                        lowerInd[jj] = (int)(dimRes-1)*(state[(noControls-1)*
+                                noSpecies + jj] - lower[jj])/(upper[jj] -
+                                lower[jj]);
 
                         if (lowerInd[jj] < 0) {
                             lowerInd[jj] = 0;
@@ -2520,7 +2617,8 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
 
                     // Now that we have all the index requirements, let's
                     // interpolate.
-                    // Get the uppermost dimension x value
+                    // Get the uppermost dimension x value (first species adj.
+                    // pop. under full flow)
                     float x0 = regression[start*noControls*(dimRes*(noSpecies +
                             1) + (int)pow(dimRes,noSpecies+1)*2) + ii*(dimRes*(
                             noSpecies+1) + (int)pow(dimRes,(noSpecies+1))*2) +
@@ -2572,7 +2670,8 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                     // Now we work our way down the dimensions using our
                     // computed coefficients to get the interpolated value.
                     for (int jj = 1; jj <= noSpecies; jj++) {
-                        // Get the current dimension x value
+                        // Get the current dimension x value (adj. pop. under
+                        // full flow)
                         x0 = regression[start*noControls*(dimRes*(noSpecies +
                                 1) + (int)pow(dimRes,noSpecies+1)*2) + ii*(dimRes*(
                                 noSpecies+1) + (int)pow(dimRes,(noSpecies+1))*2) +
@@ -2603,9 +2702,22 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                     // regression and zero.
                     double condExpIdx = coeffs[0]/(1+rrr*timeStep/100);
 
+//                    // GLOBAL QUADRATIC REGRESSION
+//                    // Set up the predictors as adj pops under full flow and
+//                    // unit profit
+//                    double condExpIdx = interpolateQuad(noSpecies+1,start,ii,
+//                            state+(noControls-1)*noSpecies,regCoeffs);
+
                     if (condExpIdx > 0) {
                         condExpIdx = 0.0;
                     }
+
+                    if (payoffs[ii] > 0) {
+                        payoffs[ii] = 0.0;
+                    }
+
+//                    // TO DELETE AFTER TESTING
+//                    regCoeffs[ii*noPaths + idx] = condExpIdx;
 
                     payoffs[ii] = currPayoffs[ii] + condExpIdx;
 
@@ -2614,9 +2726,14 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
                     free(coeffs);
                     free(lowerInd);
                 } else {
-                    currPayoffs[ii] = NAN;
-                    payoffs[ii] = NAN;
+                    currPayoffs[ii] = 0.0;
+                    payoffs[ii] = 0.0;
+
+//                    // TO DELETE AFTER TESTING
+//                    regCoeffs[ii*noPaths + idx] = 0.0;
                 }
+                // TO DELETE AFTER TESTING
+                regCoeffs[ii*noPaths + idx] = payoffs[ii];
             }
 
             // Initialise the conditional expectations for this path at this
@@ -2641,8 +2758,9 @@ __global__ void backwardInduction(int start, int noPaths, int nYears, int
             int bestCont = 0;
 
             for (int ii = 1; ii < noControls; ii++) {
-                if (isfinite(payoffs[ii])) {
-                    if (payoffs[ii] < bestExp) {
+                if (/*isfinite(payoffs[ii])*/valid[ii]) {
+                    // The numbers are a bit jittery atm. Include a buffer
+                    if (payoffs[ii] < 0.975*bestExp) {
                         bestExp = payoffs[ii];
                         bestCont = ii;
                     }
@@ -2743,19 +2861,16 @@ __global__ void buildGlobalLinReg(int noPoints, int noDims, int dimRes, int
     }
 }
 
-
-// Multiple local linear regression. Makes use of LU decomposition for
-// solving the linear equations. Does not use cuBlas.
-__global__ void multiLocLinReg(int noPoints, int noDims, int dimRes, int nYears,
-        int noControls, int year, int control, int k, int* dataPoints, float
-        *xvals, float *yvals, float *regression, float* xmins, float* xmaxes,
-        float *dist, int *ind) {
+// At this stage the following function only does two variables
+__global__ void buildGlobalQuadReg(int noPoints, int noDims, int dimRes, int
+        nYears, int noControls, int year, int control, float* regCoeffs,
+        float* xmins, float* xmaxes, float* regression) {
 
     // Global thread index
     int idx = blockIdx.x*blockDim.x + threadIdx.x;
 
     if (idx < noPoints) {
-        // First, deconstruct the index into the index along each dimension
+        // First deconstruct the index into the index along each dimension
         int *dimIdx;
         dimIdx = (int*)malloc(noDims*sizeof(int));
 
@@ -2777,88 +2892,163 @@ __global__ void multiLocLinReg(int noPoints, int noDims, int dimRes, int nYears,
                     xmins[control*noDims + ii];
         }
 
-        // 1. First find the k nearest neighbours to the query point (already)
-        // computed prior).
+        // Use the regression coefficients to compute the value at this query
+        // point
+        // Constant
+        float computed = regCoeffs[0];
 
-        // 2. Build the matrices used in the calculation
-        // A - Input design matrix
-        // B - Input known matrix
-        // C - Output matrix of coefficients
-        float *A, *B, *X;
+        // Linear Terms
+        for (int ii = 0; ii < noDims; ii++) {
+            computed += xQ[ii]*regCoeffs[ii+1];
+        }
 
-        A = (float*)malloc(pow(noDims+1,2)*sizeof(float));
-        B = (float*)malloc((noDims+1)*sizeof(float));
-        X = (float*)malloc((noDims+1)*sizeof(float));
-
-        // Bandwidth for kernel
-        float h = dist[noPoints*(k-1) + idx];
-
-        for (int ii = 0; ii <= noDims; ii++) {
-            // We will use a kernel and normalise by the distance of
-            // the furthest point of the nearest k neighbours.
-
-            // Initialise values to zero
-            B[ii] = 0.0;
-
-            for (int kk = 0; kk < k; kk++) {
-                float d = dist[noPoints*kk + idx];
-                // Gaussian kernel (Not used for now)
-//                float z = exp(-(d/h)*(d/h)/2)/sqrt(2*M_PI);
-                // Epanechnikov kernel
-                float z = 0.75*(1-pow(d/h,2));
-
-                if (ii == 0) {
-                    B[ii] += yvals[ind[noPoints*kk + idx] - 1]*z;
-                } else {
-                    B[ii] += yvals[ind[noPoints*kk + idx] - 1]*(xvals[(ind[noPoints
-                            *kk + idx] - 1)*noDims + ii - 1] - xQ[ii-1])*z;
-                }
-            }
-
-            for (int jj = 0; jj <= noDims; jj++) {
-                A[jj*(noDims+1)+ii] = 0.0;
-
-                for (int kk = 0; kk < k; kk++) {
-//                    float h = d_h[ind[kk]];
-                    float d = dist[noPoints*kk + idx];
-//                    For Gaussian kernel. Not used.
-//                    float z = exp(-(d/h)*(d/h)/2)/sqrt(2*M_PI);
-                    float z = 0.75*(1-pow(d/h,2));
-
-                    if ((ii == 0) && (jj == 0)) {
-                        A[jj*(noDims+1)+ii] += 1.0*z;
-                    } else if (ii == 0) {
-                        A[jj*(noDims+1)+ii] += (xvals[(ind[noPoints*kk + idx] - 1
-                                )*noDims + jj - 1] - xQ[jj - 1])*z;
-                    } else if (jj == 0) {
-                        A[jj*(noDims+1)+ii] += (xvals[(ind[noPoints*kk + idx] - 1
-                                )*noDims + ii - 1] - xQ[ii - 1])*z;
-                    } else {
-                        A[jj*(noDims+1)+ii] += (xvals[(ind[noPoints*kk + idx] - 1
-                                )*noDims + jj - 1] - xQ[jj-1])*(xvals[(ind[
-                                noPoints*kk + idx] - 1)*noDims + ii - 1] - xQ[ii
-                                - 1])*z;
-                    }
-                }
+        // Quadratic and Interacting Terms
+        int counter = 0;
+        for (int ii = 0; ii < noDims; ii++) {
+            for (int jj = ii; jj < noDims; jj++) {
+                computed += xQ[ii]*xQ[jj]*regCoeffs[counter+1+noDims];
+                counter++;
             }
         }
 
-        // Solve the linear system using LU decomposition.
-        solveLinearSystem(noDims+1,A,B,X);
+        // We know that a payoff cannot be greater than zero, so we adjust all
+        // conditional payoffs greater than zero to be zero.
 
-        // 4. Compute the y value at the x point of interest using the just-
-        //    found regression coefficients. This is simply the y intercept we
-        //    just computed and save to the regression matrix.
+        if (computed >= 0.0) {
+            computed = 0.0;
+        }
+
         regression[year*noControls*(dimRes*noDims + (int)pow(dimRes,noDims)*2)
                 + control*(dimRes*noDims + (int)pow(dimRes,noDims)*2) + dimRes*
-                noDims + idx] = /*yvals[ind[idx] - 1]*/ X[0];
+                noDims + idx] = computed;
 
         // Free memory
-        free(A);
-        free(B);
-        free(X);
         free(xQ);
         free(dimIdx);
+    }
+}
+
+
+// Multiple local linear regression. Makes use of LU decomposition for
+// solving the linear equations. Does not use cuBlas.
+__global__ void multiLocLinReg(int noPoints, int noDims, int dimRes, int nYears,
+        int noControls, int year, int control, int k, int* dataPoints, float
+        *xvals, float *yvals, float *regression, float* xmins, float* xmaxes,
+        float *dist, int *ind) {
+
+    // Global thread index
+    int idx = blockIdx.x*blockDim.x + threadIdx.x;
+
+    if (idx < noPoints) {
+        if (dataPoints[control] < 3) {
+            regression[year*noControls*(dimRes*noDims + (int)pow(dimRes,noDims)*2)
+                    + control*(dimRes*noDims + (int)pow(dimRes,noDims)*2) + dimRes*
+                    noDims + idx] = 0.0;
+        } else {
+            // First, deconstruct the index into the index along each dimension
+            int *dimIdx;
+            dimIdx = (int*)malloc(noDims*sizeof(int));
+
+            int rem = idx;
+
+            for (int ii = 0; ii < noDims; ii++) {
+                int div = (int)(rem/pow(dimRes,noDims-ii-1));
+                dimIdx[ii] = div;
+                rem = rem - div*pow(dimRes,noDims-ii-1);
+            }
+
+            // Get the query point coordinates
+            float *xQ;
+            xQ = (float*)malloc(noDims*sizeof(float));
+
+            for (int ii = 0; ii < noDims; ii++) {
+                xQ[ii] = ((float)dimIdx[ii])*(xmaxes[ii] - xmins[ii])/(float)(
+                        dimRes - 1) + xmins[ii];
+            }
+
+            // 1. First find the k nearest neighbours to the query point (already)
+            // computed prior).
+
+            // 2. Build the matrices used in the calculation
+            // A - Input design matrix
+            // B - Input known matrix
+            // C - Output matrix of coefficients
+            float *A, *B, *X;
+
+            A = (float*)malloc(pow(noDims+1,2)*sizeof(float));
+            B = (float*)malloc((noDims+1)*sizeof(float));
+            X = (float*)malloc((noDims+1)*sizeof(float));
+
+            // Bandwidth for kernel
+            float h = dist[noPoints*(k-1) + idx];
+
+            for (int ii = 0; ii <= noDims; ii++) {
+                // We will use a kernel and normalise by the distance of
+                // the furthest point of the nearest k neighbours.
+
+                // Initialise values to zero
+                B[ii] = 0.0;
+
+                for (int kk = 0; kk < k; kk++) {
+                    float d = dist[noPoints*kk + idx];
+                    // Gaussian kernel (Not used for now)
+                    float z = exp(-(d/h)*(d/h)/2)/sqrt(2*M_PI);
+                    // Epanechnikov kernel
+//                    float z = 0.75*(1-pow(d/h,2));
+
+                    if (ii == 0) {
+                        B[ii] += yvals[ind[noPoints*kk + idx] - 1]*z;
+                    } else {
+                        B[ii] += yvals[ind[noPoints*kk + idx] - 1]*(xvals[(ind[noPoints
+                                *kk + idx] - 1)*noDims + ii - 1] - xQ[ii-1])*z;
+                    }
+                }
+
+                for (int jj = 0; jj <= noDims; jj++) {
+                    A[jj*(noDims+1)+ii] = 0.0;
+
+                    for (int kk = 0; kk < k; kk++) {
+    //                    float h = d_h[ind[kk]];
+                        float d = dist[noPoints*kk + idx];
+    //                    For Gaussian kernel. Not used.
+                        float z = exp(-(d/h)*(d/h)/2)/sqrt(2*M_PI);
+//                        float z = 0.75*(1-pow(d/h,2));
+
+                        if ((ii == 0) && (jj == 0)) {
+                            A[jj*(noDims+1)+ii] += 1.0*z;
+                        } else if (ii == 0) {
+                            A[jj*(noDims+1)+ii] += (xvals[(ind[noPoints*kk + idx] - 1
+                                    )*noDims + jj - 1] - xQ[jj - 1])*z;
+                        } else if (jj == 0) {
+                            A[jj*(noDims+1)+ii] += (xvals[(ind[noPoints*kk + idx] - 1
+                                    )*noDims + ii - 1] - xQ[ii - 1])*z;
+                        } else {
+                            A[jj*(noDims+1)+ii] += (xvals[(ind[noPoints*kk + idx] - 1
+                                    )*noDims + jj - 1] - xQ[jj-1])*(xvals[(ind[
+                                    noPoints*kk + idx] - 1)*noDims + ii - 1] - xQ[ii
+                                    - 1])*z;
+                        }
+                    }
+                }
+            }
+
+            // Solve the linear system using LU decomposition.
+            solveLinearSystem(noDims+1,A,B,X);
+
+            // 4. Compute the y value at the x point of interest using the just-
+            //    found regression coefficients. This is simply the y intercept we
+            //    just computed and save to the regression matrix.
+            regression[year*noControls*(dimRes*noDims + (int)pow(dimRes,noDims)*2)
+                    + control*(dimRes*noDims + (int)pow(dimRes,noDims)*2) + dimRes*
+                    noDims + idx] = /*yvals[ind[idx] - 1]*/ X[0];
+
+            // Free memory
+            free(A);
+            free(B);
+            free(X);
+            free(xQ);
+            free(dimIdx);
+        }
     }
 }
 
@@ -3707,7 +3897,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
         // Scaling for relative importance of species population to unit profit
         // used in regressions.
-        float scaling = 4;
+        float scaling = 2;
 
         // Get general properties
         OptimiserPtr optimiser = sim->getRoad()->getOptimiser();
@@ -3721,7 +3911,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 getFuels();
 
         /////////////////////////////////////////
-        // Plot the surrogate
+        // Plot the regressions
         GnuplotPtr plotPtr(new Gnuplot);
         /////////////////////////////////////////
 
@@ -3893,10 +4083,6 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         CUDA_CALL(cudaMemcpy(d_fuelCosts,fuelCosts.data(),fuelCosts.size()*
                 sizeof(float),cudaMemcpyHostToDevice));
 
-        // Free the host memory
-        free(speciesParams);
-        free(uncertParams);
-
         // MOVEMENT AND MORTALITY MATRICES
         // Convert the movement and mortality matrix to a sparse matrix for
         // use in the kernel efficiently.
@@ -4028,7 +4214,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 noUncertainties*sizeof(float)));
         CUDA_CALL(cudaMalloc((void**)&d_uJumps,nYears*noPaths*noUncertainties*
                 sizeof(float)));
-        CUDA_CALL(cudaMalloc((void**)&d_uResults,noUncertainties*nYears*
+        CUDA_CALL(cudaMalloc((void**)&d_uResults,noUncertainties*(nYears+1)*
                 noPaths*sizeof(float)));
         CUDA_CALL(cudaMalloc((void**)&d_uComposition,nYears*noPaths*(
                 commodities.size())*sizeof(float)));
@@ -4175,9 +4361,16 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         // time step mapped against the N-dimensional grid. We interpolate
         // when we compute the forward paths.
         float *d_regression, *d_adjPops, *d_stats;
+//        // For global quadratic regression
+        float *d_regCoeffs;
+        int quadCoeffs = noDims*(noDims+1)/2+1+noDims;
+        // For checking interpolation of regressions
 
         CUDA_CALL(cudaMalloc((void**)&d_regression,nYears*noControls*(
                 dimRes*noDims + pow(dimRes,noDims)*2)*sizeof(float)));
+//        CUDA_CALL(cudaMalloc((void**)&d_regCoeffs,nYears*quadCoeffs*
+//                noControls*sizeof(float)));
+        CUDA_CALL(cudaMalloc((void**)&d_regCoeffs,noControls*noPaths*sizeof(float)));
         CUDA_CALL(cudaMalloc((void**)&d_adjPops,adjPops[0].rows()*
                 adjPops[0].cols()*sizeof(float)));
 
@@ -4218,7 +4411,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                         commodities.size(),dimRes,d_flowRates,d_fuelCosts,
                         d_totalPops,d_speciesParams,d_controls,d_aars,
                         d_regression,d_uComposition,d_uResults,d_fuelIdx,
-                        d_condExp,d_optCont,d_adjPops,d_unitProfits);
+                        d_condExp,d_optCont,d_adjPops,d_unitProfits,
+                        d_regCoeffs);
                 CUDA_CALL(cudaPeekAtLastError());
                 CUDA_CALL(cudaDeviceSynchronize());
 
@@ -4232,10 +4426,10 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                 // for the dependant variables. This allocates space for the
                 // input variables for the regressions.
                 float *d_xmaxes, *d_xmins;
-                CUDA_CALL(cudaMalloc((void**)&d_xmaxes,noControls*noDims*
+                CUDA_CALL(cudaMalloc((void**)&d_xmaxes,(noControls+1)*noDims*
                         sizeof(float)));
-                CUDA_CALL(cudaMalloc((void**)&d_xmins,noControls*noDims*sizeof(
-                        float)));
+                CUDA_CALL(cudaMalloc((void**)&d_xmins,(noControls+1)*noDims*
+                        sizeof(float)));
 
                 // For every other backward step not including the first
                 // period, we need to determine the adjusted population for
@@ -4278,9 +4472,8 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                     // This kernel does not take advantage of massive
                     // parallelism. It is simply to allow us to call data that
                     // is already on the device for allocating data for use in
-                    // the regressions. We pass the species data as we need to
-                    // make sure that only in-the-money paths are considered
-                    // for each control.
+                    // the regressions. We keep all data points and remove paths
+                    // that are not 'in-the-money' at a later stage.
                     allocateXYRegressionData<<<1,1>>>(noPaths,noControls,
                             noDims,nYears,d_speciesParams,ii,d_controlsTemp,
                             d_xin,d_condExp,d_dataPoints,d_xvals,d_yvals);
@@ -4288,7 +4481,11 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                     CUDA_CALL(cudaDeviceSynchronize());
 
                     // Get the minimum and maximum X value for each dimension
-                    // for each control.
+                    // for each control. However, for our regressions we will
+                    // only use the minimum and maximum values of each dimension
+                    // across all controls. This will ensure that the regressions
+                    // all have the same domain (i.e. the X grid is identical in
+                    // each case).
                     computeStateMinMax<<<1,1>>>(noControls,noDims,noPaths,
                             d_dataPoints,d_xvals,d_xmins,d_xmaxes);
                     CUDA_CALL(cudaPeekAtLastError());
@@ -4296,21 +4493,29 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 
                     // Allocate the k nearest neighbours for each design point
                     // in order to do the regression stage after this. This
-                    // component is the slowest component.
+                    // component is the slowest.
                     int *dataPoints;
                     dataPoints = (int*)malloc(noControls*sizeof(int));
                     CUDA_CALL(cudaMemcpy(dataPoints,d_dataPoints,noControls*
                             sizeof(int),cudaMemcpyDeviceToHost));
 
                     for (int jj = 0; jj < noControls; jj++) {
-                        bool localReg = false;
+                        bool localReg = true;
+
+//                        if (ii < nYears-4) {
+//                            localReg = false;
+//                        }
 
                         Eigen::VectorXf xmins(noDims);
                         Eigen::VectorXf xmaxes(noDims);
-                        CUDA_CALL(cudaMemcpy(xmins.data(),d_xmins,noDims*
-                                sizeof(float),cudaMemcpyDeviceToHost));
-                        CUDA_CALL(cudaMemcpy(xmaxes.data(),d_xmaxes,noDims*
-                                sizeof(float),cudaMemcpyDeviceToHost));
+                        // We only copy the global max and min for each
+                        // dimension
+                        CUDA_CALL(cudaMemcpy(xmins.data(),d_xmins +
+                                noControls*noDims,noDims*sizeof(float),
+                                cudaMemcpyDeviceToHost));
+                        CUDA_CALL(cudaMemcpy(xmaxes.data(),d_xmaxes +
+                                noControls*noDims,noDims*sizeof(float),
+                                cudaMemcpyDeviceToHost));
 
                         // Transfer sample data points to the host
                         Eigen::MatrixXf refX(dataPoints[jj],noDims);
@@ -4334,7 +4539,10 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                             // MULTI-LOC LIN REG APPROACH /////////////////////////
                             // Let k be the natural logarithm of the number of data
                             // points
-                            int k = 30*(log(dataPoints[jj]) + 1);
+                            int k = 0;
+                            if (dataPoints[jj] > 3) {
+                                k = 10*(log(dataPoints[jj]) + 1);
+                            }
 
                             // We first need to perform a k nearest neighbour
                             // search
@@ -4445,7 +4653,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                             CUDA_CALL(cudaFree(d_xminsN));
                             CUDA_CALL(cudaFree(d_xmaxesN));
                         } else {
-                            // GLOBAL LINEAR REGRESSION APPROACH //////////////////
+                            // GLOBAL QUADRATIC REGRESSION APPROACH ///////////////
                             // We first need to create a map of query points for
                             // the regressions
                             Eigen::MatrixXf query((int)pow(dimRes,noDims),noDims);
@@ -4469,47 +4677,84 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                             // Perform the global regression. This kernel is run on
                             // the GPU to simply avoid memory transfers. It does
                             // not make use of parallel computation.
-                            Eigen::MatrixXf regCoeffs(noDims+1,1);
+                            Eigen::MatrixXd regCoeffs(noDims*(noDims+1)/2+1+noDims,1);
 
                             // We only want to consider points that are on the sloping
-                            // hyperplane with a non-zero payoff. Therefore, we remove
+                            // portions with a non-zero payoff. Therefore, we remove
                             // data points from our analysis where the points do not
-                            // appear to be on such a hyperplane.
+                            // appear to be on such portions.
                             Eigen::MatrixXf refXValid(dataPoints[jj],noDims);
                             Eigen::MatrixXf refYValid(dataPoints[jj],1);
                             int finalPoints = 0;
 
+                            Eigen::VectorXf thresholds(srp.size());
+                            if (jj > 0){
+                                for (int kk = 0; kk < srp.size(); kk++) {
+                                    thresholds(kk) = speciesParams[kk*8+3];
+                                }
+                            } else {
+                                for (int kk = 0; kk < srp.size(); kk++) {
+                                    thresholds(kk) = 0.0;
+                                }
+                            }
+
                             SimulateGPU::keepValidPoints(noDims,dataPoints[jj],
                                     refX.data(),refY.data(),refXValid.data(),
-                                    refYValid.data(),finalPoints);
+                                    refYValid.data(),finalPoints,thresholds.data());
 
-//                            std::cout << finalPoints << std::endl;
+                            // Improve precision by using doubles
+                            Eigen::MatrixXd refXd = refXValid.cast<double>();
+                            Eigen::MatrixXd refYd = refYValid.cast<double>();
 
-                            SimulateGPU::multiLinReg(finalPoints,noDims,
-                                    refXValid.data(),refYValid.data(),regCoeffs.data());
+                            // Hyperplane basis (insufficient at early time periods)
+                            if (ii > (nYears-4)) {
+                                SimulateGPU::multiLinReg(finalPoints,noDims,
+                                        refXd.data(),refYd.data(),regCoeffs
+                                        .data());
+                            } else {
+                                // Muliple quadratic basis (standard)
+                                SimulateGPU::multiQuadReg(finalPoints,noDims,
+                                        refXd.data(),refYd.data(),regCoeffs
+                                        .data());
+                            }
 
-//                            std::cout << regCoeffs(0) << std::endl;
-//                            std::cout << regCoeffs(1) << std::endl;
-//                            std::cout << regCoeffs(2) << std::endl;
+                            Eigen::MatrixXf regCoeffsf = regCoeffs.cast<float>();
 
-                            float *d_regCoeffs;
-                            CUDA_CALL(cudaMalloc((void**)&d_regCoeffs,(noDims+1)*
+                            int coeffs = noDims*(noDims+1)/2+1+noDims;
+//                            for (int kk = 0; kk < coeffs; kk++) {
+//                                std::cout << regCoeffs(kk) << std::endl;
+//                            }
+
+                            CUDA_CALL(cudaMemcpy(d_regCoeffs+ii*quadCoeffs*
+                                    noControls + jj*quadCoeffs,
+                                    regCoeffsf.data(),coeffs*sizeof(float),
+                                    cudaMemcpyHostToDevice));
+
+                            float *d_regCoeffs2;
+
+                            CUDA_CALL(cudaMalloc((void**)&d_regCoeffs2,coeffs*
                                     sizeof(float)));
-                            CUDA_CALL(cudaMemcpy(d_regCoeffs,regCoeffs.data(),
-                                    (noDims+1)*sizeof(float),cudaMemcpyHostToDevice));
+                            CUDA_CALL(cudaMemcpy(d_regCoeffs2,regCoeffsf.data(),
+                                    coeffs*sizeof(float),cudaMemcpyHostToDevice));
 
-                            buildGlobalLinReg<<<noBlocks2,maxThreadsPerBlock2>>>(
-                                    (int)pow(dimRes,noDims),noDims,dimRes,nYears,noControls,
-                                    ii,jj,d_regCoeffs,d_xmins,d_xmaxes,d_regression);
+                            if (ii > (nYears - 4)) {
+                                buildGlobalLinReg<<<noBlocks2,maxThreadsPerBlock2>>>(
+                                        (int)pow(dimRes,noDims),noDims,dimRes,nYears,noControls,
+                                        ii,jj,d_regCoeffs2,d_xmins,d_xmaxes,d_regression);
+                            } else {
+                                buildGlobalQuadReg<<<noBlocks2,maxThreadsPerBlock2>>>(
+                                        (int)pow(dimRes,noDims),noDims,dimRes,nYears,noControls,
+                                        ii,jj,d_regCoeffs2,d_xmins,d_xmaxes,d_regression);
+                            }
                             CUDA_CALL(cudaPeekAtLastError());
                             CUDA_CALL(cudaDeviceSynchronize());
 
-                            CUDA_CALL(cudaFree(d_regCoeffs));
+                            CUDA_CALL(cudaFree(d_regCoeffs2));
                         }
 
-//                        ///////////////////////////////////////////////////////
-//                        // Test plots /////////////////////////////////////////
-//                        // Prepare raw data
+                        ///////////////////////////////////////////////////////
+                        // Test plots for regressions /////////////////////////
+                        // Prepare raw data
 
 //                        if (localReg) {
 //                            // Local regression scaled the data previously. We
@@ -4599,7 +4844,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
 //                        (*plotPtr).send1d(raw);
 //                        (*plotPtr).flush();
 
-//                        ///////////////////////////////////////////////////////
+                        ///////////////////////////////////////////////////////
                     }
 
                     free(dataPoints);
@@ -4616,14 +4861,114 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                             commodities.size(),dimRes,d_flowRates,d_fuelCosts,
                             d_totalPops,d_speciesParams,d_controls,d_aars,
                             d_regression,d_uComposition,d_uResults,d_fuelIdx,
-                            d_condExp,d_optCont,d_adjPops,d_unitProfits);
+                            d_condExp,d_optCont,d_adjPops,d_unitProfits,
+                            d_regCoeffs);
                     CUDA_CALL(cudaPeekAtLastError());
                     CUDA_CALL(cudaDeviceSynchronize());
+
+                    ///////////////////////////////////////////////////////////
+                    // TEST PLOTS FOR CHECKING INTERPOLATIONS
+                    ///////////////////////////////////////////////////////////
+//                    // Set up predictor variables
+//                    Eigen::MatrixXf xvals(noPaths,2);
+
+//                    CUDA_CALL(cudaMemcpy(xvals.data(),d_adjPops,noPaths*
+//                            sizeof(float),cudaMemcpyDeviceToHost));
+//                    CUDA_CALL(cudaMemcpy(xvals.data()+noPaths,
+//                            d_unitProfits+noPaths*ii,noPaths*sizeof(float),
+//                            cudaMemcpyDeviceToHost));
+
+//                    // Predicted answers
+//                    std::vector<std::vector<float>> interp;
+//                    interp.resize(noPaths);
+
+//                    for (int kk = 0; kk < noPaths; kk++) {
+//                        interp[kk].resize(noDims+1);
+//                    }
+
+//                    Eigen::MatrixXf yvals(noPaths,noControls);
+
+//                    CUDA_CALL(cudaMemcpy(yvals.data(),d_regCoeffs,
+//                            noControls*noPaths*sizeof(float),
+//                            cudaMemcpyDeviceToHost));
+
+//                    for (int jj = 0; jj < noControls; jj++) {
+//                        // Regressed data points
+//                        // XVALS
+//                        Eigen::MatrixXf regX(dimRes,noDims);
+//                        CUDA_CALL(cudaMemcpy(regX.data(),d_regression + ii*
+//                                noControls*(dimRes*noDims + (int)pow(dimRes,noDims)
+//                                *2) + jj*(dimRes*noDims + (int)pow(dimRes,noDims)
+//                                *2),dimRes*noDims*sizeof(float),
+//                                cudaMemcpyDeviceToHost));
+//                        // YVALS
+//                        Eigen::VectorXf surrogate((int)pow(dimRes,noDims));
+//                        CUDA_CALL(cudaMemcpy(surrogate.data(),d_regression + ii*
+//                                noControls*(dimRes*noDims + (int)pow(dimRes,noDims)
+//                                *2) + jj*(dimRes*noDims + (int)pow(dimRes,noDims)
+//                                *2) + dimRes*noDims,pow(dimRes,noDims)*sizeof(
+//                                float),cudaMemcpyDeviceToHost));
+
+////                        // Prepare regressed data
+////                        std::vector<std::vector<std::vector<double>>> reg;
+////                        reg.resize(dimRes);
+
+////                        for (int kk = 0; kk < dimRes; kk++) {
+////                            reg[kk].resize(dimRes);
+////                            for (int ll = 0; ll < dimRes; ll++) {
+////                                reg[kk][ll].resize(noDims+1);
+////                            }
+////                        }
+
+////                        for (int kk = 0; kk < dimRes; kk++) {
+////                            for (int ll = 0; ll < dimRes; ll++) {
+////                                reg[kk][ll][0] = regX(ll,0);
+////                                reg[kk][ll][1] = regX(kk,1);
+////                                reg[kk][ll][2] = surrogate(kk + ll*dimRes);
+////                            }
+////                        }
+//                    }
+
+//                    // Now plot the interpolated values for each control
+//                    (*plotPtr) << "set title 'Interpolating regression'\n";
+//                    (*plotPtr) << "set grid\n";
+//                //    (*plotPtr) << "set hidden3d\n";
+//                    (*plotPtr) << "unset key\n";
+//                    (*plotPtr) << "unset view\n";
+//                    (*plotPtr) << "unset pm3d\n";
+//                    (*plotPtr) << "unset xlabel\n";
+//                    (*plotPtr) << "unset ylabel\n";
+//                    (*plotPtr) << "set xrange [*:*]\n";
+//                    (*plotPtr) << "set yrange [*:*]\n";
+//                    (*plotPtr) << "set view 45,45\n";
+////                    (*plotPtr) << "splot '-' with points pointtype 7\n";
+////                  (*plotPtr) << "splot '-' with lines,\n";
+////                    (*plotPtr) << "splot '-' with lines, '-' with points pointtype 7\n";
+//                    (*plotPtr) << "splot '-' with points pointtype 7,'-' with points pointtype 7,'-' with points pointtype 7\n";
+//                    for (int jj = 0; jj < noControls; jj++) {
+//                        // Raw data points copy
+//                        for (int kk = 0; kk < noPaths; kk++) {
+//                            interp[kk].resize(noDims+1);
+//                            interp[kk][0] = xvals(kk,0);
+//                            interp[kk][1] = xvals(kk,1);
+//                            interp[kk][2] = yvals(kk,jj);
+//                        }
+//                        (*plotPtr).send1d(interp);
+//                    }
+////                        (*plotPtr).send2d(reg);
+//                    (*plotPtr).flush();
+
+//                    ///////////////////////////////////////////////////////////
 
                     // Copy the adjusted populations for this time step to the
                     // output variables. The conditional expectations, optimal
                     // controls and unit profits are copied as well if we are
                     // producing the policy map for the optimal road.
+                    // The adjusted population here is the state used to compute
+                    // the conditional expectations. It is therefore the
+                    // adjusted population under the maximum flow rate. This same
+                    // value is used for all controls so that we are comparing
+                    // apples with apples.
                     CUDA_CALL(cudaMemcpy(adjPopsF[ii].data(),d_adjPops,srp.
                             size()*noPaths*sizeof(float),
                             cudaMemcpyDeviceToHost));
@@ -4785,6 +5130,15 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
                             sizeof(int),cudaMemcpyDeviceToHost));
 
                     for (int jj = 0; jj < noControls; jj++) {
+//                        bool localReg = false;
+
+//                        Eigen::VectorXf xmins(noDims);
+//                        Eigen::VectorXf xmaxes(noDims);
+//                        CUDA_CALL(cudaMemcpy(xmins.data(),d_xmins,noDims*
+//                                sizeof(float),cudaMemcpyDeviceToHost));
+//                        CUDA_CALL(cudaMemcpy(xmaxes.data(),d_xmaxes,noDims*
+//                                sizeof(float),cudaMemcpyDeviceToHost));
+
                         ///////////////////////////////////////////////////////
                         // MULTI-LOC LIN REG //////////////////////////////////
                         // Let k be the natural logarithm of the number of data
@@ -5150,6 +5504,7 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         CUDA_CALL(cudaFree(d_flowRates));
         CUDA_CALL(cudaFree(d_controls));
         CUDA_CALL(cudaFree(d_regression));
+        CUDA_CALL(cudaFree(d_regCoeffs));
         CUDA_CALL(cudaFree(d_adjPops));
 
         CUDA_CALL(cudaFree(d_condExp));
@@ -5159,7 +5514,11 @@ void SimulateGPU::simulateROVCUDA(SimulatorPtr sim,
         // Remove these here?
         CUDA_CALL(cudaFree(d_totalPops));
         CUDA_CALL(cudaFree(d_aars));
-        CUDA_CALL(cudaFree(d_stats));
+        CUDA_CALL(cudaFree(d_stats));        
+
+        // Free the host memory
+        free(speciesParams);
+        free(uncertParams);
     } catch (const char* err) {
         throw err;
     }
@@ -5638,13 +5997,40 @@ void SimulateGPU::dense2Sparse(float* denseIn, int rows, int cols,
 
 // Global linear regression pre-processing
 void SimulateGPU::keepValidPoints(int dims, int originalPoints, float* refXIn,
-        float* refYIn, float* refXOut, float* refYOut, int& outPoints) {
+        float* refYIn, float* refXOut, float* refYOut, int& outPoints, float*
+        popThresholds) {
 
     outPoints = 0;
 
-    // We only keep points that have negative y values
+//    // We only keep points that have negative y values
+//    for (int ii = 0; ii < originalPoints; ii++) {
+//        if (refYIn[ii] < -10.0) {
+//            for (int jj = 0; jj < dims; jj++) {
+//                refXOut[outPoints*dims + jj] = refXIn[ii + jj*originalPoints];
+////                std::cout << refXOut[outPoints*dims + jj] << "          ";
+//            }
+//            refYOut[outPoints] = refYIn[ii];
+////            std::cout << refYOut[outPoints] << std::endl;
+//            outPoints++;
+//        }
+//    }
+    // We only keep points that have an adjusted population above threshold
+    // and a unit profit above 0 (i.e. profitable and not too damaging).
     for (int ii = 0; ii < originalPoints; ii++) {
-        if (refYIn[ii] < -10.0) {
+        bool valid = true;
+
+        if (refXIn[ii + (dims-1)*originalPoints] > 0.0) {
+            valid = false;
+        }
+
+        for (int jj = 0; jj < (dims-1); jj++) {
+            if (refXIn[ii + jj*originalPoints] < popThresholds[jj]) {
+                valid = false;
+                break;
+            }
+        }
+
+        if (valid) {
             for (int jj = 0; jj < dims; jj++) {
                 refXOut[outPoints*dims + jj] = refXIn[ii + jj*originalPoints];
 //                std::cout << refXOut[outPoints*dims + jj] << "          ";
@@ -5657,12 +6043,12 @@ void SimulateGPU::keepValidPoints(int dims, int originalPoints, float* refXIn,
 }
 
 // Multiple global linear regression
-void SimulateGPU::multiLinReg(int noPoints, int noDims, float *xvals, float
-        *yvals, float *X) {
+void SimulateGPU::multiLinReg(int noPoints, int noDims, double *xvals, double
+        *yvals, double *X) {
 
-    float *A, *B;
-    A = (float*)malloc(pow(noDims+1,2)*sizeof(float));
-    B = (float*)malloc((noDims+1)*sizeof(float));
+    double *A, *B;
+    A = (double*)malloc(pow(noDims+1,2)*sizeof(double));
+    B = (double*)malloc((noDims+1)*sizeof(double));
 
     if (noPoints > (noDims+1)) {
         for (int ii = 0; ii <= noDims; ii++) {
@@ -5703,11 +6089,215 @@ void SimulateGPU::multiLinReg(int noPoints, int noDims, float *xvals, float
     free(B);
 }
 
-// Solve a set of linear equations. (Assumes non-singular coefficient matrix)
-void SimulateGPU::solveLinearSystem(int dims, float *A, float *B, float *C) {
-    // First generate upper triangular matrix for the augmented matrix
+void SimulateGPU::multiQuadReg(int noPoints, int noDims, double *xvals,
+        double *yvals, double *X) {
+
+    int rows = noDims*(noDims+1)/2+1+noDims;
+    double *A, *B;
+    A = (double*)malloc(rows*rows*sizeof(double));
+    B = (double*)malloc(rows*sizeof(double));
+
+    if (noPoints >= rows) {
+        for (int ii = 0; ii < rows; ii++) {
+            B[ii] = 0;
+        }
+
+        for (int ii = 0; ii < rows*rows; ii++) {
+            A[ii] = 0;
+        }
+
+        for (int ii = 0; ii < noPoints; ii++) {
+            // ROWS FIRST (C-Style Indexing)
+            // 1. CONSTANT
+            // B Matrix
+            B[0] += yvals[ii];
+
+            // A Matrix
+            // Constant
+            A[0] += 1.0;
+            // Linear
+            for (int jj = 0; jj < noDims; jj++) {
+                A[rows*(jj+1)] += xvals[ii*noDims+jj];
+            }
+            // Quadratic and Interacting
+            int counter1 = 0;
+            for (int jj = 0; jj < noDims; jj++) {
+                for (int kk = jj; kk < noDims; kk++) {
+                    A[rows*(counter1+1+noDims)] += xvals[ii*noDims+jj]*xvals[
+                            ii*noDims+kk];
+                    counter1++;
+                }
+            }
+
+            // 2. LINEAR
+            for (int jj = 0; jj < noDims; jj++) {
+                // B Matrix
+                B[jj+1] += yvals[ii]*xvals[ii*noDims+jj];
+
+                // A Matrix
+                // Constant
+                A[jj+1] += xvals[ii*noDims+jj];
+
+                // Linear
+                for (int kk = 0; kk < noDims; kk++) {
+                    A[rows*(kk+1)+jj+1] += xvals[ii*noDims+jj]*xvals[
+                            ii*noDims+kk];
+                }
+
+                // Quadratic and Interacting
+                counter1 = 0;
+                for (int kk = 0; kk < noDims; kk++) {
+                    for (int ll = kk; ll < noDims; ll++) {
+                        A[jj+1+(counter1+1+noDims)*rows] += xvals[ii*noDims+
+                                jj]*xvals[ii*noDims+kk]*xvals[ii*noDims+ll];
+                        counter1++;
+                    }
+                }
+            }
+
+            // 3. QUADRATIC AND INTERACTING
+            int counter2 = 0;
+            for (int jj = 0; jj < noDims; jj++) {
+                for (int kk = jj; kk < noDims; kk++) {
+                    // B Matrix
+                    B[1+noDims+counter2] += yvals[ii]*xvals[ii*noDims+jj]*
+                            xvals[ii*noDims+kk];
+
+                    // A Matrix
+                    // Constant
+                    A[1+noDims+counter2] += xvals[ii*noDims+jj]*xvals[ii*noDims
+                            +kk];
+
+                    // Linear
+                    for (int ll = 0; ll < noDims; ll++) {
+                        A[1+noDims+counter2+rows*(1+ll)] += xvals[ii*noDims+jj]
+                                *xvals[ii*noDims+kk]*xvals[ii*noDims+ll];
+                    }
+
+                    // Quadratic and Interacting
+                    counter1 = 0;
+                    for (int ll = 0; ll < noDims; ll++) {
+                        for (int mm = ll; mm < noDims; mm++) {
+                            A[1+noDims+counter2+rows*(1+noDims+counter1)] +=
+                                    xvals[ii*noDims+jj]*xvals[ii*noDims+kk]*
+                                    xvals[ii*noDims+ll]*xvals[ii*noDims+mm];
+                            counter1++;
+                        }
+                    }
+                    counter2++;
+                }
+            }
+        }
+
+        // We need to check if the matrix is singular. If it is, we cannot solve.
+//        float determinant = SimulateGPU::determinant(A,rows);
+//        if (determinant == 0.0) {
+//            // System has all zero coefficients
+//            for (int ii = 0; ii < rows; ii++) {
+//                X[ii] = 0.0;
+//            }
+//        } else {
+//            SimulateGPU::solveLinearSystem(rows,A,B,X);
+//        }
+        SimulateGPU::solveLinearSystem(rows,A,B,X);
+    }
+
+    free(A);
+    free(B);
+}
+
+// Compute the factorial of a number
+float SimulateGPU::factorial(const int n) {
+    float result = 1;
+
+    if (n > 0) {
+        for (int ii = 1; ii <= n;ii++) {
+            result = result*ii;
+        }
+    }
+
+    return (float)result;
+}
+
+// Compute the determinant of a square matrix
+float SimulateGPU::determinant(float* In, int dims) {
+    float det;
     float *swapRow;
-    swapRow = (float*)malloc((dims+1)*sizeof(float));
+    swapRow = (float*)malloc(dims*sizeof(float));
+
+    // Create a temporary matrix so we do not disturb the original
+    float *A;
+    A = (float*)malloc(dims*dims*sizeof(float));
+    for (int ii = 0; ii < dims; ii++) {
+        for (int jj = 0; jj < dims; jj++) {
+            A[ii*dims+jj] = In[ii*dims+jj];
+        }
+    }
+
+    for (int ii = 0; ii < dims; ii++) {
+        // Search for maximum in this column
+        float maxElem = fabsf(A[ii*dims+ii]);
+        int maxRow = ii;
+
+        for (int jj = (ii+1); jj < dims; jj++) {
+            if (fabsf(A[ii*dims+jj] > maxElem)) {
+                maxElem = fabsf(A[ii*dims+jj]);
+                maxRow = jj;
+            }
+        }
+
+        if (maxElem < 1e-8) {
+            // If this column has all values as zero, the determinant
+            // is zero and the matrix is singular.
+            det = 0.0;
+            free(A);
+            free(swapRow);
+            return det;
+        }
+
+        // Swap maximum row with current row if needed
+        if (maxRow != ii) {
+            for (int jj = ii; jj < dims; jj++) {
+                swapRow[jj] = A[jj*dims+ii];
+                A[jj*dims+ii] = A[jj*dims+maxRow];
+                A[jj*dims+maxRow] = swapRow[jj];
+            }
+        }
+
+        // Make all rows below this one 0 in current column
+        for (int jj = (ii+1); jj < dims; jj++) {
+            float factor = -A[ii*dims+jj]/A[ii*dims+ii];
+
+            // Work across columns
+            for (int kk = ii; kk < dims; kk++) {
+                if (kk == ii) {
+                    A[kk*dims+jj] = 0.0;
+                } else {
+                    A[kk*dims+jj] += factor*A[kk*dims+ii];
+                }
+            }
+        }
+
+    }
+
+    // If we have come this far, compute the determinant using
+    // the decomposition.
+    det = A[0];
+
+    for (int ii = 1; ii < dims; ii++) {
+        det = det*A[ii*dims+ii];
+    }
+
+    free(A);
+    free(swapRow);
+    return det;
+}
+
+// Solve a set of linear equations. (Assumes non-singular coefficient matrix)
+void SimulateGPU::solveLinearSystem(int dims, double *A, double *B, double *C) {
+    // First generate upper triangular matrix for the augmented matrix
+    double *swapRow;
+    swapRow = (double*)malloc((dims+1)*sizeof(double));
 
     for (int ii = 0; ii < dims; ii++) {
         C[ii] = B[ii];
@@ -5715,7 +6305,7 @@ void SimulateGPU::solveLinearSystem(int dims, float *A, float *B, float *C) {
 
     for (int ii = 0; ii < dims; ii++) {
         // Search for maximum in this column
-        float maxElem = fabsf(A[ii*dims+ii]);
+        double maxElem = fabsf(A[ii*dims+ii]);
         int maxRow = ii;
 
         for (int jj = (ii+1); jj < dims; jj++) {
@@ -5740,7 +6330,7 @@ void SimulateGPU::solveLinearSystem(int dims, float *A, float *B, float *C) {
 
         // Make all rows below this one 0 in current column
         for (int jj = (ii+1); jj < dims; jj++) {
-            float factor = -A[ii*dims+jj]/A[ii*dims+ii];
+            double factor = -A[ii*dims+jj]/A[ii*dims+ii];
 
             // Work across columns
             for (int kk = ii; kk < dims; kk++) {

@@ -33,8 +33,8 @@ Initial Region Population                   : 2000
 # GROWTH RATE PARAMETERS
 Current                                     : 0.014
 Mean                                        : 0.014
-Standard Deviation                          : 0.015
-Reversion                                   : 0.02
+Standard Deviation                          : 0.005
+Reversion                                   : 0.025
 Jump Probability                            : 0.1
 Jump Poisson Parameter                      : 0.1
 

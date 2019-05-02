@@ -10,15 +10,15 @@
 ## GENERAL OPTIMISATION PARAMETERS
 Mutation Rate                                   : 0.6
 Crossover Fraction                              : 0.375
-Max Generations                                 : 500
+Max Generations                                 : 250
 Population Size                                 : 400
-Stopping Tolerance                              : 1e-6
+Stopping Tolerance                              : 1e-10
 Confidence Interval                             : 0.95
 Confidence Level                                : 0.95
 Solution Scheme                                 : void
 Stall Generations                               : 5
 Cooling Rate                                    : 1.0
-Learning Period                                 : 0
+Learning Period                                 : 2
 # GA Selection Routine
 # Stochastic Uniform                    = 0
 # Remainder                             = 1
@@ -40,11 +40,11 @@ CPU Threads (min = 1)                           : 6
 
 ###################################################################################################
 ## SURROGATE PARAMETERS
-Surrogate Dimension Resolution                  : 30
+Surrogate Dimension Resolution                  : 50
 Surrogate Threshold                             : 0.05
-Max Learning Samples per Generation             : 20
-Total Max Learning Samples                      : 7000
-Minimum Learning Samples per Generation         : 3
+Max Learning Samples per Generation             : 0
+Total Max Learning Samples                      : 70000
+Minimum Learning Samples per Generation         : 0
 # Interpolation Routine
 # Cubic Spline                          = 0
 # Multiple Local Linear Regression      = 1
@@ -120,11 +120,11 @@ Maximum Viable Y Value                          : 1
 Number of X Points                              : 20
 Numner of Y Points                              : 20
 Number of Simulation Paths                      : 100000
-ROV Dimension Resolution                        : 40
+ROV Dimension Resolution                        : 100
 
 ###################################################################################################
 ## EXPERIMENTAL PARAMETERS
-Number of Runs per Experiment                   : 10
+Number of Runs per Experiment                   : 20
 # Optimisation methods
 #    no penalty     = 0
 #    simple penalty = 1

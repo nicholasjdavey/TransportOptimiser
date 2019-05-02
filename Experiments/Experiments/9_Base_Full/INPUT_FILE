@@ -12,13 +12,13 @@ Mutation Rate                                   : 0.6
 Crossover Fraction                              : 0.375
 Max Generations                                 : 500
 Population Size                                 : 400
-Stopping Tolerance                              : 1e-4
+Stopping Tolerance                              : 1e-10
 Confidence Interval                             : 0.95
 Confidence Level                                : 0.95
 Solution Scheme                                 : void
 Stall Generations                               : 5
 Cooling Rate                                    : 1.0
-Learning Period                                 : 20
+Learning Period                                 : 10
 # GA Selection Routine
 # Stochastic Uniform                    = 0
 # Remainder                             = 1
@@ -43,7 +43,7 @@ CPU Threads (min = 1)                           : 6
 Surrogate Dimension Resolution                  : 30
 Surrogate Threshold                             : 0.05
 Max Learning Samples per Generation             : 20
-Total Max Learning Samples                      : 10000
+Total Max Learning Samples                      : 7000
 Minimum Learning Samples per Generation         : 3
 # Interpolation Routine
 # Cubic Spline                          = 0
@@ -124,13 +124,13 @@ ROV Dimension Resolution                        : 40
 
 ###################################################################################################
 ## EXPERIMENTAL PARAMETERS
-Number of Runs per Experiment                   : 5
+Number of Runs per Experiment                   : 20
 # Optimisation methods
 #    no penalty     = 0
 #    simple penalty = 1
 #    mte            = 2
 #    controlled     = 3
-Optimisation Method                             : 3
+Optimisation Method                             : 5
 # ROV Method
 #    Regression Monte Carlo (Tsitsiklis and Van Roy)                                        = 0
 #    Regression Monte Carlo (Longstaff and Schwartz)                                        = 1
@@ -139,7 +139,7 @@ Optimisation Method                             : 3
 #    Regression Monte Carlo, State, Control & Recomputation                                 = 4
 #    Regression Monte Carlo, State, Control, Recomputation & Switching (Langrene et al.)    = 5
 #    Regression Monte Carlo with targeted end population (Zhang et al.)                     = 6
-ROV Method                                      : 5
+ROV Method                                      : 3
 
 ###################################################################################################
 ## VARIABLE PARAMETERS

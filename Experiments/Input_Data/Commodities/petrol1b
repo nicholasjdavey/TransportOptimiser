@@ -1,0 +1,12 @@
+###################################################################################################
+#################################### INPUT FILE FOR COMMODITY #####################################
+###################################################################################################
+Name                                        : petrol
+Current Value                               : 1.05
+Mean Value                                  : 1.05
+Standard Deviation                          : 0.2
+Reversion                                   : 0.075
+Jump Probability                            : 0.05
+Poisson Parameter                           : 0.05
+Mean Contribution to Transported Ore        : 0
+Standard Deviation of Contribution          : 0

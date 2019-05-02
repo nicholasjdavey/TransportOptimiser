@@ -72,20 +72,13 @@ void RoadGA::initialiseStorage() {
     this->surrFit = Eigen::MatrixXd::Zero(this->generations,this->species.
             size());
 
-    this->iars = Eigen::MatrixXd::Zero(this->generations*this->
-            populationSizeGA*this->maxLearnNo,noSpecies);
-    this->pops = Eigen::MatrixXd::Zero(this->generations*this->
-            populationSizeGA*this->maxLearnNo,noSpecies);
-    this->use = Eigen::VectorXd::Zero(this->generations*this->populationSizeGA*
-            this->maxLearnNo);
-    this->popsSD = Eigen::MatrixXd::Zero(this->generations*this->
-            populationSizeGA*this->maxLearnNo,noSpecies);
-    this->useSD = Eigen::VectorXd::Zero(this->generations*this->
-            populationSizeGA*this->maxLearnNo);
-    this->values = Eigen::VectorXd::Zero(this->generations*this->
-            populationSizeGA*this->maxLearnNo);
-    this->valuesSD = Eigen::VectorXd::Zero(this->generations*this->
-            populationSizeGA*this->maxLearnNo);
+    this->iars = Eigen::MatrixXd::Zero(this->learnSamples,noSpecies);
+    this->pops = Eigen::MatrixXd::Zero(this->learnSamples,noSpecies);
+    this->use = Eigen::VectorXd::Zero(this->learnSamples);
+    this->popsSD = Eigen::MatrixXd::Zero(this->learnSamples,noSpecies);
+    this->useSD = Eigen::VectorXd::Zero(this->learnSamples);
+    this->values = Eigen::VectorXd::Zero(this->learnSamples);
+    this->valuesSD = Eigen::VectorXd::Zero(this->learnSamples);
 }
 
 void RoadGA::creation() {

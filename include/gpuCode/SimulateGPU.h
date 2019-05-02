@@ -285,32 +285,62 @@ namespace SimulateGPU {
      * @param refYOut as float*
      * @param originalPoints as int
      * @param finalPoints as int&
+     * @param popThresholds as float*
      * @param dim as int
      */
     void keepValidPoints(int dims, int originalPoints, float* refXIn, float*
-            refYIn, float* refXOut, float* refYOut, int& finalPoints);
+            refYIn, float* refXOut, float* refYOut, int& finalPoints, float
+            *popThresholds);
 
     /**
      * CPU-based multiple linear regression (global)
      *
      * @param noPoints as int
      * @param noDims as int
-     * @param (in) xvals as float*
-     * @param (in) yvals as float*
-     * @param (out) X as float*
+     * @param (in) xvals as double*
+     * @param (in) yvals as double*
+     * @param (out) X as double*
      */
-    void multiLinReg(int noPoints, int noDims, float *xvals, float *yvals,
-            float *X);
+    void multiLinReg(int noPoints, int noDims, double *xvals, double *yvals,
+            double *X);
 
+    /**
+     * Computes a global regression using polynomial basis functions of order 2
+     *
+     * @param noPoints as int
+     * @param noDims as int
+     * @param xvals as double*
+     * @param yvals as double*
+     * @param X as double*
+     */
+    void multiQuadReg(int noPoints, int noDims, double *xvals,
+            double *yvals, double *X);
+
+    /**
+     * Computes the determinant of a matrix
+     *
+     * @param In as float*
+     * @param dims as int
+     * @return Determinant as float
+     */
+    float determinant(float* In, int dims);
     /**
      * Solves a system of linear equations
      *
      * @param dims as int
-     * @param (in) A as float*
-     * @param (in) B as float*
-     * @param (out) C as float*
+     * @param (in) A as double*
+     * @param (in) B as double*
+     * @param (out) C as double*
      */
-    void solveLinearSystem(int dims, float *A, float *B, float *C);
+    void solveLinearSystem(int dims, double *A, double *B, double *C);
+
+    /**
+     * Computes the factorial of a number
+     *
+     * @param n as int
+     * @return as float
+     */
+    float factorial(const int n);
 
 //    /**
 //     * Allocates data to the different regression data based on the contrl
